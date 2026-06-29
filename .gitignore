@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+*.so
+
+# Virtual environments / uv
+.venv/
+venv/
+
+# Testing / coverage
+.pytest_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# DuckDB persistent indexes (future on-disk index format)
+*.duckdb
+*.duckdb.wal
+
+# Test fixtures cloned from upstream (kept out of the repo)
+/tmp/
+tests/fixtures/upstream/
+
+# Editors / OS
+.idea/
+.vscode/
+.DS_Store
+
+# Claude Code local overrides
+.claude/settings.local.json
