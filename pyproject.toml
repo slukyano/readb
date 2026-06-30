@@ -41,7 +41,9 @@ packages = ["src/okdb"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-ra"
+# Never collect the cloned upstream fixtures (they ship their own, unrelated test suite).
+addopts = "-ra --ignore=tests/fixtures"
+norecursedirs = ["tests/fixtures"]
 
 [tool.ruff]
 line-length = 100

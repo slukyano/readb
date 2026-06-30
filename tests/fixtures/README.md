@@ -1,9 +1,9 @@
 # Test fixtures
 
-## `mini/` (to author — offline, no network)
+## `mini/` (offline, no network — committed)
 
-A tiny hand-authored OKF bundle exercising the nasty cases from the design brief. To be created
-during the implementation/test phase. It must include:
+A tiny hand-authored OKF bundle exercising the nasty cases from the design brief. It is the
+primary fixture for the acceptance tests (`tests/test_acceptance.py`) and includes:
 
 - a type with spaces and symbols (e.g. `Big %// Table` -> `bigtable`)
 - a type normalizing to a leading digit (e.g. `3D Model` -> `_3dmodel`)
