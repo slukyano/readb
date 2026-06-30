@@ -42,6 +42,18 @@ Two-pass load: pass 1 parses every concept and infers unified column types via t
 pass 2 coerces values and inserts into DuckDB. The brief's acceptance criteria (1-12) should be
 written as tests.
 
+## Task backlog (dogfooding)
+
+The project backlog lives in `tasks/`, which is itself an OKF bundle (one `Task` concept per
+file). Query it with okdb: `okdb query "SELECT status, title FROM task" --bundle ./tasks`.
+
+Tasks move along a single linear chain — `Draft → Refining → Refined → Implementing → Done` —
+where `Refining`/`Implementing` are in-progress locks and human approval is the PR merge (no
+separate `approved` status). The agent loop `scripts/agent-loop.sh` advances one ready task by
+one step per run: it claims the task on `main` (the lock), branches, invokes an agent, runs the
+validation gate, and opens a PR for human review + subagent review. The full lifecycle,
+frontmatter schema, claim/lease lock, and gates are documented in `tasks/workflow.md`.
+
 ## Stack
 
 - Python >=3.11 (developed on 3.14, pinned in `.python-version`).
