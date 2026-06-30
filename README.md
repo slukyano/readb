@@ -8,9 +8,10 @@ okdb loads a bundle into an embedded [DuckDB](https://duckdb.org/) engine and le
 execute the SQL. There is no custom SQL parser or query planner, and the source files are never
 modified.
 
-> Status: early scaffold. The module layout and public API are in place; the loader, type
-> inference, and CLI commands are stubbed. See [`docs/design-brief.md`](docs/design-brief.md)
-> for the full design and acceptance criteria.
+> Status: MVP implemented. Bundle loading, type inference, the library API, and the CLI all
+> work; the 12 acceptance criteria in [`docs/design-brief.md`](docs/design-brief.md) are covered
+> by tests. Not yet built (left as clean seams): persistent on-disk index, git-aware incremental
+> rebuild, and write-back — all explicit non-goals for this MVP.
 
 ## Install
 
@@ -41,11 +42,24 @@ okdb schema --bundle ./path                                  # detected types, t
 
 | Name | Rows |
 | --- | --- |
-| `__DOCUMENTS` | one per concept (the six reserved OKF fields + `__path`, `__body`) |
-| *per-type tables* | one per detected `type`; columns are the union of keys across docs of that type |
-| `__INDEXES` | one per reserved `index.md` file |
-| `__UNKNOWNTYPE` | one per non-conformant concept (no/non-string/empty-normalized `type`) |
+| `__DOCUMENTS` | one per concept (the six reserved OKF fields + the virtual fields below) |
+| *per-type tables* | one per detected `type`; columns are reserved fields + the union of producer keys across docs of that type |
+| `__INDEXES` | one per reserved `index.md` file; columns are the union of their frontmatter fields |
+| `__LOG` | one per reserved `log.md` file (created only if any exist) |
+| `__UNKNOWNTYPE` | one per non-conformant concept (no / non-string / empty-normalized `type`) |
 | `__TAGS` | normalized `(concept_path, tag)` view for join-style tag filtering |
+
+Every table also carries three virtual columns: `__path` (bundle-relative path, with `.md`),
+`__id` (the Concept ID, i.e. `__path` minus `.md`), and `__body` (the markdown body).
+
+## Type inference
+
+Each column's type is inferred once at load time as the narrowest DuckDB type that losslessly
+holds every observed value (`int`+`float` → `DOUBLE`; a scalar alongside a list → a `LIST`;
+maps with a consistent key set → a `STRUCT`). Anything that doesn't reduce to a single engine
+type is stored as a `JSON` column — nothing is dropped, and producer intent is never guessed
+(strings are never split or parsed). The reserved `tags` field is always a `LIST`. Run
+`okdb schema` to see the inferred type of every column.
 
 ## Development
 
