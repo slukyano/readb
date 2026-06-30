@@ -2,7 +2,8 @@
 
 A :class:`Database` is produced by loading a bundle (see :mod:`okdb.loader`) and registering
 the derived tables/views (``__DOCUMENTS``, per-type tables, ``__INDEXES``, ``__UNKNOWNTYPE``,
-``__TAGS``). Callers run SQL via :meth:`Database.sql`; DuckDB does all parsing and planning.
+``__LOG``, ``__TAGS``). Callers run SQL via :meth:`Database.sql`; DuckDB does all parsing and
+planning. The wrapper is read-only with respect to the source bundle — it never writes files.
 """
 
 from __future__ import annotations
@@ -34,12 +35,18 @@ class Database:
         connection, schema = load_bundle(bundle_path)
         return cls(connection, schema)
 
-    def sql(self, query: str) -> list[dict[str, Any]]:
+    def sql(self, query: str, parameters: list[Any] | None = None) -> list[dict[str, Any]]:
         """Execute ``query`` against the loaded bundle and return rows as dicts.
 
-        DuckDB parses and plans the SQL; okdb never does. Read-only.
+        DuckDB parses and plans the SQL; okdb never does. Optional positional ``parameters`` are
+        bound through DuckDB's prepared-statement interface. A statement that returns no result
+        set (rare for this read-only layer) yields an empty list.
         """
-        raise NotImplementedError
+        cursor = self._conn.execute(query, parameters) if parameters else self._conn.execute(query)
+        if cursor.description is None:
+            return []
+        columns = [descriptor[0] for descriptor in cursor.description]
+        return [dict(zip(columns, row, strict=True)) for row in cursor.fetchall()]
 
     def schema(self) -> BundleSchema:
         """Return the detected schema: types, normalized table names, columns + inferred types."""
