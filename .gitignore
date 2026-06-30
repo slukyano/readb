@@ -31,5 +31,8 @@ tests/fixtures/upstream/
 .vscode/
 .DS_Store
 
+# Agent-loop worktrees (scripts/agent-loop.sh creates per-step git worktrees here)
+.worktrees/
+
 # Claude Code local overrides
 .claude/settings.local.json

@@ -106,12 +106,15 @@ One run moves **one task by one step**:
 1. Sync `main`.
 2. Select the next *ready* task — highest `priority`, then oldest `created`, then `__id`.
 3. **Claim** it on `main` (`status` → `Refining`/`Implementing` + lease), and push (the lock).
-4. Branch `task/<id>/<refine|implement>`.
-5. Invoke the agent to do the work; on success it sets the task to the target status
-   (`Refined`/`Done`) and clears the lease, on the branch.
-6. For implementation, run the **validation gate** (`uv run pytest` + `uv run ruff check`).
-7. Open a PR and stop. **Human review** (plus a **subagent review**) and the merge complete the
-   step — landing `Refined`/`Done` on `main`.
+4. Create a **git worktree** on branch `task/<id>/<refine|implement>` — the main checkout stays
+   on `main`, so you can keep working and several runs can proceed in parallel without colliding.
+5. Invoke the agent **in the worktree**; on success it sets the task to the target status
+   (`Refined`/`Done`) and clears the lease.
+6. For implementation, run the **validation gate** (`uv run pytest` + `uv run ruff check`) in the
+   worktree.
+7. Open a PR and remove the worktree (the branch is retained). **Human review** (plus a
+   **subagent review**) and the merge complete the step — landing `Refined`/`Done` on `main`. If
+   the agent fails to advance the task, the worktree is kept for inspection.
 
 ```sh
 scripts/agent-loop.sh                 # advance one ready task by one step
@@ -122,7 +125,8 @@ scripts/agent-loop.sh --release <id>  # release a stuck claim
 
 Configuration is via environment variables (see the script header): `BUNDLE` (default `tasks`),
 `OKDB`, `AGENT_CMD` (override the agent invocation — defaults to `claude -p`; set it to a no-op
-or a different agent for testing), `CLAIM_OWNER`, `BRANCH_PREFIX`, `MAIN_BRANCH`, `NO_PR`.
+or a different agent for testing), `CLAIM_OWNER`, `BRANCH_PREFIX`, `MAIN_BRANCH`,
+`WORKTREE_ROOT` (default `.worktrees/`, gitignored), `NO_PR`.
 
 Schedule the loop (cron, or a `while` wrapper) to keep the backlog moving. Because claimed tasks
 are skipped, repeated runs **fan out across distinct tasks** rather than racing on one.

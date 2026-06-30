@@ -50,8 +50,9 @@ file). Query it with okdb: `okdb query "SELECT status, title FROM task" --bundle
 Tasks move along a single linear chain — `Draft → Refining → Refined → Implementing → Done` —
 where `Refining`/`Implementing` are in-progress locks and human approval is the PR merge (no
 separate `approved` status). The agent loop `scripts/agent-loop.sh` advances one ready task by
-one step per run: it claims the task on `main` (the lock), branches, invokes an agent, runs the
-validation gate, and opens a PR for human review + subagent review. The full lifecycle,
+one step per run: it claims the task on `main` (the lock), creates a git worktree for the branch
+(the main checkout stays on `main`), invokes an agent there, runs the validation gate, and opens
+a PR for human review + subagent review. The full lifecycle,
 frontmatter schema, claim/lease lock, and gates are documented in `tasks/workflow.md`.
 
 ## Stack
