@@ -98,8 +98,11 @@ Rules, narrowest-fit-wins:
 - No git awareness, no incremental rebuild, no secondary indexes, no watcher/daemon. (Daemon
   is low-value because, with a DuckDB-file index, page cache + mmap make repeat opens near-free;
   the only residual win is amortizing process startup.)
-- No write-back. READ-ONLY. Never modify the markdown files. (Future DML would be asymmetric:
-  UPDATE/DELETE map to frontmatter rewrites, INSERT does not map cleanly — out of scope now.)
+- No write-back from SQL. The query/load path is strictly READ-ONLY: loading and querying never
+  modify the markdown files. (DML-via-SQL would be asymmetric: UPDATE/DELETE map to frontmatter
+  rewrites, INSERT does not map cleanly — out of scope.) The one sanctioned write path is a
+  separate, explicit frontmatter field editor (`okdb get`/`set`/`unset`, `okdb.fields`) that edits
+  a single concept's `key: value` lines in place — deliberately kept out of the SQL/load path.
 - No body-structure parsing. `__body` is text; addressing it as a DOM/JSON tree by heading is
   a future, type-specific feature. Leave a hook.
 - No schema enforcement. Inference only. Leave a clean seam for an OPTIONAL future "declared

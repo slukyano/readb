@@ -23,12 +23,19 @@ uv run okdb --help   # exercise the CLI
   Wrap this, not callers, to add the future persistent-index cache.
 - `src/okdb/parser.py` — parse one file -> `Concept(path, frontmatter, body)`. Permissive.
 - `src/okdb/schema.py` — type-name normalization + the column-type unification lattice.
-- `src/okdb/cli.py` — click CLI: `okdb query` and `okdb schema`.
+- `src/okdb/fields.py` — the ONE write path: a surgical, line-based frontmatter field editor
+  (`get_field`/`set_fields`/`unset_fields`). Stdlib only; does NOT load the bundle or round-trip
+  YAML — only the targeted `key: value` lines change.
+- `src/okdb/cli.py` — click CLI: `okdb query`/`okdb schema` (read-only) and `okdb get`/`set`/
+  `unset` (the frontmatter editor, addressed by `--bundle <dir> <concept-id>`).
 
 ## Hard constraints
 
 - NEVER write a SQL parser or query planner. DuckDB executes all SQL.
-- READ-ONLY: never create or modify any file inside a bundle, during any operation.
+- READ-ONLY query/load path: loading a bundle and running SQL (`query`/`schema`, `okdb.open`)
+  never create or modify any file. The ONLY write path is the explicit frontmatter editor
+  (`okdb set`/`unset`, `okdb.fields`) — kept out of the load/query path and its own CLI commands.
+  Never write back from SQL, and never mutate a file as a side effect of loading or querying.
 - Be permissive when loading: tolerate unknown keys, broken cross-links, missing `index.md`,
   malformed files. A bad file is logged and skipped — never crashes the load.
 - Union-of-keys per type must be lossless (missing key -> NULL, never an error).
@@ -52,7 +59,8 @@ where `Refining`/`Implementing` are in-progress locks and human approval is the 
 separate `approved` status). The agent loop `scripts/agent-loop.sh` advances one ready task by
 one step per run: it claims the task on `main` (the lock), creates a git worktree for the branch
 (the main checkout stays on `main`), invokes an agent there, runs the validation gate, and opens
-a PR for human review + subagent review. The full lifecycle,
+a PR for human review + subagent review. Status/lease edits (claim, release, advance) are made
+with okdb's own field editor — `okdb set`/`unset --bundle ./tasks <id> ...`. The full lifecycle,
 frontmatter schema, claim/lease lock, and gates are documented in `tasks/workflow.md`.
 
 ## Stack
