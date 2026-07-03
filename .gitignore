@@ -25,6 +25,7 @@ htmlcov/
 # Test fixtures cloned from upstream (kept out of the repo)
 /tmp/
 tests/fixtures/upstream/
+.scratchpad/
 
 # Editors / OS
 .idea/
