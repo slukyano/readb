@@ -2,13 +2,16 @@
 type: Task
 title: Remove the __id virtual field
 description: Drop __id; __path is already unique and can serve as the primary key.
-status: Draft
+status: Refining
 priority: medium
 tags:
 - schema
 - cleanup
 created: 2026-06-29
 blocked_by: []
+claimed_by: slukyanov@Mac
+claimed_at: '2026-07-04T20:35:00Z'
+timestamp: '2026-07-04T20:35:00Z'
 ---
 
 We currently expose both `__path` (with `.md`) and `__id` (path minus `.md`) on every table.
