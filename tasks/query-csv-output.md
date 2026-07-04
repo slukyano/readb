@@ -2,12 +2,15 @@
 type: Task
 title: Add plain-text row output to okdb query
 description: A --csv/--tsv output mode so shell callers can read rows without python-parsing --json.
-status: Draft
+status: Refining
 priority: low
 tags:
 - cli
 - dx
 created: 2026-07-02
+claimed_by: slukyanov@Mac
+claimed_at: '2026-07-04T20:35:00Z'
+timestamp: '2026-07-04T20:35:00Z'
 ---
 
 `okdb query` emits a pretty table or `--json`. Shell consumers (like the agent loop's
