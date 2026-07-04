@@ -2,12 +2,15 @@
 type: Task
 title: Research similar markdown+frontmatter task/reader tools
 description: Survey Backlog.md, taskmd, and similar wrappers for ideas worth adopting.
-status: Draft
+status: Refining
 priority: low
 tags:
 - research
 created: 2026-06-29
 blocked_by: []
+claimed_by: slukyanov@Mac
+claimed_at: '2026-07-04T20:35:00Z'
+timestamp: '2026-07-04T20:35:00Z'
 ---
 
 Survey existing tools that read/manage markdown-with-frontmatter (especially task managers and
