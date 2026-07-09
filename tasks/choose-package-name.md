@@ -2,16 +2,14 @@
 type: Task
 title: Choose a package name (okdb is taken)
 description: Pick and verify an available distribution name; okdb is already taken on PyPI.
-status: Refining
+status: Draft
 priority: high
 tags:
 - packaging
 - naming
 created: 2026-06-29
 blocked_by: []
-claimed_by: slukyanov@cleanair
-claimed_at: '2026-07-03T00:35:39Z'
-timestamp: '2026-07-03T00:35:39Z'
+timestamp: '2026-07-09T00:00:00Z'
 ---
 
 `okdb` is taken on PyPI, so we need a different distribution name before we can publish.

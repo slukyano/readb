@@ -1,163 +1,248 @@
 ---
 type: Process
 title: Task workflow
-description: How tasks in this bundle are drafted, refined, and implemented — and how the agent loop moves them.
+description: How development runs in sessions and sprints — scoping, design, autonomous implementation, and approval gates.
 tags:
 - meta
 - process
-timestamp: '2026-06-30T00:00:00Z'
+timestamp: '2026-07-09T00:00:00Z'
 ---
 
 # Overview
 
-This `tasks/` directory is the project backlog **and** an OKF bundle — a directory of markdown
-files with YAML frontmatter, one file per task. We dogfood okdb here: the backlog is queried
-with okdb itself (see [Querying with okdb](#querying-with-okdb)), and an **agent loop**
-(`scripts/agent-loop.sh`) advances one task by one step per run.
+This `tasks/` directory is the project backlog **and** an OKF bundle — one markdown file per
+concept. We dogfood okdb here: the backlog is queried with okdb itself (see
+[Querying with okdb](#querying-with-okdb)) and all frontmatter edits are made with okdb's own
+field editor (`okdb set`/`unset --bundle ./tasks <id> ...`).
 
-- Each task is one concept document with `type: Task`.
-- This workflow doc is a `type: Process` concept (so it stays out of the `task` table).
-- `index.md` and `log.md` are OKF-reserved (a listing and a change log); they are not tasks.
+Development happens in **sprints**, driven interactively in **sessions**:
 
-# Lifecycle
+- A **session** is one sitting with the human: open the repo, tell the agent to start or
+  continue development.
+- A **sprint** is one batch of tasks taken from scope approval through design and
+  implementation to a final merge. A sprint usually spans several sessions.
 
-A task moves along a single **linear** chain, tracked in the `status` frontmatter field:
+The bundle holds three concept types:
+
+- `Task` — one backlog item per file.
+- `Sprint` — one `sprint-NNN.md` per sprint: the durable state of active and past work.
+- `Process` — this document.
+
+`index.md` and `log.md` are OKF-reserved (a listing and a change log); they are not concepts.
+Architecture Decision Records live in a separate bundle, [`docs/adr/`](../docs/adr/index.md).
+
+# Task lifecycle
 
 ```
-                 ┌── agent loop · PR · human approval ──┐         ┌── agent loop · PR · human approval ──┐
-   Draft ───────►│              Refining                │──────► Refined ──►│           Implementing            │──────► Done
-  (a seed)       └──────────── (claim → refine) ─────────┘  (plan merged)   └─────────── (claim → build) ────────┘  (impl merged)
+   Draft ──────► Designed ──────► Done
+  (a seed)   (design merged)  (impl merged)      Dropped (terminal, from anywhere)
 ```
 
-There is **no `approved` status**: human approval *is* the PR merge. Approving/merging the
-refine PR is what advances `Refining → Refined`; approving/merging the implement PR advances
-`Implementing → Done`.
+| `status` | Meaning | Set when |
+|----------|---------|----------|
+| `Draft` | A seed — a few words to a short description. | Authored directly on `main`, anytime, by human or agent. |
+| `Designed` | The task body carries an approved design (a `## Design` section). | The sprint's **design merge** lands on `main`. |
+| `Done` | Implemented, gated, approved. | The sprint's **final merge** lands on `main`. |
+| `Dropped` | Abandoned; the body records why. | Human decision, anytime. |
 
-| `status` | Meaning | Who sets it | Advances when |
-|----------|---------|-------------|---------------|
-| `Draft` | A seed — a few words to a short description. Unclaimed. | Human or agent (often committed directly to `main`) | The loop claims it for refinement. |
-| `Refining` | A loop run has **claimed** it; refinement is in progress or its PR awaits human review. **(lock)** | The loop, as a claim commit on `main` | The refine PR is merged. |
-| `Refined` | An executable plan is merged and in place. Unclaimed, ready to implement. | The merged refine PR | The loop claims it for implementation. |
-| `Implementing` | A loop run has **claimed** it; implementation is in progress or its PR awaits review. **(lock)** | The loop, as a claim commit on `main` | The implement PR is merged. |
-| `Done` | Implementation merged. | The merged implement PR | — (terminal) |
-| `Dropped` | Abandoned; record why in the body. | Human | — (terminal) |
+There are no lock/claim states and no lease fields: sprints are single-flight, and "in a
+sprint" is recorded in the sprint concept, not on the task.
 
-`Refining` and `Implementing` are **in-progress markers**: while a task sits in one of them, the
-loop will not pick it up again. Because the chain is linear and single-writer, exactly one
-actor advances a task at a time.
+# Sprint lifecycle
 
-# Claim / lease (the lock)
+One sprint moves through:
 
-When the loop picks a task it **claims** it by committing the in-progress status to `main`
-(`Draft → Refining` or `Refined → Implementing`) along with advisory lease fields:
+```
+  (scope approved)          (design approved)         (implementation approved)
+        │                          │                            │
+        ▼                          ▼                            ▼
+    Designing ──────────────► Implementing ──────────────────► Done
+        │                          │
+        └────────── Aborted ◄──────┘   (human decision; record why)
+```
 
-- `claimed_by` — who/what holds the claim (e.g. `user@host`).
-- `claimed_at` — UTC ISO-8601 time of the claim.
+## 1. Session start
 
-The claim commit is **pushed before any work begins**, so a concurrent run sees the lock and
-skips the task (single-flight). If the push is rejected because someone else claimed first, the
-run rolls the claim back and bows out.
-
-The lease fields are advisory — they let a human see how long a task has been held. They are
-deliberately **not** auto-expired: if a PR is abandoned (closed unmerged), the task stays in its
-in-progress state until a human releases it:
+Every session begins by checking for unfinished work:
 
 ```sh
-scripts/agent-loop.sh --release <task-id>   # Refining → Draft, or Implementing → Refined
+okdb query "SELECT __id, status, branch FROM sprint WHERE status NOT IN ('Done','Aborted')" --bundle ./tasks
 ```
 
-(Automatic stale-claim reclaim by lease age is left for later — see the
-[research task](research-similar-tools.md) — to avoid duplicating work that is still in review.)
+- **An active sprint exists** → check out its branch (the branch always has the freshest
+  sprint state) and resume from the sprint body: the task checklist, open questions, and
+  session log say exactly where work stopped.
+- **No active sprint** → propose scope for a new one.
 
-# Frontmatter schema
+(A "table with name sprint does not exist" error means no sprint concept has ever been
+created — same as no active sprint. Also glance at `git branch --list 'sprint/*'` for a stray
+branch.)
+
+## 2. Scoping
+
+The agent reviews the open backlog (`Draft` tasks, unblocked) and proposes a set for the
+sprint — proposing *all* open tasks is fine when the scope feels right. The human adjusts and
+approves.
+
+**Scope approval is the sprint-start commit on `main`**: create `tasks/sprint-NNN.md`
+(status `Designing`, the task list, the branch name), commit it to `main`, then create the
+sprint branch `sprint/NNN` from it. All subsequent work happens on the branch.
+
+## 3. Design phase (interactive)
+
+On the sprint branch, the agent and the human design the tasks **one by one**. The human acts
+as stakeholder, product owner, and senior architect; the agent drives — proposes a design,
+asks questions, records decisions. Per task, the outcome is:
+
+- a `## Design` section written into the task body — the executable plan; and
+- zero or more **ADRs** in `docs/adr/` (status `Proposed`) for decisions of architectural
+  weight. See [ADRs](#adrs).
+
+Commit throughout the phase. When all tasks in scope are designed, the human reviews the
+batch. **Design approval** triggers, in order:
+
+1. ADRs from this phase flip `Proposed → Accepted` (only the human approves ADRs).
+2. Tasks flip `Draft → Designed`; the sprint flips `Designing → Implementing`.
+3. The sprint branch is **merged to `main`** (design merge). The branch stays alive.
+
+## 4. Implementation phase (autonomous)
+
+The agent implements the designed tasks independently — preferably in one long run, using
+subagents where appropriate. Rules of the phase:
+
+- **Commit throughout**, per coherent step, on the sprint branch.
+- **Track progress** in the sprint body (per-task checklist), so any session can resume.
+- **Stop and ask**: if a decision surfaces that belongs to the human — a product call or an
+  architectural fork the design doesn't cover — do **not** guess. Record the open question in
+  the sprint body (`## Open questions`), commit, and stop that task (or the sprint, if it
+  blocks everything). Fidelity over throughput.
+- New decisions of architectural weight get ADRs (`Proposed`) as part of the change.
+
+## 5. Gates (must pass before presenting)
+
+- **Validation** — the full suite passes: `uv run pytest` and `uv run ruff check`. New
+  behavior is covered by tests.
+- **Independent review** — a fresh subagent with no implementation context reviews the full
+  sprint diff; findings are fixed (or explicitly presented as known issues).
+
+## 6. Presentation & final merge
+
+The agent presents a sprint summary to the human:
+
+- features delivered (per task),
+- **breaking changes**,
+- architectural decisions made (with their ADRs),
+- difficulties encountered and open questions,
+- review findings and how they were resolved.
+
+**Implementation approval** triggers, in order:
+
+1. New ADRs flip `Proposed → Accepted` (or are revised/rejected per the human).
+2. Completed tasks flip `Designed → Done`; the sprint flips `Implementing → Done`.
+3. The sprint branch is **merged to `main`** (final merge) and deleted.
+
+Tasks that didn't make it stay `Designed` (or are returned to `Draft` if the design was
+invalidated) and return to the backlog for a future sprint.
+
+# Sprint frontmatter schema
+
+| Field | Required | Type | Notes |
+|-------|----------|------|-------|
+| `type` | yes | string | Always `Sprint`. |
+| `title` | yes | string | Short theme, e.g. "CLI ergonomics". |
+| `status` | yes | string | `Designing` \| `Implementing` \| `Done` \| `Aborted`. |
+| `branch` | yes | string | The sprint branch, e.g. `sprint/001`. |
+| `tasks` | yes | list | Concept IDs of the tasks in scope. |
+| `created` | yes | date | ISO date of the sprint-start commit. |
+| `timestamp` | recommended | string | OKF-reserved; ISO-8601 of the last meaningful change. |
+
+The **body** is the working state: scope rationale, a per-task checklist (`[ ]` → `[x]`) kept
+current during implementation, `## Open questions` (the stop-and-ask log), and a short
+`## Session log` (one line per session: date, what moved).
+
+# Task frontmatter schema
 
 | Field | Required | Type | Notes |
 |-------|----------|------|-------|
 | `type` | yes | string | Always `Task`. |
 | `title` | yes | string | Short imperative title. |
 | `description` | recommended | string | One-line summary; also used in `index.md`. |
-| `status` | yes | string | `Draft` \| `Refining` \| `Refined` \| `Implementing` \| `Done` \| `Dropped`. |
+| `status` | yes | string | `Draft` \| `Designed` \| `Done` \| `Dropped`. |
 | `priority` | recommended | string | `low` \| `medium` \| `high`. |
 | `tags` | optional | list | Cross-cutting labels (`research`, `cli`, `packaging`, …). |
 | `created` | recommended | date | ISO date the draft was created. |
 | `timestamp` | optional | string | OKF-reserved; ISO-8601 of the last meaningful change. |
-| `blocked_by` | optional | list | Concept IDs of tasks that must be `Done` first (see below). |
-| `claimed_by` / `claimed_at` | while claimed | string | Advisory lease (set on `Refining`/`Implementing`). |
-| `branch` / `pr` | optional | string | Set by the loop when it opens a branch / PR. |
+| `blocked_by` | optional | list | Concept IDs of tasks that must be `Done` first. |
 
 Producers may add more keys — okdb's union-of-keys keeps them queryable, and columns simply
-appear once the first task uses them.
+appear once the first task uses them. A missing `blocked_by` means unblocked; don't write
+empty lists.
 
-# Blockers
+## Blockers
 
 `blocked_by` lists the **Concept IDs** of prerequisite tasks (a Concept ID is the filename
-without `.md`, e.g. `choose-package-name`). A task is *ready* when:
+without `.md`). A task is eligible for a sprint when its `status` is `Draft` (or `Designed`,
+for implementation) and every task in `blocked_by` is `Done`. A dangling or mistyped blocker
+counts as blocking (conservative — better to stall than to double-build). Tasks within one
+sprint may depend on each other; the design phase orders them.
 
-1. its `status` is `Draft` or `Refined` (i.e. unclaimed and actionable), and
-2. every task in `blocked_by` is `Done`.
+# ADRs
 
-A dangling or mistyped blocker counts as blocking (conservative — better to stall than to
-double-build). Blocking is a dependency, not a status: keep it in `blocked_by`, not in `status`.
+Architecture Decision Records live in [`docs/adr/`](../docs/adr/) — itself an OKF bundle, one
+concept per decision, named `NNNN-short-slug.md`.
 
-# The agent loop (`scripts/agent-loop.sh`)
+| Field | Required | Type | Notes |
+|-------|----------|------|-------|
+| `type` | yes | string | Always `ADR`. |
+| `title` | yes | string | The decision, stated as a decision. |
+| `status` | yes | string | `Proposed` \| `Accepted` \| `Rejected` \| `Superseded`. |
+| `created` | yes | date | ISO date proposed. |
+| `sprint` | optional | string | Concept ID of the originating sprint. |
+| `superseded_by` | when superseded | string | Concept ID of the replacing ADR. |
 
-One run moves **one task by one step**:
+Body: Context, Decision, Consequences (and Alternatives considered, when useful).
 
-1. Sync `main`.
-2. Select the next *ready* task — highest `priority`, then oldest `created`, then `__id`.
-3. **Claim** it on `main` (`status` → `Refining`/`Implementing` + lease), and push (the lock).
-4. Create a **git worktree** on branch `task/<id>/<refine|implement>` — the main checkout stays
-   on `main`, so you can keep working and several runs can proceed in parallel without colliding.
-5. Invoke the agent **in the worktree**; on success it sets the task to the target status
-   (`Refined`/`Done`) and clears the lease.
-6. For implementation, run the **validation gate** (`uv run pytest` + `uv run ruff check`) in the
-   worktree.
-7. Open a PR and remove the worktree (the branch is retained). **Human review** (plus a
-   **subagent review**) and the merge complete the step — landing `Refined`/`Done` on `main`. If
-   the agent fails to advance the task, the worktree is kept for inspection.
+Rules:
+
+- The agent **proposes** ADRs — during design sessions and during implementation — as part of
+  the change itself, committed on the sprint branch.
+- **Only the human approves ADRs.** `Proposed → Accepted` happens at the batch approval
+  (design or implementation), never unilaterally.
+- Reversing an accepted decision means a new ADR that supersedes the old one, not an edit.
 
 ```sh
-scripts/agent-loop.sh                 # advance one ready task by one step
-scripts/agent-loop.sh --dry-run       # show what it would do; change nothing
-scripts/agent-loop.sh --task <id>     # operate on a specific task
-scripts/agent-loop.sh --release <id>  # release a stuck claim
+okdb query "SELECT __id, status, title FROM adr ORDER BY __id" --bundle ./docs/adr
 ```
-
-Configuration is via environment variables (see the script header): `BUNDLE` (default `tasks`),
-`OKDB`, `AGENT_CMD` (override the agent invocation — defaults to `claude -p`; set it to a no-op
-or a different agent for testing), `CLAIM_OWNER`, `BRANCH_PREFIX`, `MAIN_BRANCH`,
-`WORKTREE_ROOT` (default `.worktrees/`, gitignored), `NO_PR`.
-
-Schedule the loop (cron, or a `while` wrapper) to keep the backlog moving. Because claimed tasks
-are skipped, repeated runs **fan out across distinct tasks** rather than racing on one.
-
-# Gates (must-haves)
-
-- **Human approval** — merging the PR is the approval, and it is what advances the status (both
-  transitions). PRs are never auto-merged.
-- **Validation** — the result is always covered by tests, and they (plus `ruff`) pass.
-- **Review** — a subagent reviews the diff (e.g. `/code-review`) before merge.
 
 # Querying with okdb
 
 ```sh
-# The whole board, highest priority first
-okdb query "SELECT status, priority, title FROM task
-            ORDER BY CASE lower(priority) WHEN 'high' THEN 0 WHEN 'medium' THEN 1 ELSE 2 END" --bundle ./tasks
+# Anything in flight?
+okdb query "SELECT __id, status, branch FROM sprint WHERE status NOT IN ('Done','Aborted')" --bundle ./tasks
 
-# What the loop would pick next: ready (Draft or Refined) and unblocked
+# The open backlog, highest priority first
+okdb query "SELECT __id, priority, title FROM task WHERE status = 'Draft'
+            ORDER BY CASE lower(priority) WHEN 'high' THEN 0 WHEN 'medium' THEN 1 ELSE 2 END, created" --bundle ./tasks
+
+# Sprint-eligible: Draft and unblocked
 okdb query "
-  SELECT t.__id, t.status, t.priority
+  SELECT t.__id, t.priority
   FROM task t
-  WHERE t.status IN ('Draft','Refined')
+  WHERE t.status = 'Draft'
     AND NOT EXISTS (
       SELECT 1 FROM unnest(t.blocked_by) AS b(dep)
       WHERE NOT EXISTS (SELECT 1 FROM task d WHERE d.__id = b.dep AND d.status = 'Done')
     )
   ORDER BY CASE lower(t.priority) WHEN 'high' THEN 0 WHEN 'medium' THEN 1 ELSE 2 END,
-           t.created, t.__id
+           t.created NULLS LAST, t.__id
 " --bundle ./tasks
 
 # Count by state
 okdb query "SELECT status, count(*) AS n FROM task GROUP BY status ORDER BY n DESC" --bundle ./tasks
 ```
+
+# History
+
+Until 2026-07-09 the backlog ran on a PR-per-step agent loop (`scripts/agent-loop.sh`, statuses
+`Refining`/`Refined`/`Implementing`, claim/lease locks). It was replaced by this
+session/sprint workflow — see [ADR 0001](../docs/adr/0001-sessions-sprints-workflow.md).

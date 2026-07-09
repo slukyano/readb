@@ -2,16 +2,14 @@
 type: Task
 title: Keep index.md and log.md current automatically
 description: Generate the bundle index from a query and let the loop append log entries, instead of hand-editing both.
-status: Refining
+status: Draft
 priority: low
 tags:
 - bundle
 - dx
 - agent-loop
 created: 2026-07-02
-claimed_by: slukyanov@Mac
-claimed_at: '2026-07-04T20:35:00Z'
-timestamp: '2026-07-04T20:35:00Z'
+timestamp: '2026-07-09T00:00:00Z'
 ---
 
 `tasks/index.md` must be hand-edited for every new task (drift risk — it is a listing okdb

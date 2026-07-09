@@ -2,16 +2,14 @@
 type: Task
 title: Research querying the body as structured data
 description: Investigate exposing the body as JSON/YAML/DOM (headings as structure).
-status: Refining
+status: Draft
 priority: low
 tags:
 - research
 - body
 created: 2026-06-29
 blocked_by: []
-claimed_by: slukyanov@Mac
-claimed_at: '2026-07-04T20:35:00Z'
-timestamp: '2026-07-04T20:35:00Z'
+timestamp: '2026-07-09T00:00:00Z'
 ---
 
 Right now `__body` is plain text. Investigate exposing it as a queryable structure — e.g. a tree
