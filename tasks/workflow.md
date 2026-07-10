@@ -162,7 +162,10 @@ agent finishes an iteration or needs a decision, it formats the ask as:
 1. a **separator** (`---`),
 2. the **question or summary in short** — one or two sentences,
 3. the **complete decision context** — everything needed to decide, self-contained in the
-   chat (quote the relevant parts; never just point at files, never dump whole files),
+   chat (quote the relevant parts; never just point at files, never dump whole files). A
+   batch approval that covers tasks (scope, design, implementation) lists **every task in
+   the batch with at least a one-line description** — never a bare task name, never "as
+   presented before",
 4. **references to the key files** touched or decided on (paths, with line numbers where it
    helps), so the human can double-click into any detail,
 5. the **explicit list of questions** to answer (or the single question), each answerable

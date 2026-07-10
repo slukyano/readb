@@ -74,8 +74,9 @@ an independent subagent review of the diff), a sprint summary, and on human appr
 merge. Task lifecycle: `Draft → Designed → Done` (+ `Dropped`). ADRs live in `docs/adr/` (an
 OKF bundle); **only the human approves ADRs**. All approvals happen in chat: present a
 separator, a short summary, the complete self-contained decision context (quote what matters;
-don't require reading files), key-file references for double-clicking, then the explicit
-question(s). Full workflow: `tasks/workflow.md`.
+don't require reading files; batch approvals list every task with at least a one-line
+description), key-file references for double-clicking, then the explicit question(s). Full
+workflow: `tasks/workflow.md`.
 
 ## Stack
 
