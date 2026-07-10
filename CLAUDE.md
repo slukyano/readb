@@ -49,19 +49,27 @@ Two-pass load: pass 1 parses every concept and infers unified column types via t
 pass 2 coerces values and inserts into DuckDB. The brief's acceptance criteria (1-12) should be
 written as tests.
 
-## Task backlog (dogfooding)
+## Development workflow (sessions + sprints, dogfooding)
 
 The project backlog lives in `tasks/`, which is itself an OKF bundle (one `Task` concept per
-file). Query it with okdb: `okdb query "SELECT status, title FROM task" --bundle ./tasks`.
+file, plus one `Sprint` concept per sprint). Query it with okdb:
+`okdb query "SELECT status, title FROM task" --bundle ./tasks`. All frontmatter edits go
+through okdb's own field editor — `okdb set`/`unset --bundle ./tasks <id> ...`.
 
-Tasks move along a single linear chain — `Draft → Refining → Refined → Implementing → Done` —
-where `Refining`/`Implementing` are in-progress locks and human approval is the PR merge (no
-separate `approved` status). The agent loop `scripts/agent-loop.sh` advances one ready task by
-one step per run: it claims the task on `main` (the lock), creates a git worktree for the branch
-(the main checkout stays on `main`), invokes an agent there, runs the validation gate, and opens
-a PR for human review + subagent review. Status/lease edits (claim, release, advance) are made
-with okdb's own field editor — `okdb set`/`unset --bundle ./tasks <id> ...`. The full lifecycle,
-frontmatter schema, claim/lease lock, and gates are documented in `tasks/workflow.md`.
+Development runs in **sprints** (no PRs). At session start, check for an unfinished sprint
+(`SELECT __id, status, branch FROM sprint WHERE status NOT IN ('Done','Aborted')`; a missing
+`sprint` table means no sprint ever ran) and resume it from its branch; otherwise propose a
+scope from the `Draft` backlog. Scope approval =
+committing `tasks/sprint-NNN.md` to `main` and cutting branch `sprint/NNN`. Then: an
+interactive design phase (per-task `## Design` sections + `Proposed` ADRs; human approval →
+design merge to `main`), an autonomous implementation phase (commit throughout; **stop and
+ask** on any decision that belongs to the human — never guess), gates (`pytest` + `ruff` +
+an independent subagent review of the diff), a sprint summary, and on human approval the final
+merge. Task lifecycle: `Draft → Designed → Done` (+ `Dropped`). ADRs live in `docs/adr/` (an
+OKF bundle); **only the human approves ADRs**. All approvals happen in chat: present a
+separator, a short summary, the complete self-contained decision context (quote what matters;
+don't require reading files), key-file references for double-clicking, then the explicit
+question(s). Full workflow: `tasks/workflow.md`.
 
 ## Stack
 
@@ -74,4 +82,5 @@ frontmatter schema, claim/lease lock, and gates are documented in `tasks/workflo
 
 Conventional Commits (`feat`, `fix`, `docs`, `refactor`, `test`, `chore`, `perf`, `style`).
 Scopes match components (e.g. `loader`, `schema`, `cli`). If Claude helped write code in a
-commit, add `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`; otherwise no attribution.
+commit, add a `Co-Authored-By` trailer for the model that helped (e.g.
+`Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>`); otherwise no attribution.

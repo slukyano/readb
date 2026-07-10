@@ -2,16 +2,14 @@
 type: Task
 title: Change the license to Apache 2.0
 description: Replace the MIT license with Apache License 2.0 across the repo and metadata.
-status: Refining
+status: Draft
 priority: high
 tags:
 - legal
 - packaging
 created: 2026-06-30
 blocked_by: []
-claimed_by: slukyanov@Mac
-claimed_at: '2026-07-04T20:34:59Z'
-timestamp: '2026-07-04T20:34:59Z'
+timestamp: '2026-07-09T00:00:00Z'
 ---
 
 Switch the project license from MIT to Apache License 2.0.
