@@ -72,4 +72,4 @@ uv run ruff format   # format
 
 ## License
 
-[MIT](LICENSE) © Stanislav Lukyanov
+[Apache 2.0](LICENSE) © 2026 Stanislav Lukyanov
