@@ -123,6 +123,9 @@ def test_raw_column_in_schema_output() -> None:
     result = _run("schema", "--bundle", str(MINI_BUNDLE))
     assert result.exit_code == 0
     assert "__raw" in result.output
+    # The separate mapping section is gone; the original type still shows inline per table.
+    assert "Type mapping" not in result.output
+    assert "(type: 'Widget')" in result.output
 
 
 def test_show_prints_body_matching_body_column() -> None:

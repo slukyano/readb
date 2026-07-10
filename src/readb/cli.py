@@ -77,7 +77,7 @@ def query(sql: str, bundle: str, output_format: str | None, as_json: bool) -> No
 @main.command()
 @_BUNDLE_OPTION
 def schema(bundle: str) -> None:
-    """Print detected types, their normalized table names, columns + types, and the mapping."""
+    """Print detected types, their normalized table names, and columns + types."""
     try:
         with readb.open(bundle) as db:
             bundle_schema = db.schema()
@@ -271,7 +271,7 @@ def _cell(value: Any) -> str:
 
 
 def _format_schema(bundle_schema: Any) -> str:
-    """Render the detected schema: tables (with columns + types) and the type-name mapping."""
+    """Render the detected schema: tables with columns + types (original type inline)."""
     lines: list[str] = []
     for warning in bundle_schema.warnings:
         lines.append(f"! warning: {warning}")
@@ -287,17 +287,6 @@ def _format_schema(bundle_schema: Any) -> str:
         name_width = max((len(c) for c in table.columns), default=0)
         for column, ddl in table.columns.items():
             lines.append(f"    {column.ljust(name_width)}  {ddl}")
-
-    lines.append("\nType mapping (table name <- original type)")
-    lines.append("==========================================")
-    if bundle_schema.type_mapping:
-        map_width = max(len(n) for n in bundle_schema.type_mapping)
-        for table_name in sorted(bundle_schema.type_mapping):
-            lines.append(
-                f"    {table_name.ljust(map_width)}  <-  {bundle_schema.type_mapping[table_name]}"
-            )
-    else:
-        lines.append("    (no concept types detected)")
 
     return "\n".join(lines)
 
