@@ -9,7 +9,7 @@ tags:
 - dx
 - dogfooding
 created: 2026-07-09
-timestamp: '2026-07-09T00:00:00Z'
+timestamp: '2026-07-10T00:00:00Z'
 ---
 
 Any SQL error in `okdb query` surfaces as a full Python traceback ending in a
@@ -33,3 +33,21 @@ Found while dogfooding: the traceback made the agent abandon okdb mid-session (2
 - Keep exit code nonzero so scripts can branch on failure.
 - Decide whether a missing table deserves special affordance (e.g. hint listing available
   tables) or just the clean DuckDB message.
+
+## Design
+
+Designed 2026-07-10.
+
+CLI-layer translation only — the Python API (`okdb.open`, `Database.sql`) keeps raising real
+exceptions; programmatic users want them. In `cli.py`:
+
+- Wrap the body of `query` (open + `db.sql`) and `schema` (open + `.schema()`) in
+  `try/except duckdb.Error as exc: raise click.ClickException(str(exc)) from exc` — the same
+  pattern `get`/`set`/`unset` already use for `FrontmatterError`.
+- DuckDB's messages are kept verbatim: they already carry the category ("Catalog Error",
+  "Parser Error"), the "Did you mean ...?" hint, and the caret context line. click prefixes
+  `Error:` and exits 1.
+- **No special-casing of missing tables** — the catalog message already names the table and
+  suggests alternatives, which covers the workflow's session-start `sprint` probe.
+- Tests (CliRunner): bad SQL and missing-table each → `exit_code == 1`, output contains the
+  DuckDB message, and does **not** contain `Traceback`.

@@ -33,7 +33,7 @@ standalone tasks at scope approval: `choose-package-name` and `license-apache-2`
 Design phase (a checked box = `## Design` section written and discussed):
 
 - [x] choose-package-name — `readb`, aligned dist/import/CLI ([ADR 0002](../docs/adr/0002-package-name-readb.md), Proposed)
-- [ ] cli-clean-errors
+- [x] cli-clean-errors — CLI-layer try/except → `click.ClickException`; DuckDB message verbatim
 - [ ] read-full-concept
 - [ ] default-bundle-cwd
 - [ ] query-csv-output
@@ -53,3 +53,5 @@ Implementation checklist is added at the design merge.
   started.
 - 2026-07-10 — `choose-package-name` designed: name research across registries/GitHub/web;
   human picked `readb` (over `readbl`, `plaindex`, `knowdb`). ADR 0002 proposed.
+- 2026-07-10 — `cli-clean-errors` designed (no human forks: CLI-layer error translation,
+  DuckDB messages kept verbatim). `read-full-concept` design fork presented to the human.
