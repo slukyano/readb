@@ -1,7 +1,7 @@
 ---
 type: Sprint
 title: CLI ergonomics, dogfooding gaps, name & license
-status: Designing
+status: Implementing
 branch: sprint/001
 tasks:
 - cli-clean-errors
@@ -41,17 +41,16 @@ Design phase (a checked box = `## Design` section written and discussed):
 - [x] schema-drop-type-mapping — CLI section removed; `BundleSchema.type_mapping` stays
 - [x] license-apache-2 — Apache 2.0 text + SPDX metadata; no NOTICE
 
-Implementation checklist is added at the design merge.
+## Implementation checklist (in order)
 
-## Implementation order
-
-1. `choose-package-name` (the rename — everything else lands on `readb`)
-2. `cli-clean-errors`
-3. `read-full-concept` + `query-csv-output` (shared output-format surface)
-4. `remove-id-virtual-field` (incl. workflow/CLAUDE doc query rewrites)
-5. `default-bundle-cwd`
-6. `schema-drop-type-mapping`
-7. `license-apache-2`
+1. [ ] `choose-package-name` (the rename — everything else lands on `readb`)
+2. [ ] `cli-clean-errors`
+3. [ ] `read-full-concept` + `query-csv-output` (shared output-format surface)
+4. [ ] `remove-id-virtual-field` (incl. workflow/CLAUDE doc query rewrites)
+5. [ ] `default-bundle-cwd`
+6. [ ] `schema-drop-type-mapping`
+7. [ ] `license-apache-2` (incl. NOTICE — decision revised at approval)
+8. [ ] Gates: full `pytest` + `ruff` + independent subagent review of the sprint diff
 
 ## Open questions
 
@@ -71,3 +70,6 @@ Implementation checklist is added at the design merge.
 - 2026-07-10 — Human retired "ID" terminology: wiki-style `__name` (simple file name, assumed
   unique, clash → listing exception) replaces `__id`; `__path` is the guaranteed key.
   ADR 0003 rewritten.
+- 2026-07-10 — **Design approved** (human, in chat; NOTICE decision delegated → yes, minimal
+  NOTICE). ADRs 0002/0003 Accepted, tasks Designed, sprint Implementing, design merge to
+  `main`. Implementation phase started.

@@ -1,7 +1,7 @@
 ---
 type: ADR
 title: Name the package readb (dist, import, and CLI aligned)
-status: Proposed
+status: Accepted
 created: 2026-07-10
 sprint: sprint-001
 timestamp: '2026-07-10T00:00:00Z'

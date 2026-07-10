@@ -8,7 +8,7 @@ okf_version: "0.1"
 
 # Sprints
 
-* [Sprint 001 — CLI ergonomics, dogfooding gaps, name & license](sprint-001.md) - Designing.
+* [Sprint 001 — CLI ergonomics, dogfooding gaps, name & license](sprint-001.md) - Implementing.
 
 # Tasks
 

@@ -2,7 +2,7 @@
 type: Task
 title: Choose a package name (okdb is taken)
 description: Pick and verify an available distribution name; okdb is already taken on PyPI.
-status: Draft
+status: Designed
 priority: high
 tags:
 - packaging

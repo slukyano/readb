@@ -2,7 +2,7 @@
 type: Task
 title: Print clean CLI errors instead of Python tracebacks
 description: A failed query (e.g. missing table) dumps a raw DuckDB traceback; print a one-line error and exit nonzero.
-status: Draft
+status: Designed
 priority: high
 tags:
 - cli

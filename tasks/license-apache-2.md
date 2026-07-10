@@ -2,7 +2,7 @@
 type: Task
 title: Change the license to Apache 2.0
 description: Replace the MIT license with Apache License 2.0 across the repo and metadata.
-status: Draft
+status: Designed
 priority: high
 tags:
 - legal
@@ -31,14 +31,16 @@ Switch the project license from MIT to Apache License 2.0.
 
 Designed 2026-07-10.
 
-- `LICENSE`: replace with the canonical Apache License 2.0 text; copyright line
-  "Copyright 2026 Stanislav Lukyanov" in the appendix boilerplate.
+- `LICENSE`: replace with the canonical Apache License 2.0 text, **verbatim** (the canonical
+  text is not edited; attribution lives in NOTICE).
 - `pyproject.toml`: switch `license = { text = "MIT" }` (pyproject.toml:11) to the PEP 639
   SPDX expression `license = "Apache-2.0"` if the pinned hatchling accepts it, else
   `{ text = "Apache-2.0" }`; swap the classifier to
   `License :: OSI Approved :: Apache Software License`.
 - README license section and any other MIT references (grep the repo).
-- **No `NOTICE` file** — it is optional under Apache 2.0 and there are no third-party
-  attributions to carry; add one later if that changes.
+- **`NOTICE` file: yes** (decision revised at design approval, 2026-07-10): the LICENSE text
+  stays verbatim and there are no per-file headers, so a minimal NOTICE
+  (`readb` + `Copyright 2026 Stanislav Lukyanov`) is the one place the copyright claim lives;
+  Apache 2.0 §4(d) makes redistributors preserve it. No third-party attributions to carry.
 - No per-file license headers (none exist today; not introducing them).
 - Gate: the wheel still builds (`uv build` or equivalent) with the new metadata.

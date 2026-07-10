@@ -2,7 +2,7 @@
 type: Task
 title: Read a full concept (frontmatter + body) via okdb
 description: No ergonomic way to read one whole concept; long bodies are unusable in table output, forcing cat fallbacks.
-status: Draft
+status: Designed
 priority: high
 tags:
 - cli

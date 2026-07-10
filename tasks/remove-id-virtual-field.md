@@ -2,7 +2,7 @@
 type: Task
 title: Remove the __id virtual field
 description: Drop __id; __path is already unique and can serve as the primary key.
-status: Draft
+status: Designed
 priority: medium
 tags:
 - schema

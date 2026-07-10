@@ -1,7 +1,7 @@
 ---
 type: ADR
 title: 'Virtual columns __path, __name, __body, __raw; wiki-style name addressing; __id removed'
-status: Proposed
+status: Accepted
 created: 2026-07-10
 sprint: sprint-001
 timestamp: '2026-07-10T00:00:00Z'

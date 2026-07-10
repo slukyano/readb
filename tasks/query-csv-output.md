@@ -2,7 +2,7 @@
 type: Task
 title: Add plain-text row output to okdb query
 description: A --csv/--tsv output mode so shell callers can read rows without python-parsing --json.
-status: Draft
+status: Designed
 priority: low
 tags:
 - cli

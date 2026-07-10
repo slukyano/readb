@@ -2,7 +2,7 @@
 type: Task
 title: Drop the type mapping from `okdb schema` output
 description: Remove the separate type-mapping section; the original type is already shown per table.
-status: Draft
+status: Designed
 priority: low
 tags:
 - cli

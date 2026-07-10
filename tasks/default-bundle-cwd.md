@@ -2,7 +2,7 @@
 type: Task
 title: Default --bundle to the current directory
 description: When no --bundle is passed, default to the current directory.
-status: Draft
+status: Designed
 priority: medium
 tags:
 - cli
