@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import Any
 
 import click
+import duckdb
 
 import readb
 from readb import fields
@@ -44,8 +45,11 @@ def main() -> None:
 @click.option("--json", "as_json", is_flag=True, help="Emit results as JSON instead of a table.")
 def query(sql: str, bundle: str, as_json: bool) -> None:
     """Execute SQL against the bundle and print the result rows."""
-    with readb.open(bundle) as db:
-        rows = db.sql(sql)
+    try:
+        with readb.open(bundle) as db:
+            rows = db.sql(sql)
+    except duckdb.Error as exc:
+        raise click.ClickException(str(exc)) from exc
     if as_json:
         click.echo(json.dumps(rows, indent=2, default=_json_default, ensure_ascii=False))
     else:
@@ -56,8 +60,11 @@ def query(sql: str, bundle: str, as_json: bool) -> None:
 @_BUNDLE_OPTION
 def schema(bundle: str) -> None:
     """Print detected types, their normalized table names, columns + types, and the mapping."""
-    with readb.open(bundle) as db:
-        bundle_schema = db.schema()
+    try:
+        with readb.open(bundle) as db:
+            bundle_schema = db.schema()
+    except duckdb.Error as exc:
+        raise click.ClickException(str(exc)) from exc
     click.echo(_format_schema(bundle_schema))
 
 
