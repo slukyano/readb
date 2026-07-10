@@ -1,4 +1,4 @@
-"""Unit tests for the type lattice and type-name normalization in okdb.schema."""
+"""Unit tests for the type lattice and type-name normalization in readb.schema."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import datetime as dt
 
 import pytest
 
-from okdb import schema as s
+from readb import schema as s
 
 
 @pytest.mark.parametrize(

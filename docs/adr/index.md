@@ -9,7 +9,7 @@ An OKF bundle: one `type: ADR` concept per decision, named `NNNN-short-slug.md`.
 Process: see [the task workflow](../../tasks/workflow.md#adrs).
 
 ```sh
-okdb query "SELECT __id, status, title FROM adr ORDER BY __id" --bundle ./docs/adr
+readb query "SELECT __id, status, title FROM adr ORDER BY __id" --bundle ./docs/adr
 ```
 
 * [0001 — Replace the PR-per-step agent loop with a session/sprint workflow](0001-sessions-sprints-workflow.md) - Accepted.

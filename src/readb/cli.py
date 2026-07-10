@@ -1,16 +1,16 @@
-"""Command-line interface for okdb.
+"""Command-line interface for readb.
 
-okdb query "<SQL>" --bundle ./path         # results as a table
-okdb query "<SQL>" --bundle ./path --json  # results as JSON
-okdb schema --bundle ./path                # detected types, table names, columns, mapping
+readb query "<SQL>" --bundle ./path         # results as a table
+readb query "<SQL>" --bundle ./path --json  # results as JSON
+readb schema --bundle ./path                # detected types, table names, columns, mapping
 
 Read-only query commands (query, schema) never touch the bundle. The get/set/unset commands are
 the one, deliberately separate, write path: a surgical frontmatter field editor (see
-``okdb.fields``). ``get`` is read-only; ``set``/``unset`` edit a single concept file in place.
+``readb.fields``). ``get`` is read-only; ``set``/``unset`` edit a single concept file in place.
 
-okdb get   --bundle ./path <concept-id> <key>              # print one frontmatter field
-okdb set   --bundle ./path <concept-id> key=value ...      # set fields in place
-okdb unset --bundle ./path <concept-id> <key> ...          # remove fields in place
+readb get   --bundle ./path <concept-id> <key>              # print one frontmatter field
+readb set   --bundle ./path <concept-id> key=value ...      # set fields in place
+readb unset --bundle ./path <concept-id> <key> ...          # remove fields in place
 """
 
 from __future__ import annotations
@@ -21,8 +21,8 @@ from typing import Any
 
 import click
 
-import okdb
-from okdb import fields
+import readb
+from readb import fields
 
 _BUNDLE_OPTION = click.option(
     "--bundle",
@@ -33,9 +33,9 @@ _BUNDLE_OPTION = click.option(
 
 
 @click.group()
-@click.version_option(version=okdb.__version__, prog_name="okdb")
+@click.version_option(version=readb.__version__, prog_name="readb")
 def main() -> None:
-    """okdb: run real SQL against an OKF bundle (read-only)."""
+    """readb: run real SQL against an OKF bundle (read-only)."""
 
 
 @main.command()
@@ -44,7 +44,7 @@ def main() -> None:
 @click.option("--json", "as_json", is_flag=True, help="Emit results as JSON instead of a table.")
 def query(sql: str, bundle: str, as_json: bool) -> None:
     """Execute SQL against the bundle and print the result rows."""
-    with okdb.open(bundle) as db:
+    with readb.open(bundle) as db:
         rows = db.sql(sql)
     if as_json:
         click.echo(json.dumps(rows, indent=2, default=_json_default, ensure_ascii=False))
@@ -56,7 +56,7 @@ def query(sql: str, bundle: str, as_json: bool) -> None:
 @_BUNDLE_OPTION
 def schema(bundle: str) -> None:
     """Print detected types, their normalized table names, columns + types, and the mapping."""
-    with okdb.open(bundle) as db:
+    with readb.open(bundle) as db:
         bundle_schema = db.schema()
     click.echo(_format_schema(bundle_schema))
 
@@ -66,7 +66,7 @@ def schema(bundle: str) -> None:
 #
 # The one write path, kept separate from the read-only query layer. Each command addresses a
 # single concept by its ID within the bundle (``<bundle>/<concept-id>.md``); the edit is
-# surgical and line-based (see okdb.fields), so only the touched fields change.
+# surgical and line-based (see readb.fields), so only the touched fields change.
 # --------------------------------------------------------------------------------------------
 
 

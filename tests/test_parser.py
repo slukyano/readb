@@ -1,11 +1,11 @@
-"""Unit tests for the permissive OKF file parser (okdb.parser)."""
+"""Unit tests for the permissive OKF file parser (readb.parser)."""
 
 from __future__ import annotations
 
 import logging
 from pathlib import Path
 
-from okdb.parser import parse_file
+from readb.parser import parse_file
 
 
 def _write(tmp_path: Path, name: str, text: str) -> Path:
@@ -44,7 +44,7 @@ def test_empty_frontmatter_block_is_empty_mapping(tmp_path: Path) -> None:
 
 def test_malformed_yaml_is_skipped(tmp_path: Path, caplog) -> None:
     f = _write(tmp_path, "bad.md", "---\nitems: [1, 2, 3\noops: : :\n---\nbody\n")
-    with caplog.at_level(logging.WARNING, logger="okdb.parser"):
+    with caplog.at_level(logging.WARNING, logger="readb.parser"):
         c = parse_file(f, bundle_root=tmp_path)
     assert c is None
     assert any("bad.md" in rec.getMessage() for rec in caplog.records)

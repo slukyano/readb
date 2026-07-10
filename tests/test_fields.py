@@ -1,4 +1,4 @@
-"""Tests for the frontmatter field editor (okdb.fields) and its CLI (okdb get/set/unset).
+"""Tests for the frontmatter field editor (readb.fields) and its CLI (readb get/set/unset).
 
 The editor is the one write path in an otherwise read-only tool, so these tests pin down two
 things: edits are surgical (only the targeted lines move; body and lists stay byte-for-byte),
@@ -12,8 +12,8 @@ from pathlib import Path
 import pytest
 from click.testing import CliRunner, Result
 
-from okdb import fields
-from okdb.cli import main
+from readb import fields
+from readb.cli import main
 
 # A representative task file: scalar fields to edit, a list and a body that must stay untouched.
 TASK = """\
@@ -108,7 +108,7 @@ def test_set_without_frontmatter_raises(tmp_path: Path) -> None:
 
 
 # --------------------------------------------------------------------------------------------
-# CLI: okdb get / set / unset
+# CLI: readb get / set / unset
 # --------------------------------------------------------------------------------------------
 
 

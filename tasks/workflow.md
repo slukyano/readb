@@ -11,9 +11,9 @@ timestamp: '2026-07-09T00:00:00Z'
 # Overview
 
 This `tasks/` directory is the project backlog **and** an OKF bundle — one markdown file per
-concept. We dogfood okdb here: the backlog is queried with okdb itself (see
-[Querying with okdb](#querying-with-okdb)) and all frontmatter edits are made with okdb's own
-field editor (`okdb set`/`unset --bundle ./tasks <id> ...`).
+concept. We dogfood readb here: the backlog is queried with readb itself (see
+[Querying with readb](#querying-with-readb)) and all frontmatter edits are made with readb's own
+field editor (`readb set`/`unset --bundle ./tasks <id> ...`).
 
 Development happens in **sprints**, driven interactively in **sessions**:
 
@@ -33,11 +33,11 @@ Architecture Decision Records live in a separate bundle, [`docs/adr/`](../docs/a
 
 ## Dogfooding rule
 
-okdb is the interface to the local OKF bundles. Reading and querying `tasks/` and `docs/adr/`
-goes through `okdb query`/`okdb schema`/`okdb get`; edits go through `okdb set`/`unset`. Do not
-fall back to `cat`, grep, or manual file reads for what okdb should answer. When okdb fails or
+readb is the interface to the local OKF bundles. Reading and querying `tasks/` and `docs/adr/`
+goes through `readb query`/`readb schema`/`readb get`; edits go through `readb set`/`unset`. Do not
+fall back to `cat`, grep, or manual file reads for what readb should answer. When readb fails or
 can't express something needed for the workflow: **stop, immediately record a new `Draft` task**
-describing the gap, and only then use a workaround. Tasks that block dogfooding okdb take
+describing the gap, and only then use a workaround. Tasks that block dogfooding readb take
 priority over the rest of the backlog when scoping sprints.
 
 # Task lifecycle
@@ -75,7 +75,7 @@ One sprint moves through:
 Every session begins by checking for unfinished work:
 
 ```sh
-okdb query "SELECT __id, status, branch FROM sprint WHERE status NOT IN ('Done','Aborted')" --bundle ./tasks
+readb query "SELECT __id, status, branch FROM sprint WHERE status NOT IN ('Done','Aborted')" --bundle ./tasks
 ```
 
 - **An active sprint exists** → check out its branch (the branch always has the freshest
@@ -204,7 +204,7 @@ current during implementation, `## Open questions` (the stop-and-ask log), and a
 | `timestamp` | optional | string | OKF-reserved; ISO-8601 of the last meaningful change. |
 | `blocked_by` | optional | list | Concept IDs of tasks that must be `Done` first. |
 
-Producers may add more keys — okdb's union-of-keys keeps them queryable, and columns simply
+Producers may add more keys — readb's union-of-keys keeps them queryable, and columns simply
 appear once the first task uses them. A missing `blocked_by` means unblocked; don't write
 empty lists.
 
@@ -241,21 +241,21 @@ Rules:
 - Reversing an accepted decision means a new ADR that supersedes the old one, not an edit.
 
 ```sh
-okdb query "SELECT __id, status, title FROM adr ORDER BY __id" --bundle ./docs/adr
+readb query "SELECT __id, status, title FROM adr ORDER BY __id" --bundle ./docs/adr
 ```
 
-# Querying with okdb
+# Querying with readb
 
 ```sh
 # Anything in flight?
-okdb query "SELECT __id, status, branch FROM sprint WHERE status NOT IN ('Done','Aborted')" --bundle ./tasks
+readb query "SELECT __id, status, branch FROM sprint WHERE status NOT IN ('Done','Aborted')" --bundle ./tasks
 
 # The open backlog, highest priority first
-okdb query "SELECT __id, priority, title FROM task WHERE status = 'Draft'
+readb query "SELECT __id, priority, title FROM task WHERE status = 'Draft'
             ORDER BY CASE lower(priority) WHEN 'high' THEN 0 WHEN 'medium' THEN 1 ELSE 2 END, created" --bundle ./tasks
 
 # Sprint-eligible: Draft and unblocked
-okdb query "
+readb query "
   SELECT t.__id, t.priority
   FROM task t
   WHERE t.status = 'Draft'
@@ -268,7 +268,7 @@ okdb query "
 " --bundle ./tasks
 
 # Count by state
-okdb query "SELECT status, count(*) AS n FROM task GROUP BY status ORDER BY n DESC" --bundle ./tasks
+readb query "SELECT status, count(*) AS n FROM task GROUP BY status ORDER BY n DESC" --bundle ./tasks
 ```
 
 # History

@@ -6,17 +6,17 @@ acceptance criteria in docs/design-brief.md arrive with the implementation.
 
 from __future__ import annotations
 
-import okdb
+import readb
 
 
 def test_version_is_exposed() -> None:
-    assert isinstance(okdb.__version__, str)
-    assert okdb.__version__
+    assert isinstance(readb.__version__, str)
+    assert readb.__version__
 
 
 def test_open_is_callable() -> None:
-    assert callable(okdb.open)
+    assert callable(readb.open)
 
 
 def test_database_is_exported() -> None:
-    assert hasattr(okdb, "Database")
+    assert hasattr(readb, "Database")

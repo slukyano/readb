@@ -8,7 +8,7 @@ The MVP load is a deliberate two-pass over the bundle:
 
   Pass 1 (infer): walk the tree, parse every file, route concepts to tables by normalized type,
                   and for each derived table infer the unified column types via the lattice in
-                  :mod:`okdb.schema`.
+                  :mod:`readb.schema`.
   Pass 2 (insert): create each table with explicit DDL, coerce each value to its column's
                    inferred type, and bind-insert the rows.
 
@@ -32,8 +32,8 @@ from pathlib import Path
 
 import duckdb
 
-from okdb.parser import Concept, parse_file
-from okdb.schema import (
+from readb.parser import Concept, parse_file
+from readb.schema import (
     RESERVED_FIELDS,
     SYSTEM_TABLE_NAMES,
     VIRTUAL_FIELDS,

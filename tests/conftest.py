@@ -12,8 +12,8 @@ from pathlib import Path
 
 import pytest
 
-import okdb
-from okdb.database import Database
+import readb
+from readb.database import Database
 
 FIXTURES = Path(__file__).parent / "fixtures"
 MINI_BUNDLE = FIXTURES / "mini"
@@ -28,7 +28,7 @@ def mini_path() -> Path:
 
 @pytest.fixture
 def mini_db() -> Iterator[Database]:
-    db = okdb.open(str(MINI_BUNDLE))
+    db = readb.open(str(MINI_BUNDLE))
     yield db
     db.close()
 
@@ -42,7 +42,7 @@ def ga4_path() -> Path:
 
 @pytest.fixture
 def ga4_db(ga4_path: Path) -> Iterator[Database]:
-    db = okdb.open(str(ga4_path))
+    db = readb.open(str(ga4_path))
     yield db
     db.close()
 

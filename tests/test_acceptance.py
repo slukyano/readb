@@ -10,8 +10,8 @@ from __future__ import annotations
 import hashlib
 from pathlib import Path
 
-import okdb
-from okdb.database import Database
+import readb
+from readb.database import Database
 
 
 def _md_files(bundle: Path) -> list[Path]:
@@ -103,7 +103,7 @@ def test_unknowntype_routing_and_documents_membership(mini_db: Database) -> None
 
 
 def test_normalization_rules() -> None:
-    from okdb.schema import normalize_type
+    from readb.schema import normalize_type
 
     assert normalize_type("Big %// Table") == "bigtable"
     assert normalize_type("3D Model") == "_3dmodel"
@@ -214,8 +214,8 @@ def test_malformed_file_skipped_but_load_succeeds(mini_db: Database, caplog) -> 
 def test_malformed_file_emits_warning(mini_path: Path, caplog) -> None:
     import logging
 
-    with caplog.at_level(logging.WARNING, logger="okdb.parser"):
-        okdb.open(str(mini_path)).close()
+    with caplog.at_level(logging.WARNING, logger="readb.parser"):
+        readb.open(str(mini_path)).close()
     assert any("malformed.md" in rec.getMessage() for rec in caplog.records)
 
 
@@ -232,7 +232,7 @@ def _hash_tree(bundle: Path) -> dict[str, str]:
 
 def test_no_files_created_or_modified(mini_path: Path) -> None:
     before = _hash_tree(mini_path)
-    db = okdb.open(str(mini_path))
+    db = readb.open(str(mini_path))
     db.sql("SELECT * FROM __DOCUMENTS")
     db.sql("SELECT * FROM widget")
     db.sql("SELECT * FROM __TAGS")

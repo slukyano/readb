@@ -1,4 +1,4 @@
-# okdb
+# readb
 
 Read-only SQL query layer over an OKF (Open Knowledge Format) bundle — a directory of markdown
 files with YAML frontmatter. The bundle is loaded into an in-memory DuckDB; DuckDB executes the
@@ -12,29 +12,29 @@ uv sync              # install deps + dev tools
 uv run pytest        # run tests
 uv run ruff check    # lint
 uv run ruff format   # format
-uv run okdb --help   # exercise the CLI
+uv run readb --help   # exercise the CLI
 ```
 
 ## Repo structure
 
-- `src/okdb/__init__.py` — public API: `okdb.open(path)` -> `Database`.
-- `src/okdb/database.py` — `Database`: thin read-only wrapper over a DuckDB connection; `.sql()`.
-- `src/okdb/loader.py` — THE load seam (`load_bundle`): bundle dir -> populated DuckDB + schema.
+- `src/readb/__init__.py` — public API: `readb.open(path)` -> `Database`.
+- `src/readb/database.py` — `Database`: thin read-only wrapper over a DuckDB connection; `.sql()`.
+- `src/readb/loader.py` — THE load seam (`load_bundle`): bundle dir -> populated DuckDB + schema.
   Wrap this, not callers, to add the future persistent-index cache.
-- `src/okdb/parser.py` — parse one file -> `Concept(path, frontmatter, body)`. Permissive.
-- `src/okdb/schema.py` — type-name normalization + the column-type unification lattice.
-- `src/okdb/fields.py` — the ONE write path: a surgical, line-based frontmatter field editor
+- `src/readb/parser.py` — parse one file -> `Concept(path, frontmatter, body)`. Permissive.
+- `src/readb/schema.py` — type-name normalization + the column-type unification lattice.
+- `src/readb/fields.py` — the ONE write path: a surgical, line-based frontmatter field editor
   (`get_field`/`set_fields`/`unset_fields`). Stdlib only; does NOT load the bundle or round-trip
   YAML — only the targeted `key: value` lines change.
-- `src/okdb/cli.py` — click CLI: `okdb query`/`okdb schema` (read-only) and `okdb get`/`set`/
+- `src/readb/cli.py` — click CLI: `readb query`/`readb schema` (read-only) and `readb get`/`set`/
   `unset` (the frontmatter editor, addressed by `--bundle <dir> <concept-id>`).
 
 ## Hard constraints
 
 - NEVER write a SQL parser or query planner. DuckDB executes all SQL.
-- READ-ONLY query/load path: loading a bundle and running SQL (`query`/`schema`, `okdb.open`)
+- READ-ONLY query/load path: loading a bundle and running SQL (`query`/`schema`, `readb.open`)
   never create or modify any file. The ONLY write path is the explicit frontmatter editor
-  (`okdb set`/`unset`, `okdb.fields`) — kept out of the load/query path and its own CLI commands.
+  (`readb set`/`unset`, `readb.fields`) — kept out of the load/query path and its own CLI commands.
   Never write back from SQL, and never mutate a file as a side effect of loading or querying.
 - Be permissive when loading: tolerate unknown keys, broken cross-links, missing `index.md`,
   malformed files. A bad file is logged and skipped — never crashes the load.
@@ -52,14 +52,14 @@ written as tests.
 ## Development workflow (sessions + sprints, dogfooding)
 
 The project backlog lives in `tasks/`, which is itself an OKF bundle (one `Task` concept per
-file, plus one `Sprint` concept per sprint). Query it with okdb:
-`okdb query "SELECT status, title FROM task" --bundle ./tasks`. All frontmatter edits go
-through okdb's own field editor — `okdb set`/`unset --bundle ./tasks <id> ...`.
+file, plus one `Sprint` concept per sprint). Query it with readb:
+`readb query "SELECT status, title FROM task" --bundle ./tasks`. All frontmatter edits go
+through readb's own field editor — `readb set`/`unset --bundle ./tasks <id> ...`.
 
-**Dogfooding rule:** always prefer okdb itself for reading and querying the local OKF bundles
-(`tasks/`, `docs/adr/`) — do not fall back to `cat`/grep/manual file reads for what okdb should
-answer. When okdb fails or can't express what you need: stop, immediately record a new `Draft`
-task for the gap, and only then work around it. Tasks that block dogfooding okdb take priority
+**Dogfooding rule:** always prefer readb itself for reading and querying the local OKF bundles
+(`tasks/`, `docs/adr/`) — do not fall back to `cat`/grep/manual file reads for what readb should
+answer. When readb fails or can't express what you need: stop, immediately record a new `Draft`
+task for the gap, and only then work around it. Tasks that block dogfooding readb take priority
 over the rest of the backlog.
 
 Development runs in **sprints** (no PRs). At session start, check for an unfinished sprint

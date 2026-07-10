@@ -1,10 +1,10 @@
-# okdb
+# readb
 
 A transparent, read-only SQL query layer over an **Open Knowledge Format (OKF)** bundle — a
 directory of markdown files with YAML frontmatter — so an agent or a human can run real SQL
 against the wiki with no explicit database-creation step.
 
-okdb loads a bundle into an embedded [DuckDB](https://duckdb.org/) engine and lets DuckDB
+readb loads a bundle into an embedded [DuckDB](https://duckdb.org/) engine and lets DuckDB
 execute the SQL. There is no custom SQL parser or query planner, and the source files are never
 modified.
 
@@ -24,18 +24,18 @@ uv sync
 Library:
 
 ```python
-import okdb
+import readb
 
-db = okdb.open("./path/to/bundle")          # builds an in-memory DuckDB; no files written
+db = readb.open("./path/to/bundle")          # builds an in-memory DuckDB; no files written
 rows = db.sql("SELECT * FROM __DOCUMENTS WHERE type = 'Metric'")
 ```
 
 CLI:
 
 ```sh
-okdb query "SELECT * FROM __DOCUMENTS" --bundle ./path       # results as a table
-okdb query "SELECT * FROM __DOCUMENTS" --bundle ./path --json
-okdb schema --bundle ./path                                  # detected types, tables, columns
+readb query "SELECT * FROM __DOCUMENTS" --bundle ./path       # results as a table
+readb query "SELECT * FROM __DOCUMENTS" --bundle ./path --json
+readb schema --bundle ./path                                  # detected types, tables, columns
 ```
 
 ## Tables and views
@@ -59,7 +59,7 @@ holds every observed value (`int`+`float` → `DOUBLE`; a scalar alongside a lis
 maps with a consistent key set → a `STRUCT`). Anything that doesn't reduce to a single engine
 type is stored as a `JSON` column — nothing is dropped, and producer intent is never guessed
 (strings are never split or parsed). The reserved `tags` field is always a `LIST`. Run
-`okdb schema` to see the inferred type of every column.
+`readb schema` to see the inferred type of every column.
 
 ## Development
 

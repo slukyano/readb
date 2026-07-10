@@ -3,12 +3,12 @@
 Two responsibilities:
 
 1. ``normalize_type`` maps a frontmatter ``type`` string to a SQL table name, tracking the
-   reverse mapping and collision-driven suffixes (collisions are resolved in :mod:`okdb.loader`,
+   reverse mapping and collision-driven suffixes (collisions are resolved in :mod:`readb.loader`,
    which holds the cross-document state).
 2. The column-type lattice infers ONE losslessly-holding DuckDB type per column from all
    observed values, with JSON as the universal fallback at the top of the lattice.
 
-These are pure, side-effect-free building blocks consumed by :mod:`okdb.loader`.
+These are pure, side-effect-free building blocks consumed by :mod:`readb.loader`.
 
 The lattice
 -----------
@@ -79,7 +79,7 @@ def normalize_type(raw_type: str) -> str:
         - If the result is empty, return ``""`` (caller routes the doc to ``__UNKNOWNTYPE``).
 
     Collision resolution (``_2``, ``_3``, ... on distinct original types) is the caller's job,
-    since it requires cross-document state. See :mod:`okdb.loader`.
+    since it requires cross-document state. See :mod:`readb.loader`.
 
     Examples:
         >>> normalize_type("Big %// Table")
@@ -289,7 +289,7 @@ def quote_ident(name: str) -> str:
 
 
 # --------------------------------------------------------------------------------------------
-# Public schema description (consumed by `okdb schema`)
+# Public schema description (consumed by `readb schema`)
 # --------------------------------------------------------------------------------------------
 
 

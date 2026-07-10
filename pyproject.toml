@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "okdb"
+name = "readb"
 version = "0.0.1"
 description = "A transparent, read-only SQL query layer over Open Knowledge Format (OKF) bundles."
 readme = "README.md"
@@ -24,11 +24,11 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/slukyano/okdb"
-Repository = "https://github.com/slukyano/okdb"
+Homepage = "https://github.com/slukyano/readb"
+Repository = "https://github.com/slukyano/readb"
 
 [project.scripts]
-okdb = "okdb.cli:main"
+readb = "readb.cli:main"
 
 [dependency-groups]
 dev = [
@@ -37,7 +37,7 @@ dev = [
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/okdb"]
+packages = ["src/readb"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
