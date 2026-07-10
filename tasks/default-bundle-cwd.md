@@ -9,7 +9,7 @@ tags:
 - dx
 created: 2026-06-29
 blocked_by: []
-timestamp: '2026-07-09T00:00:00Z'
+timestamp: '2026-07-10T00:00:00Z'
 ---
 
 Make `--bundle` optional and default it to `.` so you can run okdb from inside a bundle without
@@ -24,3 +24,22 @@ repeating the path.
 
 - Apply to both `query` and `schema`.
 - Keep the existing not-a-directory error behavior; give a clear message if `.` isn't a bundle.
+
+## Design
+
+Designed 2026-07-10.
+
+`--bundle` becomes optional with `default="."` (`show_default=True`) on **all five commands** —
+`query`, `schema`, `show`, and the editor commands `get`/`set`/`unset`. The seed named only
+`query`/`schema`, but a flag that defaults differently per command is worse than the
+consistency; flagged for the design review.
+
+- `click.Path(exists=True, file_okay=False)` stays — a nonexistent or non-directory `--bundle`
+  keeps its current clear usage error.
+- **No "is this really a bundle?" heuristic.** An empty/markdown-free directory loads as zero
+  tables (the permissive-load constraint says that's a valid bundle); a query against it then
+  fails with the clean missing-table catalog error from
+  [cli-clean-errors](cli-clean-errors.md), which names what exists. `okdb schema` on it shows
+  no tables — that *is* the clear message.
+- Tests: CliRunner with `chdir` into a fixture bundle, no `--bundle` flag, for a query and an
+  editor command; default shown in `--help` output.

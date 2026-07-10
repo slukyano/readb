@@ -9,7 +9,7 @@ tags:
 - cleanup
 created: 2026-06-29
 blocked_by: []
-timestamp: '2026-07-09T00:00:00Z'
+timestamp: '2026-07-10T00:00:00Z'
 ---
 
 We currently expose both `__path` (with `.md`) and `__id` (path minus `.md`) on every table.
@@ -26,3 +26,25 @@ redundant.
 - Decide: drop `__id` entirely, or keep it derivable on demand (e.g. a function/expression).
 - Update the lattice/loader, the `okdb schema` output, tests, and docs accordingly.
 - Confirm nothing in `__TAGS`/joins depends on `__id`.
+
+## Design
+
+Designed 2026-07-10. The contract change is [ADR 0003](../docs/adr/0003-virtual-columns.md)
+(also adds `__raw` from [read-full-concept](read-full-concept.md)).
+
+**Drop `__id` entirely** — no macro, no generated column. `__path` (with `.md`) is the primary
+key. Deriving an ID in SQL when needed: `regexp_replace(__path, '\.md$', '')`.
+
+Changes:
+
+- `schema.py`: remove `VIRTUAL_ID`; `loader.py`: remove the `concept_id` row value
+  (`loader.py:243`); `parser.Concept.concept_id` stays (the CLI resolver and `fields` editor
+  address by ID — only the SQL surface loses the column).
+- Verified: `__TAGS(concept_path, tag)` joins on the path — unaffected.
+- **Docs ripple (breaking):** every `__id` query in `tasks/workflow.md`, `CLAUDE.md`, and
+  `docs/adr/index.md` example blocks rewrites to `__path` (e.g.
+  `WHERE __path = 'sprint-001.md'`, `SELECT __path, status ...`). The sprint's own session-start
+  query changes shape — update the workflow doc in the same commit.
+- Known asymmetry (accepted in ADR 0003): CLI addresses by ID, SQL shows `__path`; the
+  resolver accepts both spellings.
+- Tests: `__id` absent from tables and `okdb schema`; `__path` uniqueness still asserted.

@@ -34,14 +34,24 @@ Design phase (a checked box = `## Design` section written and discussed):
 
 - [x] choose-package-name — `readb`, aligned dist/import/CLI ([ADR 0002](../docs/adr/0002-package-name-readb.md), Proposed)
 - [x] cli-clean-errors — CLI-layer try/except → `click.ClickException`; DuckDB message verbatim
-- [ ] read-full-concept
-- [ ] default-bundle-cwd
-- [ ] query-csv-output
-- [ ] remove-id-virtual-field
-- [ ] schema-drop-type-mapping
-- [ ] license-apache-2
+- [x] read-full-concept — `__raw` virtual column + `okdb show` (body); raw SQL output via `--format`
+- [x] default-bundle-cwd — `--bundle` optional, default `.`, all five commands
+- [x] query-csv-output — `--format table|json|csv|tsv|raw`; stdlib csv; `--json` alias kept
+- [x] remove-id-virtual-field — drop `__id` entirely ([ADR 0003](../docs/adr/0003-virtual-columns.md), Proposed); docs ripple
+- [x] schema-drop-type-mapping — CLI section removed; `BundleSchema.type_mapping` stays
+- [x] license-apache-2 — Apache 2.0 text + SPDX metadata; no NOTICE
 
 Implementation checklist is added at the design merge.
+
+## Implementation order
+
+1. `choose-package-name` (the rename — everything else lands on `readb`)
+2. `cli-clean-errors`
+3. `read-full-concept` + `query-csv-output` (shared output-format surface)
+4. `remove-id-virtual-field` (incl. workflow/CLAUDE doc query rewrites)
+5. `default-bundle-cwd`
+6. `schema-drop-type-mapping`
+7. `license-apache-2`
 
 ## Open questions
 
@@ -55,3 +65,6 @@ Implementation checklist is added at the design merge.
   human picked `readb` (over `readbl`, `plaindex`, `knowdb`). ADR 0002 proposed.
 - 2026-07-10 — `cli-clean-errors` designed (no human forks: CLI-layer error translation,
   DuckDB messages kept verbatim). `read-full-concept` design fork presented to the human.
+- 2026-07-10 — Human called the output shape: both `okdb show` (body alias) and `--format`,
+  plus a byte-exact whole-file virtual column (named `__raw`, ADR 0003). Remaining five
+  designs written (fork-free). All 8 designed — design approval requested.

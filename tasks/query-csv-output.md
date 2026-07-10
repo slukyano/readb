@@ -8,7 +8,7 @@ tags:
 - cli
 - dx
 created: 2026-07-02
-timestamp: '2026-07-09T00:00:00Z'
+timestamp: '2026-07-10T00:00:00Z'
 ---
 
 `okdb query` emits a pretty table or `--json`. Shell consumers (like the agent loop's
@@ -29,3 +29,30 @@ directly.
   better than accumulating booleans; keep `--json` as an alias either way).
 - Define NULL and list/JSON-value representation in text output; document it.
 - Update the loop's `select_next` to use it once available.
+  (Obsolete: the agent loop was retired with ADR 0001; the consumer is now any shell caller.)
+
+## Design
+
+Designed 2026-07-10 (human decision: one `--format` enum; also serves
+[read-full-concept](read-full-concept.md)).
+
+`okdb query` grows `--format table|json|csv|tsv|raw` (default `table`). `--json` stays as a
+compatibility alias for `--format json`; combining `--json` with a conflicting `--format` is a
+usage error.
+
+Per-format semantics:
+
+- **`csv` / `tsv`** — header row, then data rows, quoting/escaping via Python's **stdlib
+  `csv` module** (csv dialect / excel-tab). NULL → empty field; lists/dicts → their JSON text
+  (same coercion as the table's `_cell`). *Decision note:* the seed suggested delegating to
+  DuckDB's native CSV writer, but that means textually wrapping the user's SQL in
+  `COPY (...) TO`, which is exactly the kind of SQL string manipulation we forbid; stdlib
+  `csv` is not hand-rolled escaping.
+- **`raw`** — every selected value printed verbatim, each followed by a newline; no quoting,
+  no escaping. NULL → empty line. Intended for single-column reads
+  (`SELECT __body ... --format raw`); with multiline values, row boundaries are ambiguous by
+  construction — documented, not "fixed" (that is what csv is for).
+- **`json`, `table`** — unchanged.
+
+Tests: csv quoting (comma, quote, newline inside a value), tsv, raw verbatim + NULL-as-empty,
+`--json` alias unchanged, conflict error.
