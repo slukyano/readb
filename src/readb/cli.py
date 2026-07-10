@@ -30,7 +30,8 @@ from readb import fields, parser
 
 _BUNDLE_OPTION = click.option(
     "--bundle",
-    required=True,
+    default=".",
+    show_default=True,
     type=click.Path(exists=True, file_okay=False, dir_okay=True),
     help="Path to the OKF bundle directory.",
 )

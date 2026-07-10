@@ -200,3 +200,25 @@ def test_name_column_present_and_id_gone() -> None:
     assert result.exit_code == 0
     assert "__name" in result.output
     assert "__id" not in result.output
+
+
+# --------------------------------------------------------------------------------------------
+# --bundle defaults to the current directory.
+# --------------------------------------------------------------------------------------------
+
+
+def test_bundle_defaults_to_cwd_for_query_and_show() -> None:
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        Path("thing.md").write_text("---\ntype: T\ntitle: hi\n---\nthe body\n", encoding="utf-8")
+        result = runner.invoke(main, ["query", "SELECT title FROM t", "--format", "raw"])
+        assert result.exit_code == 0, result.output
+        assert result.output == "hi\n"
+        result = runner.invoke(main, ["show", "thing"])
+        assert result.exit_code == 0, result.output
+        assert result.output == "the body\n"
+
+
+def test_bundle_default_shown_in_help() -> None:
+    result = _run("query", "--help")
+    assert "[default: .]" in " ".join(result.output.split())  # help text may wrap the line
