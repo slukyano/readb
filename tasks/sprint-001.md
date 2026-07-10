@@ -49,7 +49,7 @@ Design phase (a checked box = `## Design` section written and discussed):
 4. [x] `remove-id-virtual-field` (incl. workflow/CLAUDE doc query rewrites)
 5. [x] `default-bundle-cwd`
 6. [x] `schema-drop-type-mapping`
-7. [ ] `license-apache-2` (incl. NOTICE — decision revised at approval)
+7. [x] `license-apache-2` (incl. NOTICE — decision revised at approval)
 8. [ ] Gates: full `pytest` + `ruff` + independent subagent review of the sprint diff
 
 ## Open questions
