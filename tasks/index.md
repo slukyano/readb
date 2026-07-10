@@ -8,6 +8,8 @@ okf_version: "0.1"
 
 # Tasks
 
+* [Print clean CLI errors instead of Python tracebacks](cli-clean-errors.md) - failed queries dump raw DuckDB tracebacks.
+* [Read a full concept via okdb](read-full-concept.md) - no ergonomic frontmatter+body read; forces cat fallbacks.
 * [Change the license to Apache 2.0](license-apache-2.md) - swap MIT for Apache 2.0.
 * [Choose a package name](choose-package-name.md) - okdb is taken; pick an available distribution name.
 * [Create a distributable package](distributable-package.md) - publish under the new name (blocked by: choose a package name).

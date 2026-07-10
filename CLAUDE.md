@@ -56,6 +56,12 @@ file, plus one `Sprint` concept per sprint). Query it with okdb:
 `okdb query "SELECT status, title FROM task" --bundle ./tasks`. All frontmatter edits go
 through okdb's own field editor — `okdb set`/`unset --bundle ./tasks <id> ...`.
 
+**Dogfooding rule:** always prefer okdb itself for reading and querying the local OKF bundles
+(`tasks/`, `docs/adr/`) — do not fall back to `cat`/grep/manual file reads for what okdb should
+answer. When okdb fails or can't express what you need: stop, immediately record a new `Draft`
+task for the gap, and only then work around it. Tasks that block dogfooding okdb take priority
+over the rest of the backlog.
+
 Development runs in **sprints** (no PRs). At session start, check for an unfinished sprint
 (`SELECT __id, status, branch FROM sprint WHERE status NOT IN ('Done','Aborted')`; a missing
 `sprint` table means no sprint ever ran) and resume it from its branch; otherwise propose a

@@ -31,6 +31,15 @@ The bundle holds three concept types:
 `index.md` and `log.md` are OKF-reserved (a listing and a change log); they are not concepts.
 Architecture Decision Records live in a separate bundle, [`docs/adr/`](../docs/adr/index.md).
 
+## Dogfooding rule
+
+okdb is the interface to the local OKF bundles. Reading and querying `tasks/` and `docs/adr/`
+goes through `okdb query`/`okdb schema`/`okdb get`; edits go through `okdb set`/`unset`. Do not
+fall back to `cat`, grep, or manual file reads for what okdb should answer. When okdb fails or
+can't express something needed for the workflow: **stop, immediately record a new `Draft` task**
+describing the gap, and only then use a workaround. Tasks that block dogfooding okdb take
+priority over the rest of the backlog when scoping sprints.
+
 # Task lifecycle
 
 ```

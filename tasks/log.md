@@ -1,6 +1,10 @@
 # Task Bundle Log
 
 ## 2026-07-09
+* **Dogfooding rule + gap tasks**: Recorded the dogfooding rule in `workflow.md` (prefer okdb
+  for the local bundles; when okdb fails, stop and record a task; okdb-blocking tasks take
+  priority). Added two high-priority gap tasks found while dogfooding:
+  [clean CLI errors](cli-clean-errors.md) and [read a full concept](read-full-concept.md).
 * **Workflow change**: Replaced the PR-per-step agent loop with the session/sprint workflow
   ([ADR 0001](../docs/adr/0001-sessions-sprints-workflow.md)). Rewrote `workflow.md`; task
   lifecycle is now `Draft → Designed → Done` (+ `Dropped`), sprint state lives in `Sprint`
