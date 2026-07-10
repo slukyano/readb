@@ -13,7 +13,7 @@ tasks:
 - choose-package-name
 - license-apache-2
 created: 2026-07-09
-timestamp: '2026-07-09T00:00:00Z'
+timestamp: '''2026-07-10T00:00:00Z'''
 ---
 
 First sprint under the session/sprint workflow ([ADR 0001](../docs/adr/0001-sessions-sprints-workflow.md)).
@@ -32,7 +32,7 @@ standalone tasks at scope approval: `choose-package-name` and `license-apache-2`
 
 Design phase (a checked box = `## Design` section written and discussed):
 
-- [ ] choose-package-name
+- [x] choose-package-name — `readb`, aligned dist/import/CLI ([ADR 0002](../docs/adr/0002-package-name-readb.md), Proposed)
 - [ ] cli-clean-errors
 - [ ] read-full-concept
 - [ ] default-bundle-cwd
@@ -51,3 +51,5 @@ Implementation checklist is added at the design merge.
 
 - 2026-07-09 — Sprint scoped and approved (8 tasks); branch `sprint/001` cut. Design phase
   started.
+- 2026-07-10 — `choose-package-name` designed: name research across registries/GitHub/web;
+  human picked `readb` (over `readbl`, `plaindex`, `knowdb`). ADR 0002 proposed.

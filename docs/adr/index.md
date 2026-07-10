@@ -13,3 +13,4 @@ okdb query "SELECT __id, status, title FROM adr ORDER BY __id" --bundle ./docs/a
 ```
 
 * [0001 — Replace the PR-per-step agent loop with a session/sprint workflow](0001-sessions-sprints-workflow.md) - Accepted.
+* [0002 — Name the package readb (dist, import, and CLI aligned)](0002-package-name-readb.md) - Proposed.
