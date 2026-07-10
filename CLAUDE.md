@@ -66,7 +66,9 @@ design merge to `main`), an autonomous implementation phase (commit throughout; 
 ask** on any decision that belongs to the human — never guess), gates (`pytest` + `ruff` +
 an independent subagent review of the diff), a sprint summary, and on human approval the final
 merge. Task lifecycle: `Draft → Designed → Done` (+ `Dropped`). ADRs live in `docs/adr/` (an
-OKF bundle); **only the human approves ADRs**. Full workflow: `tasks/workflow.md`.
+OKF bundle); **only the human approves ADRs**. All approvals happen in chat: present a
+separator, a short summary, the complete self-contained decision context (quote what matters;
+don't point at files), then the explicit question(s). Full workflow: `tasks/workflow.md`.
 
 ## Stack
 

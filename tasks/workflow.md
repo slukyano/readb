@@ -144,6 +144,22 @@ The agent presents a sprint summary to the human:
 Tasks that didn't make it stay `Designed` (or are returned to `Draft` if the design was
 invalidated) and return to the backlog for a future sprint.
 
+# Asking for approval (chat protocol)
+
+All approvals happen **in the chat**. The human decides from what's presented there — files
+are for double-clicking into details, never required reading for a decision. Whenever the
+agent finishes an iteration or needs a decision, it formats the ask as:
+
+1. a **separator** (`---`),
+2. the **question or summary in short** — one or two sentences,
+3. the **complete decision context** — everything needed to decide, self-contained in the
+   chat (quote the relevant parts; never just point at files, never dump whole files),
+4. the **explicit list of questions** to answer (or the single question), each answerable
+   with a short reply.
+
+This applies to scope approval, design approval, implementation approval, ADR acceptance,
+and stop-and-ask questions raised mid-implementation.
+
 # Sprint frontmatter schema
 
 | Field | Required | Type | Notes |
