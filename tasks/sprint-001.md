@@ -13,7 +13,7 @@ tasks:
 - choose-package-name
 - license-apache-2
 created: 2026-07-09
-timestamp: '''2026-07-10T00:00:00Z'''
+timestamp: '2026-07-10T00:00:00Z'
 ---
 
 First sprint under the session/sprint workflow ([ADR 0001](../docs/adr/0001-sessions-sprints-workflow.md)).
