@@ -28,8 +28,13 @@ The virtual-column contract is exactly three columns, all VARCHAR, on every conc
 | `__body` | Markdown body, frontmatter block stripped. |
 | `__raw` | The byte-exact file text as on disk (frontmatter included, decoded UTF-8). |
 
-`__id` is removed. When an ID is wanted in SQL, derive it:
-`regexp_replace(__path, '\.md$', '')`.
+`__id` is removed — **the path is the ID**. Nothing needs a derived bare ID:
+
+- CLI addressing (`show`/`get`/`set`/`unset`) accepts the ID with or without `.md`, so `__path`
+  values paste straight into commands.
+- Frontmatter cross-references (`blocked_by`, a sprint's `tasks:`) hold bare IDs by the
+  workflow's convention; joining them against `__path` appends the suffix:
+  `WHERE d.__path = b.dep || '.md'`.
 
 # Consequences
 

@@ -32,8 +32,10 @@ redundant.
 Designed 2026-07-10. The contract change is [ADR 0003](../docs/adr/0003-virtual-columns.md)
 (also adds `__raw` from [read-full-concept](read-full-concept.md)).
 
-**Drop `__id` entirely** — no macro, no generated column. `__path` (with `.md`) is the primary
-key. Deriving an ID in SQL when needed: `regexp_replace(__path, '\.md$', '')`.
+**Drop `__id` entirely** — no macro, no generated column, no derivation. `__path` (with `.md`)
+is the primary key and *is* the ID; joins against ID-valued frontmatter references append the
+suffix instead (`WHERE d.__path = b.dep || '.md'`), and the CLI resolver accepts both
+spellings.
 
 Changes:
 
