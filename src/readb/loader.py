@@ -202,7 +202,8 @@ def _build_table(
 ) -> None:
     """Infer types for ``frontmatter_columns``, create ``table_name``, and insert ``rows``.
 
-    Virtual columns (``__path``, ``__id``, ``__body``) are always appended as VARCHAR. The table
+    Virtual columns (``__path``, ``__id``, ``__body``, ``__raw``) are always appended as
+    VARCHAR. The table
     is always created even when empty, so queries against it never fail.
     """
     column_types: dict[str, LType] = {}
@@ -242,6 +243,7 @@ def _bind_row(
     row.append(concept.path)  # __path
     row.append(concept.concept_id)  # __id
     row.append(concept.body)  # __body
+    row.append(concept.raw)  # __raw
     return row
 
 

@@ -32,11 +32,14 @@ class Concept:
             using forward slashes regardless of platform.
         frontmatter: Parsed YAML mapping (may contain arbitrary producer keys; may be empty).
         body: Markdown body with the frontmatter block stripped (the ``__body`` virtual field).
+        raw: The byte-exact file text as on disk, frontmatter included, no normalization
+            (the ``__raw`` virtual field).
     """
 
     path: str
     frontmatter: dict[str, Any]
     body: str
+    raw: str
 
     @property
     def concept_id(self) -> str:
@@ -60,7 +63,7 @@ def parse_file(file_path: Path, *, bundle_root: Path) -> Concept | None:
 
     if frontmatter_text is None:
         # No frontmatter block: all body, empty frontmatter (normal for index.md / log.md).
-        return Concept(path=rel_path, frontmatter={}, body=body)
+        return Concept(path=rel_path, frontmatter={}, body=body, raw=text)
 
     try:
         parsed = yaml.safe_load(frontmatter_text)
@@ -76,7 +79,7 @@ def parse_file(file_path: Path, *, bundle_root: Path) -> Concept | None:
         )
         return None
 
-    return Concept(path=rel_path, frontmatter=parsed, body=body)
+    return Concept(path=rel_path, frontmatter=parsed, body=body, raw=text)
 
 
 def _split_frontmatter(text: str) -> tuple[str | None, str]:
