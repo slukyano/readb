@@ -127,11 +127,11 @@ def test_collision_gets_suffix_and_warning(mini_db: Database) -> None:
 
 def test_path_and_body_virtual_fields(mini_db: Database) -> None:
     row = mini_db.sql(
-        "SELECT __path, __id, __body FROM widget WHERE __path = 'concepts/widget_one.md'"
+        "SELECT __path, __name, __body FROM widget WHERE __path = 'concepts/widget_one.md'"
     )[0]
     assert row["__path"] == "concepts/widget_one.md"
     assert row["__path"].endswith(".md")
-    assert row["__id"] == "concepts/widget_one"  # Concept ID = __path minus .md
+    assert row["__name"] == "widget_one"  # simple file name: no directories, no .md
     assert "The first Widget" in row["__body"]
     assert "---" not in row["__body"]
     assert "type:" not in row["__body"]  # no frontmatter leaked into the body

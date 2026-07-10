@@ -63,7 +63,7 @@ task for the gap, and only then work around it. Tasks that block dogfooding read
 over the rest of the backlog.
 
 Development runs in **sprints** (no PRs). At session start, check for an unfinished sprint
-(`SELECT __id, status, branch FROM sprint WHERE status NOT IN ('Done','Aborted')`; a missing
+(`SELECT __name, status, branch FROM sprint WHERE status NOT IN ('Done','Aborted')`; a missing
 `sprint` table means no sprint ever ran) and resume it from its branch; otherwise propose a
 scope from the `Draft` backlog. Scope approval =
 committing `tasks/sprint-NNN.md` to `main` and cutting branch `sprint/NNN`. Then: an

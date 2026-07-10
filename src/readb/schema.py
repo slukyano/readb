@@ -49,11 +49,11 @@ RESERVED_FIELDS: tuple[str, ...] = (
 )
 
 # Virtual fields injected on every table.
-VIRTUAL_PATH = "__path"  # concept path relative to bundle root, WITH the .md suffix
-VIRTUAL_ID = "__id"  # Concept ID: __path minus the .md suffix
+VIRTUAL_PATH = "__path"  # concept path relative to bundle root, WITH the .md suffix (the key)
+VIRTUAL_NAME = "__name"  # the simple file name, no dirs/.md; assumed unique, NOT guaranteed
 VIRTUAL_BODY = "__body"  # the markdown body, frontmatter stripped
 VIRTUAL_RAW = "__raw"  # the byte-exact file text as on disk, frontmatter included
-VIRTUAL_FIELDS: tuple[str, ...] = (VIRTUAL_PATH, VIRTUAL_ID, VIRTUAL_BODY, VIRTUAL_RAW)
+VIRTUAL_FIELDS: tuple[str, ...] = (VIRTUAL_PATH, VIRTUAL_NAME, VIRTUAL_BODY, VIRTUAL_RAW)
 
 # Reserved filenames that are NOT concept docs.
 RESERVED_FILENAMES: frozenset[str] = frozenset({"index.md", "log.md"})

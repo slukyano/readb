@@ -9,9 +9,9 @@ Read-only query commands (query, schema) never touch the bundle. The get/set/uns
 the one, deliberately separate, write path: a surgical frontmatter field editor (see
 ``readb.fields``). ``get`` is read-only; ``set``/``unset`` edit a single concept file in place.
 
-readb get   --bundle ./path <concept-id> <key>              # print one frontmatter field
-readb set   --bundle ./path <concept-id> key=value ...      # set fields in place
-readb unset --bundle ./path <concept-id> <key> ...          # remove fields in place
+readb get   --bundle ./path <name-or-path> <key>              # print one frontmatter field
+readb set   --bundle ./path <name-or-path> key=value ...      # set fields in place
+readb unset --bundle ./path <name-or-path> <key> ...          # remove fields in place
 """
 
 from __future__ import annotations
@@ -103,34 +103,35 @@ def show(bundle: str, names: tuple[str, ...]) -> None:
             raise click.ClickException(f"cannot parse {name!r} ({file_path})")
         if len(resolved) > 1:
             click.echo(f"==> {concept.path} <==")
-        click.echo(concept.body)
+        # The body is printed verbatim; add a newline only when the file lacks a trailing one.
+        click.echo(concept.body, nl=not concept.body.endswith("\n"))
 
 
 # --------------------------------------------------------------------------------------------
 # Frontmatter field editing (get / set / unset).
 #
 # The one write path, kept separate from the read-only query layer. Each command addresses a
-# single concept by its ID within the bundle (``<bundle>/<concept-id>.md``); the edit is
+# single concept by wiki-style name or full ``.md`` path (see ``_concept_path``); the edit is
 # surgical and line-based (see readb.fields), so only the touched fields change.
 # --------------------------------------------------------------------------------------------
 
 
 @main.command()
 @_BUNDLE_OPTION
-@click.argument("concept_id")
+@click.argument("name_or_path")
 @click.argument("key")
-def get(bundle: str, concept_id: str, key: str) -> None:
+def get(bundle: str, name_or_path: str, key: str) -> None:
     """Print one frontmatter field of a concept (nothing if the field is absent)."""
-    value = fields.get_field(_concept_path(bundle, concept_id), key)
+    value = fields.get_field(_concept_path(bundle, name_or_path), key)
     if value is not None:
         click.echo(value)
 
 
 @main.command(name="set")
 @_BUNDLE_OPTION
-@click.argument("concept_id")
+@click.argument("name_or_path")
 @click.argument("assignments", nargs=-1, required=True)
-def set_(bundle: str, concept_id: str, assignments: tuple[str, ...]) -> None:
+def set_(bundle: str, name_or_path: str, assignments: tuple[str, ...]) -> None:
     """Set one or more frontmatter fields (KEY=VALUE ...) on a concept, in place."""
     pairs: list[tuple[str, str]] = []
     for item in assignments:
@@ -140,42 +141,67 @@ def set_(bundle: str, concept_id: str, assignments: tuple[str, ...]) -> None:
         if not key:
             raise click.BadParameter(f"empty key in {item!r}", param_hint="ASSIGNMENTS")
         pairs.append((key, value))
-    _edit(lambda path: fields.set_fields(path, pairs), bundle, concept_id)
+    _edit(lambda path: fields.set_fields(path, pairs), bundle, name_or_path)
 
 
 @main.command()
 @_BUNDLE_OPTION
-@click.argument("concept_id")
+@click.argument("name_or_path")
 @click.argument("keys", nargs=-1, required=True)
-def unset(bundle: str, concept_id: str, keys: tuple[str, ...]) -> None:
+def unset(bundle: str, name_or_path: str, keys: tuple[str, ...]) -> None:
     """Remove one or more frontmatter fields (KEY ...) from a concept, in place."""
-    _edit(lambda path: fields.unset_fields(path, list(keys)), bundle, concept_id)
+    _edit(lambda path: fields.unset_fields(path, list(keys)), bundle, name_or_path)
 
 
-def _concept_path(bundle: str, concept_id: str) -> Path:
-    """Resolve a concept ID to its file (``<bundle>/<id>.md``), guarding against escapes.
+_CLASH_LIST_CAP = 5
 
-    Accepts an ID with or without a trailing ``.md``. Raises a click error if the path escapes
-    the bundle directory or the file does not exist.
+
+def _concept_path(bundle: str, name_or_path: str) -> Path:
+    """Resolve a concept reference to its file: a full ``.md`` path or a wiki-style name.
+
+    A reference ending in ``.md`` is a bundle-relative path, resolved exactly (guarded against
+    escaping the bundle). Anything else is a simple name — no path separators — resolved by
+    searching the bundle for ``**/<name>.md``: exactly one match resolves; several raise an
+    error listing the clashing paths (at most 5) so the caller can re-run with the full path.
     """
     bundle_root = Path(bundle).resolve()
-    relative = concept_id[:-3] if concept_id.endswith(".md") else concept_id
-    target = (bundle_root / f"{relative}.md").resolve()
-    try:
-        target.relative_to(bundle_root)
-    except ValueError:
+
+    if name_or_path.endswith(".md"):
+        target = (bundle_root / name_or_path).resolve()
+        try:
+            target.relative_to(bundle_root)
+        except ValueError:
+            raise click.BadParameter(
+                f"path escapes the bundle: {name_or_path!r}", param_hint="NAME_OR_PATH"
+            ) from None
+        if not target.is_file():
+            raise click.ClickException(f"no such concept in bundle: {name_or_path!r} ({target})")
+        return target
+
+    if "/" in name_or_path or "\\" in name_or_path:
         raise click.BadParameter(
-            f"concept id escapes the bundle: {concept_id!r}", param_hint="CONCEPT_ID"
-        ) from None
-    if not target.is_file():
-        raise click.ClickException(f"no such concept in bundle: {concept_id!r} ({target})")
-    return target
+            f"a concept name has no path separators; use the full path ending in .md "
+            f"instead: {name_or_path!r}",
+            param_hint="NAME_OR_PATH",
+        )
+    matches = sorted(bundle_root.rglob(f"{name_or_path}.md"), key=lambda p: p.as_posix())
+    if not matches:
+        raise click.ClickException(f"no such concept in bundle: {name_or_path!r}")
+    if len(matches) > 1:
+        shown = ", ".join(str(p.relative_to(bundle_root)) for p in matches[:_CLASH_LIST_CAP])
+        more = len(matches) - _CLASH_LIST_CAP
+        tail = f", and {more} more" if more > 0 else ""
+        raise click.ClickException(
+            f"name {name_or_path!r} is ambiguous in this bundle: {shown}{tail}; "
+            f"re-run with the full path instead of the simple name"
+        )
+    return matches[0]
 
 
-def _edit(action: Any, bundle: str, concept_id: str) -> None:
+def _edit(action: Any, bundle: str, name_or_path: str) -> None:
     """Run a frontmatter mutation, translating a missing frontmatter block into a click error."""
     try:
-        action(_concept_path(bundle, concept_id))
+        action(_concept_path(bundle, name_or_path))
     except fields.FrontmatterError as exc:
         raise click.ClickException(str(exc)) from exc
 

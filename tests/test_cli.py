@@ -138,7 +138,8 @@ def test_show_prints_body_matching_body_column() -> None:
     row = json.loads(path_result.output)[0]
     shown = _run("show", "--bundle", str(MINI_BUNDLE), row["__path"])
     assert shown.exit_code == 0, shown.output
-    assert shown.output == row["__body"] + "\n"
+    body = row["__body"]
+    assert shown.output == (body if body.endswith("\n") else body + "\n")
 
 
 def test_show_multiple_uses_path_headers() -> None:
@@ -153,3 +154,49 @@ def test_show_missing_concept_is_clean_error() -> None:
     assert result.exit_code == 1
     assert "does-not-exist" in result.output
     assert "Traceback" not in result.output
+
+
+# --------------------------------------------------------------------------------------------
+# Wiki-style name resolution: a clashing simple name errors with the clashing paths listed.
+# --------------------------------------------------------------------------------------------
+
+
+def _clashing_bundle(tmp_path: Path, copies: int) -> Path:
+    for i in range(copies):
+        sub = tmp_path / f"dir{i}"
+        sub.mkdir()
+        (sub / "dup.md").write_text(f"---\ntype: T\n---\nbody {i}\n", encoding="utf-8")
+    return tmp_path
+
+
+def test_show_name_clash_lists_paths(tmp_path: Path) -> None:
+    bundle = _clashing_bundle(tmp_path, 2)
+    result = _run("show", "--bundle", str(bundle), "dup")
+    assert result.exit_code == 1
+    assert "ambiguous" in result.output
+    assert "dir0/dup.md" in result.output
+    assert "dir1/dup.md" in result.output
+    assert "full path" in result.output
+
+
+def test_name_clash_list_is_capped_at_five(tmp_path: Path) -> None:
+    bundle = _clashing_bundle(tmp_path, 7)
+    result = _run("show", "--bundle", str(bundle), "dup")
+    assert result.exit_code == 1
+    assert "dir4/dup.md" in result.output
+    assert "dir5/dup.md" not in result.output
+    assert "and 2 more" in result.output
+
+
+def test_full_path_resolves_during_clash(tmp_path: Path) -> None:
+    bundle = _clashing_bundle(tmp_path, 2)
+    result = _run("show", "--bundle", str(bundle), "dir1/dup.md")
+    assert result.exit_code == 0, result.output
+    assert result.output == "body 1\n"
+
+
+def test_name_column_present_and_id_gone() -> None:
+    result = _run("schema", "--bundle", str(MINI_BUNDLE))
+    assert result.exit_code == 0
+    assert "__name" in result.output
+    assert "__id" not in result.output

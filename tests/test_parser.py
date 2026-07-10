@@ -22,7 +22,7 @@ def test_parses_frontmatter_and_body(tmp_path: Path) -> None:
     assert c.frontmatter == {"type": "Thing", "title": "T"}
     assert c.body == "Body here.\n"
     assert c.path == "a.md"
-    assert c.concept_id == "a"
+    assert c.name == "a"
 
 
 def test_no_frontmatter_is_all_body(tmp_path: Path) -> None:
@@ -77,4 +77,4 @@ def test_nested_path_is_posix_relative(tmp_path: Path) -> None:
     c = parse_file(f, bundle_root=tmp_path)
     assert c is not None
     assert c.path == "sub/dir/x.md"
-    assert c.concept_id == "sub/dir/x"
+    assert c.name == "x"  # wiki-style: the simple file name, directories dropped

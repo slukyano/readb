@@ -75,7 +75,7 @@ One sprint moves through:
 Every session begins by checking for unfinished work:
 
 ```sh
-readb query "SELECT __id, status, branch FROM sprint WHERE status NOT IN ('Done','Aborted')" --bundle ./tasks
+readb query "SELECT __name, status, branch FROM sprint WHERE status NOT IN ('Done','Aborted')" --bundle ./tasks
 ```
 
 - **An active sprint exists** → check out its branch (the branch always has the freshest
@@ -182,7 +182,7 @@ and stop-and-ask questions raised mid-implementation.
 | `title` | yes | string | Short theme, e.g. "CLI ergonomics". |
 | `status` | yes | string | `Designing` \| `Implementing` \| `Done` \| `Aborted`. |
 | `branch` | yes | string | The sprint branch, e.g. `sprint/001`. |
-| `tasks` | yes | list | Concept IDs of the tasks in scope. |
+| `tasks` | yes | list | concept names of the tasks in scope. |
 | `created` | yes | date | ISO date of the sprint-start commit. |
 | `timestamp` | recommended | string | OKF-reserved; ISO-8601 of the last meaningful change. |
 
@@ -202,7 +202,7 @@ current during implementation, `## Open questions` (the stop-and-ask log), and a
 | `tags` | optional | list | Cross-cutting labels (`research`, `cli`, `packaging`, …). |
 | `created` | recommended | date | ISO date the draft was created. |
 | `timestamp` | optional | string | OKF-reserved; ISO-8601 of the last meaningful change. |
-| `blocked_by` | optional | list | Concept IDs of tasks that must be `Done` first. |
+| `blocked_by` | optional | list | concept names of tasks that must be `Done` first. |
 
 Producers may add more keys — readb's union-of-keys keeps them queryable, and columns simply
 appear once the first task uses them. A missing `blocked_by` means unblocked; don't write
@@ -210,7 +210,7 @@ empty lists.
 
 ## Blockers
 
-`blocked_by` lists the **Concept IDs** of prerequisite tasks (a Concept ID is the filename
+`blocked_by` lists the **concept names** of prerequisite tasks (a concept name is the filename
 without `.md`). A task is eligible for a sprint when its `status` is `Draft` (or `Designed`,
 for implementation) and every task in `blocked_by` is `Done`. A dangling or mistyped blocker
 counts as blocking (conservative — better to stall than to double-build). Tasks within one
@@ -227,8 +227,8 @@ concept per decision, named `NNNN-short-slug.md`.
 | `title` | yes | string | The decision, stated as a decision. |
 | `status` | yes | string | `Proposed` \| `Accepted` \| `Rejected` \| `Superseded`. |
 | `created` | yes | date | ISO date proposed. |
-| `sprint` | optional | string | Concept ID of the originating sprint. |
-| `superseded_by` | when superseded | string | Concept ID of the replacing ADR. |
+| `sprint` | optional | string | concept name of the originating sprint. |
+| `superseded_by` | when superseded | string | concept name of the replacing ADR. |
 
 Body: Context, Decision, Consequences (and Alternatives considered, when useful).
 
@@ -241,30 +241,30 @@ Rules:
 - Reversing an accepted decision means a new ADR that supersedes the old one, not an edit.
 
 ```sh
-readb query "SELECT __id, status, title FROM adr ORDER BY __id" --bundle ./docs/adr
+readb query "SELECT __name, status, title FROM adr ORDER BY __name" --bundle ./docs/adr
 ```
 
 # Querying with readb
 
 ```sh
 # Anything in flight?
-readb query "SELECT __id, status, branch FROM sprint WHERE status NOT IN ('Done','Aborted')" --bundle ./tasks
+readb query "SELECT __name, status, branch FROM sprint WHERE status NOT IN ('Done','Aborted')" --bundle ./tasks
 
 # The open backlog, highest priority first
-readb query "SELECT __id, priority, title FROM task WHERE status = 'Draft'
+readb query "SELECT __name, priority, title FROM task WHERE status = 'Draft'
             ORDER BY CASE lower(priority) WHEN 'high' THEN 0 WHEN 'medium' THEN 1 ELSE 2 END, created" --bundle ./tasks
 
 # Sprint-eligible: Draft and unblocked
 readb query "
-  SELECT t.__id, t.priority
+  SELECT t.__name, t.priority
   FROM task t
   WHERE t.status = 'Draft'
     AND NOT EXISTS (
       SELECT 1 FROM unnest(t.blocked_by) AS b(dep)
-      WHERE NOT EXISTS (SELECT 1 FROM task d WHERE d.__id = b.dep AND d.status = 'Done')
+      WHERE NOT EXISTS (SELECT 1 FROM task d WHERE d.__name = b.dep AND d.status = 'Done')
     )
   ORDER BY CASE lower(t.priority) WHEN 'high' THEN 0 WHEN 'medium' THEN 1 ELSE 2 END,
-           t.created NULLS LAST, t.__id
+           t.created NULLS LAST, t.__name
 " --bundle ./tasks
 
 # Count by state

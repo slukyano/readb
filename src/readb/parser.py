@@ -42,9 +42,14 @@ class Concept:
     raw: str
 
     @property
-    def concept_id(self) -> str:
-        """The Concept ID: ``path`` with the trailing ``.md`` removed."""
-        return self.path[:-3] if self.path.endswith(".md") else self.path
+    def name(self) -> str:
+        """The concept name (wiki-style): the simple file name, no directories, no ``.md``.
+
+        Assumed unique within a bundle, NOT guaranteed (the ``__name`` virtual field);
+        ``path`` is the unambiguous key.
+        """
+        filename = self.path.rsplit("/", 1)[-1]
+        return filename[:-3] if filename.endswith(".md") else filename
 
 
 def parse_file(file_path: Path, *, bundle_root: Path) -> Concept | None:
