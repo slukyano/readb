@@ -50,7 +50,7 @@ Design phase (a checked box = `## Design` section written and discussed):
 5. [x] `default-bundle-cwd`
 6. [x] `schema-drop-type-mapping`
 7. [x] `license-apache-2` (incl. NOTICE — decision revised at approval)
-8. [ ] Gates: full `pytest` + `ruff` + independent subagent review of the sprint diff
+8. [x] Gates: full `pytest` + `ruff` + independent subagent review of the sprint diff
 
 ## Open questions
 
@@ -73,3 +73,9 @@ Design phase (a checked box = `## Design` section written and discussed):
 - 2026-07-10 — **Design approved** (human, in chat; NOTICE decision delegated → yes, minimal
   NOTICE). ADRs 0002/0003 Accepted, tasks Designed, sprint Implementing, design merge to
   `main`. Implementation phase started.
+- 2026-07-10 — All 7 tasks implemented (one commit each, gates green throughout). Independent
+  review: 1 high (symlink escape via name resolution — also writable through `set`), 3 medium
+  (`__raw` not byte-exact on CRLF, glob metachars in names, directories named `*.md`), 6 low
+  (README ripple, shadowed-key silence, csv zero-row header, test gaps, leftover `concept_id`
+  param). All fixed with regression tests; csv zero-row prints nothing — documented as a known
+  limitation (column names travel with rows). 96 tests pass. Implementation approval requested.
