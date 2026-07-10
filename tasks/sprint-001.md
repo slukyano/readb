@@ -43,7 +43,7 @@ Design phase (a checked box = `## Design` section written and discussed):
 
 ## Implementation checklist (in order)
 
-1. [ ] `choose-package-name` (the rename — everything else lands on `readb`)
+1. [x] `choose-package-name` (the rename — everything else lands on `readb`)
 2. [ ] `cli-clean-errors`
 3. [ ] `read-full-concept` + `query-csv-output` (shared output-format surface)
 4. [ ] `remove-id-virtual-field` (incl. workflow/CLAUDE doc query rewrites)
