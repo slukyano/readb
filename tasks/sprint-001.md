@@ -45,7 +45,7 @@ Design phase (a checked box = `## Design` section written and discussed):
 
 1. [x] `choose-package-name` (the rename — everything else lands on `readb`)
 2. [x] `cli-clean-errors`
-3. [ ] `read-full-concept` + `query-csv-output` (shared output-format surface)
+3. [x] `read-full-concept` + `query-csv-output` (shared output-format surface)
 4. [ ] `remove-id-virtual-field` (incl. workflow/CLAUDE doc query rewrites)
 5. [ ] `default-bundle-cwd`
 6. [ ] `schema-drop-type-mapping`
