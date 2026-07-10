@@ -37,7 +37,7 @@ Design phase (a checked box = `## Design` section written and discussed):
 - [x] read-full-concept — `__raw` virtual column + `okdb show` (body); raw SQL output via `--format`
 - [x] default-bundle-cwd — `--bundle` optional, default `.`, all five commands
 - [x] query-csv-output — `--format table|json|csv|tsv|raw`; stdlib csv; `--json` alias kept
-- [x] remove-id-virtual-field — drop `__id` entirely ([ADR 0003](../docs/adr/0003-virtual-columns.md), Proposed); docs ripple
+- [x] remove-id-virtual-field — `__id` → wiki-style `__name` + clash exception ([ADR 0003](../docs/adr/0003-virtual-columns.md), Proposed); docs ripple
 - [x] schema-drop-type-mapping — CLI section removed; `BundleSchema.type_mapping` stays
 - [x] license-apache-2 — Apache 2.0 text + SPDX metadata; no NOTICE
 
@@ -68,3 +68,6 @@ Implementation checklist is added at the design merge.
 - 2026-07-10 — Human called the output shape: both `okdb show` (body alias) and `--format`,
   plus a byte-exact whole-file virtual column (named `__raw`, ADR 0003). Remaining five
   designs written (fork-free). All 8 designed — design approval requested.
+- 2026-07-10 — Human retired "ID" terminology: wiki-style `__name` (simple file name, assumed
+  unique, clash → listing exception) replaces `__id`; `__path` is the guaranteed key.
+  ADR 0003 rewritten.

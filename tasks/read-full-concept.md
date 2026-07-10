@@ -46,13 +46,15 @@ Three pieces:
    attribute carrying the full text it already read. `SELECT __raw` is *the* way to get the
    exact document; `__body` stays body-only. Contract change recorded in
    [ADR 0003](../docs/adr/0003-virtual-columns.md) together with the `__id` removal.
-2. **`okdb show [--bundle <dir>] <id> [<id>...]`** — a read-only CLI alias for "get `__body`":
-   prints each concept's body (frontmatter stripped), semantics identical to `__body` by
-   construction (same parser). Resolves IDs with the same escape-guarded resolver as
-   `get`/`set` (`_concept_path`, `.md` optional), so `okdb show index`/`log` also work —
-   file-level and permissive. Does **not** load the bundle into DuckDB (parses just the
-   addressed files, like `get`). Multiple IDs are separated by `==> <id> <==` header lines
-   (head-style); a single ID prints the body bare.
+2. **`okdb show [--bundle <dir>] <name-or-path> [...]`** — a read-only CLI alias for "get
+   `__body`": prints each concept's body (frontmatter stripped), semantics identical to
+   `__body` by construction (same parser). Arguments follow the wiki-style resolution of
+   [ADR 0003](../docs/adr/0003-virtual-columns.md): a simple name (assumed unique; clash →
+   the listing exception) or a full `.md` path (always unambiguous). `okdb show index`/`log`
+   work too — file-level and permissive. Does **not** load the bundle into DuckDB (parses
+   just the addressed files, like `get`). Multiple arguments are separated by
+   `==> <path> <==` header lines (paths, since they are unambiguous); a single argument
+   prints the body bare.
 3. Reading values verbatim out of SQL (`--format raw`) is designed under
    [query-csv-output](query-csv-output.md); `SELECT __raw ... --format raw` becomes the exact
    `cat` equivalent.

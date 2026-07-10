@@ -29,24 +29,28 @@ redundant.
 
 ## Design
 
-Designed 2026-07-10. The contract change is [ADR 0003](../docs/adr/0003-virtual-columns.md)
-(also adds `__raw` from [read-full-concept](read-full-concept.md)).
+Designed 2026-07-10 (revised same day: wiki-style naming). The contract change is
+[ADR 0003](../docs/adr/0003-virtual-columns.md) (which also adds `__raw` from
+[read-full-concept](read-full-concept.md)).
 
-**Drop `__id` entirely** — no macro, no generated column, no derivation. `__path` (with `.md`)
-is the primary key and *is* the ID; joins against ID-valued frontmatter references append the
-suffix instead (`WHERE d.__path = b.dep || '.md'`), and the CLI resolver accepts both
-spellings.
+**`__id` is dropped and replaced by `__name`** — the simple file name (no directories, no
+`.md`), wiki-style: *assumed* unique, not guaranteed. `__path` (full relative path with `.md`)
+is the guaranteed-unambiguous primary key. "ID" terminology is retired throughout.
 
 Changes:
 
-- `schema.py`: remove `VIRTUAL_ID`; `loader.py`: remove the `concept_id` row value
-  (`loader.py:243`); `parser.Concept.concept_id` stays (the CLI resolver and `fields` editor
-  address by ID — only the SQL surface loses the column).
-- Verified: `__TAGS(concept_path, tag)` joins on the path — unaffected.
-- **Docs ripple (breaking):** every `__id` query in `tasks/workflow.md`, `CLAUDE.md`, and
-  `docs/adr/index.md` example blocks rewrites to `__path` (e.g.
-  `WHERE __path = 'sprint-001.md'`, `SELECT __path, status ...`). The sprint's own session-start
-  query changes shape — update the workflow doc in the same commit.
-- Known asymmetry (accepted in ADR 0003): CLI addresses by ID, SQL shows `__path`; the
-  resolver accepts both spellings.
-- Tests: `__id` absent from tables and `okdb schema`; `__path` uniqueness still asserted.
+- `schema.py`: `VIRTUAL_ID` → `VIRTUAL_NAME` (`__name`); `loader.py:243`: row value becomes
+  the basename; `parser.Concept.concept_id` → `Concept.name` (basename semantics).
+- **CLI resolver rewrite** (`_concept_path`, shared by `show`/`get`/`set`/`unset`): argument
+  ending in `.md` = exact path (escape-guarded, as today); otherwise = name (no `/` allowed),
+  resolved via `**/<name>.md` search — one match resolves, zero errors, **two+ raise the clash
+  exception listing at most 5 clashing paths** and prompting to re-run with the full path.
+- Frontmatter references (`blocked_by`, sprint `tasks:`) hold names; the eligibility join
+  becomes `WHERE d.__name = b.dep`.
+- Verified: `__TAGS(concept_path, tag)` joins on the path — unaffected; the bundle walk is
+  already recursive (`rglob`), so clashes are real, not theoretical.
+- **Docs ripple (breaking):** `tasks/workflow.md` and `CLAUDE.md` example queries move from
+  `__id` to `__name` (unchanged shape for flat bundles); prose "Concept ID" → "concept name".
+- Tests: `__id` absent, `__name` present (basename for a nested fixture file); clash exception
+  message (5-path cap) for a name duplicated across subdirectories; exact-path addressing
+  still works during a clash.
