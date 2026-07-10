@@ -1,6 +1,9 @@
 # Task Bundle Log
 
 ## 2026-07-09
+* **Sprint 001 started**: Scope approved in chat — 8 tasks (the CLI/dogfooding cluster plus
+  `choose-package-name` and `license-apache-2`). Created [sprint-001](sprint-001.md)
+  (`Designing`, branch `sprint/001`).
 * **Dogfooding rule + gap tasks**: Recorded the dogfooding rule in `workflow.md` (prefer okdb
   for the local bundles; when okdb fails, stop and record a task; okdb-blocking tasks take
   priority). Added two high-priority gap tasks found while dogfooding:

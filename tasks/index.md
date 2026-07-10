@@ -6,6 +6,10 @@ okf_version: "0.1"
 
 * [Task workflow](workflow.md) - sessions, sprints, design/implementation approvals, ADRs.
 
+# Sprints
+
+* [Sprint 001 — CLI ergonomics, dogfooding gaps, name & license](sprint-001.md) - Designing.
+
 # Tasks
 
 * [Print clean CLI errors instead of Python tracebacks](cli-clean-errors.md) - failed queries dump raw DuckDB tracebacks.
