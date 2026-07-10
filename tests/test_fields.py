@@ -33,8 +33,8 @@ Do the thing.
 """
 
 
-def _bundle(tmp_path: Path, concept_id: str = "okf-demo", text: str = TASK) -> Path:
-    path = tmp_path / f"{concept_id}.md"
+def _bundle(tmp_path: Path, name: str = "okf-demo", text: str = TASK) -> Path:
+    path = tmp_path / f"{name}.md"
     path.write_text(text, encoding="utf-8")
     return tmp_path
 

@@ -17,6 +17,7 @@ readb unset --bundle ./path <name-or-path> <key> ...          # remove fields in
 from __future__ import annotations
 
 import csv
+import glob
 import io
 import json
 from pathlib import Path
@@ -157,6 +158,15 @@ def unset(bundle: str, name_or_path: str, keys: tuple[str, ...]) -> None:
 _CLASH_LIST_CAP = 5
 
 
+def _is_inside(path: Path, root: Path) -> bool:
+    """True when ``path`` (already resolved) is ``root`` or lives under it."""
+    try:
+        path.relative_to(root)
+    except ValueError:
+        return False
+    return True
+
+
 def _concept_path(bundle: str, name_or_path: str) -> Path:
     """Resolve a concept reference to its file: a full ``.md`` path or a wiki-style name.
 
@@ -185,7 +195,17 @@ def _concept_path(bundle: str, name_or_path: str) -> Path:
             f"instead: {name_or_path!r}",
             param_hint="NAME_OR_PATH",
         )
-    matches = sorted(bundle_root.rglob(f"{name_or_path}.md"), key=lambda p: p.as_posix())
+    # glob.escape: a name is a literal file name, never a pattern. Candidates must be regular
+    # files that still live inside the bundle after resolving (a symlink pointing outside the
+    # bundle must not be reachable by name any more than by path).
+    matches = sorted(
+        (
+            p
+            for p in bundle_root.rglob(f"{glob.escape(name_or_path)}.md")
+            if p.is_file() and _is_inside(p.resolve(), bundle_root)
+        ),
+        key=lambda p: p.as_posix(),
+    )
     if not matches:
         raise click.ClickException(f"no such concept in bundle: {name_or_path!r}")
     if len(matches) > 1:
@@ -218,7 +238,11 @@ def _json_default(obj: Any) -> str:
 
 
 def _format_csv(rows: list[dict[str, Any]], *, delimiter: str) -> str:
-    """Render rows as CSV/TSV: header row, stdlib-csv quoting, NULL as an empty field."""
+    """Render rows as CSV/TSV: header row, stdlib-csv quoting, NULL as an empty field.
+
+    A zero-row result prints nothing, header included — column names travel with the rows
+    (``Database.sql`` returns dicts), so there is nothing to name an empty result with.
+    """
     buffer = io.StringIO()
     writer = csv.writer(buffer, delimiter=delimiter, lineterminator="\n")
     if rows:

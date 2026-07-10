@@ -257,10 +257,17 @@ _NON_PRODUCER_KEYS: frozenset[str] = frozenset(RESERVED_FIELDS) | frozenset(VIRT
 def _producer_keys(rows: list[Concept]) -> list[str]:
     """Sorted union of non-reserved, non-virtual frontmatter keys across ``rows``."""
     keys: set[str] = set()
+    shadowed: set[str] = set()
     for concept in rows:
         for key in concept.frontmatter:
-            if isinstance(key, str) and key not in _NON_PRODUCER_KEYS:
+            if not isinstance(key, str):
+                continue
+            if key in VIRTUAL_FIELDS:
+                shadowed.add(key)  # the injected virtual column wins; the value is dropped
+            elif key not in _NON_PRODUCER_KEYS:
                 keys.add(key)
+    for key in sorted(shadowed):
+        logger.warning("frontmatter key %r shadows a virtual column; its values are ignored", key)
     return sorted(keys)
 
 

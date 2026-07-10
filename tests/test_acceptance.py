@@ -219,6 +219,22 @@ def test_malformed_file_emits_warning(mini_path: Path, caplog) -> None:
     assert any("malformed.md" in rec.getMessage() for rec in caplog.records)
 
 
+def test_frontmatter_key_shadowing_virtual_column_warns_and_is_ignored(
+    tmp_path: Path, caplog
+) -> None:
+    import logging
+
+    (tmp_path / "x.md").write_text("---\ntype: T\n__raw: sneaky\n---\nbody\n", encoding="utf-8")
+    with caplog.at_level(logging.WARNING, logger="readb.loader"):
+        db = readb.open(str(tmp_path))
+    try:
+        row = db.sql("SELECT __raw FROM t")[0]
+        assert row["__raw"].startswith("---")  # the injected file text, not the producer value
+        assert any("shadows a virtual column" in rec.getMessage() for rec in caplog.records)
+    finally:
+        db.close()
+
+
 # --- Criterion 12: no files are created or modified in the bundle during any operation ---------
 
 

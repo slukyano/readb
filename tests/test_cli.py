@@ -92,6 +92,22 @@ def test_json_flag_conflicts_with_other_format() -> None:
     assert "conflicts" in result.output
 
 
+def test_json_flag_with_format_json_is_allowed() -> None:
+    result = _run(
+        "query", "SELECT 1 AS n", "--bundle", str(MINI_BUNDLE), "--json", "--format", "json"
+    )
+    assert result.exit_code == 0, result.output
+
+
+def test_format_csv_zero_rows_prints_nothing() -> None:
+    # Documented: column names travel with rows, so an empty result has no header to print.
+    result = _run(
+        "query", "SELECT 1 AS n WHERE false", "--bundle", str(MINI_BUNDLE), "--format", "csv"
+    )
+    assert result.exit_code == 0, result.output
+    assert result.output == ""
+
+
 # --------------------------------------------------------------------------------------------
 # __raw virtual column and the show command.
 # --------------------------------------------------------------------------------------------
@@ -198,6 +214,42 @@ def test_full_path_resolves_during_clash(tmp_path: Path) -> None:
     assert result.output == "body 1\n"
 
 
+def test_name_resolution_refuses_symlink_escape(tmp_path: Path) -> None:
+    # A symlink inside the bundle pointing outside must be unreachable by name AND by path.
+    bundle = tmp_path / "bundle"
+    bundle.mkdir()
+    outside = tmp_path / "outside.md"
+    outside.write_text("---\ntype: T\n---\nsecret\n", encoding="utf-8")
+    (bundle / "evil.md").symlink_to(outside)
+    by_name = _run("show", "--bundle", str(bundle), "evil")
+    assert by_name.exit_code == 1
+    assert "no such concept" in by_name.output
+    by_path = _run("show", "--bundle", str(bundle), "evil.md")
+    assert by_path.exit_code != 0
+    assert "secret" not in by_path.output
+
+
+def test_name_is_literal_not_a_glob_pattern(tmp_path: Path) -> None:
+    (tmp_path / "task.md").write_text("---\ntype: T\n---\na\n", encoding="utf-8")
+    (tmp_path / "tusk.md").write_text("---\ntype: T\n---\nb\n", encoding="utf-8")
+    result = _run("show", "--bundle", str(tmp_path), "t?sk")
+    assert result.exit_code == 1
+    assert "no such concept" in result.output
+    result = _run("show", "--bundle", str(tmp_path), "*")
+    assert result.exit_code == 1
+
+
+def test_directory_named_md_is_not_a_concept(tmp_path: Path) -> None:
+    (tmp_path / "weird.md").mkdir()
+    (tmp_path / "real.md").write_text("---\ntype: T\n---\nok\n", encoding="utf-8")
+    by_name = _run("show", "--bundle", str(tmp_path), "weird")
+    assert by_name.exit_code == 1
+    assert "no such concept" in by_name.output
+    by_path = _run("get", "--bundle", str(tmp_path), "weird.md", "type")
+    assert by_path.exit_code == 1
+    assert "Traceback" not in by_path.output
+
+
 def test_name_column_present_and_id_gone() -> None:
     result = _run("schema", "--bundle", str(MINI_BUNDLE))
     assert result.exit_code == 0
@@ -220,6 +272,17 @@ def test_bundle_defaults_to_cwd_for_query_and_show() -> None:
         result = runner.invoke(main, ["show", "thing"])
         assert result.exit_code == 0, result.output
         assert result.output == "the body\n"
+
+
+def test_bundle_defaults_to_cwd_for_editor_commands() -> None:
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        Path("thing.md").write_text("---\ntype: T\ntitle: hi\n---\nbody\n", encoding="utf-8")
+        result = runner.invoke(main, ["set", "thing", "status=Done"])
+        assert result.exit_code == 0, result.output
+        result = runner.invoke(main, ["get", "thing", "status"])
+        assert result.exit_code == 0, result.output
+        assert result.output == "Done\n"
 
 
 def test_bundle_default_shown_in_help() -> None:

@@ -59,7 +59,9 @@ def parse_file(file_path: Path, *, bundle_root: Path) -> Concept | None:
     """
     rel_path = file_path.relative_to(bundle_root).as_posix()
     try:
-        text = file_path.read_text(encoding="utf-8")
+        # read_bytes + decode, NOT read_text: universal-newline mode would rewrite CRLF to LF
+        # and ``raw`` must stay byte-exact (ADR 0003).
+        text = file_path.read_bytes().decode("utf-8")
     except (OSError, UnicodeDecodeError) as exc:
         logger.warning("skipping %s: cannot read as UTF-8 (%s)", rel_path, exc)
         return None

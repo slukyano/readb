@@ -78,3 +78,13 @@ def test_nested_path_is_posix_relative(tmp_path: Path) -> None:
     assert c is not None
     assert c.path == "sub/dir/x.md"
     assert c.name == "x"  # wiki-style: the simple file name, directories dropped
+
+
+def test_raw_is_byte_exact_including_crlf(tmp_path: Path) -> None:
+    f = tmp_path / "c.md"
+    f.write_bytes(b"---\r\ntype: T\r\n---\r\nbody line\r\n")
+    c = parse_file(f, bundle_root=tmp_path)
+    assert c is not None
+    assert c.raw == "---\r\ntype: T\r\n---\r\nbody line\r\n"  # CRLF preserved verbatim
+    assert c.frontmatter == {"type": "T"}  # parsing still normalizes internally
+    assert "body line" in c.body
