@@ -12,4 +12,4 @@ Process: see [the task workflow](../../tasks/workflow.md#adrs).
 okdb query "SELECT __id, status, title FROM adr ORDER BY __id" --bundle ./docs/adr
 ```
 
-* [0001 — Replace the PR-per-step agent loop with a session/sprint workflow](0001-sessions-sprints-workflow.md) - Proposed.
+* [0001 — Replace the PR-per-step agent loop with a session/sprint workflow](0001-sessions-sprints-workflow.md) - Accepted.
