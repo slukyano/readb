@@ -13,7 +13,7 @@ tasks:
 - choose-package-name
 - license-apache-2
 created: 2026-07-09
-timestamp: '2026-07-10T00:00:00Z'
+timestamp: '2026-07-11T00:00:00Z'
 ---
 
 First sprint under the session/sprint workflow ([ADR 0001](../docs/adr/0001-sessions-sprints-workflow.md)).
@@ -47,7 +47,9 @@ Design phase (a checked box = `## Design` section written and discussed):
 2. [x] `cli-clean-errors`
 3. [x] `read-full-concept` + `query-csv-output` (shared output-format surface)
 4. [x] `remove-id-virtual-field` (incl. workflow/CLAUDE doc query rewrites)
-5. [x] `default-bundle-cwd`
+5. [x] ~~`default-bundle-cwd`~~ — implemented, then **reverted and Dropped** at implementation
+   review (human decision: cwd default = silent wrong-scope operations; successor draft:
+   `bundle-init-discovery`)
 6. [x] `schema-drop-type-mapping`
 7. [x] `license-apache-2` (incl. NOTICE — decision revised at approval)
 8. [x] Gates: full `pytest` + `ruff` + independent subagent review of the sprint diff
@@ -79,3 +81,8 @@ Design phase (a checked box = `## Design` section written and discussed):
   (README ripple, shadowed-key silence, csv zero-row header, test gaps, leftover `concept_id`
   param). All fixed with regression tests; csv zero-row prints nothing — documented as a known
   limitation (column names travel with rows). 96 tests pass. Implementation approval requested.
+- 2026-07-11 — At review the human dropped `default-bundle-cwd` (reverted; silent wrong-scope
+  hazard, verified live from the repo root) in favor of a future explicit-`init` + upward
+  discovery (draft: `bundle-init-discovery`). Also drafted `rename-repo-dir` (special: no
+  design, runs from the parent dir). Open design question raised: un-prefix `__name` → `name`
+  (inferred but producer-settable).

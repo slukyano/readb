@@ -1,5 +1,13 @@
 # Task Bundle Log
 
+## 2026-07-11
+* **Sprint 001 review decisions**: Dropped [default-bundle-cwd](default-bundle-cwd.md) after
+  implementing it — a cwd default silently treats any directory as a bundle (human decision at
+  implementation review; change reverted). Added drafts:
+  [bundle-init-discovery](bundle-init-discovery.md) (explicit `readb init` + git-style upward
+  discovery, marker doubles as the persistent-index home) and
+  [rename-repo-dir](rename-repo-dir.md) (special: no design, must run from the parent dir).
+
 ## 2026-07-09
 * **Sprint 001 started**: Scope approved in chat — 8 tasks (the CLI/dogfooding cluster plus
   `choose-package-name` and `license-apache-2`). Created [sprint-001](sprint-001.md)

@@ -29,10 +29,12 @@ import duckdb
 import readb
 from readb import fields, parser
 
+# --bundle is deliberately required: defaulting to the cwd silently treats any directory
+# (a repo root, $HOME) as a bundle — wrong-scope reads and misdirected name-resolved writes.
+# The ergonomic replacement is explicit init + upward discovery (task: bundle-init-discovery).
 _BUNDLE_OPTION = click.option(
     "--bundle",
-    default=".",
-    show_default=True,
+    required=True,
     type=click.Path(exists=True, file_okay=False, dir_okay=True),
     help="Path to the OKF bundle directory.",
 )

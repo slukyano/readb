@@ -34,14 +34,14 @@ CLI:
 
 ```sh
 readb query "SELECT * FROM __DOCUMENTS" --bundle ./path       # results as a table
-readb query "SELECT * FROM __DOCUMENTS" --format json         # or csv | tsv | raw
+readb query "SELECT * FROM __DOCUMENTS" --bundle ./path --format json   # or csv | tsv | raw
 readb schema --bundle ./path                                  # detected types, tables, columns
-readb show some-concept                                       # a concept's body, by name
+readb show --bundle ./path some-concept                       # a concept's body, by name
 ```
 
-`--bundle` defaults to the current directory. Concepts are addressed wiki-style: a simple file
-name (`some-concept`) when it is unique in the bundle, or the full path (`sub/some-concept.md`)
-— always unambiguous — when it is not. `--format raw` prints values verbatim, so
+Concepts are addressed wiki-style: a simple file name (`some-concept`) when it is unique in
+the bundle, or the full path (`sub/some-concept.md`) — always unambiguous — when it is not.
+`--format raw` prints values verbatim, so
 `readb query "SELECT __raw FROM task WHERE __name = 'x'" --format raw` is exactly `cat`.
 
 ## Tables and views

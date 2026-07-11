@@ -2,14 +2,14 @@
 type: Task
 title: Default --bundle to the current directory
 description: When no --bundle is passed, default to the current directory.
-status: Designed
+status: Dropped
 priority: medium
 tags:
 - cli
 - dx
 created: 2026-06-29
 blocked_by: []
-timestamp: '2026-07-10T00:00:00Z'
+timestamp: '2026-07-11T00:00:00Z'
 ---
 
 Make `--bundle` optional and default it to `.` so you can run okdb from inside a bundle without
@@ -43,3 +43,15 @@ consistency; flagged for the design review.
   no tables — that *is* the clear message.
 - Tests: CliRunner with `chdir` into a fixture bundle, no `--bundle` flag, for a query and an
   editor command; default shown in `--help` output.
+
+## Dropped (2026-07-11)
+
+Implemented in sprint 001, then reverted at implementation review, by human decision. A cwd
+default turns scoping mistakes into silent wrong-scope operations: any directory (a repo root,
+`$HOME`) quietly loads as a bundle, queries return wrong-scope data, and — sharpest — a
+name-resolved `set` can write into a bundle the caller never named. Verified live from the
+repo root: the whole repository loaded and a `task` table materialized.
+
+The ergonomic goal returns as [bundle-init-discovery](bundle-init-discovery.md): explicit
+`readb init` + git-style upward discovery, with the marker doubling as the future
+persistent-index home.

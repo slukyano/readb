@@ -17,7 +17,8 @@ okf_version: "0.1"
 * [Change the license to Apache 2.0](license-apache-2.md) - swap MIT for Apache 2.0.
 * [Choose a package name](choose-package-name.md) - okdb is taken; pick an available distribution name.
 * [Create a distributable package](distributable-package.md) - publish under the new name (blocked by: choose a package name).
-* [Default --bundle to the current directory](default-bundle-cwd.md) - run commands from inside a bundle with no flag.
+* [Explicit readb init + upward bundle discovery](bundle-init-discovery.md) - the git model; marker doubles as the persistent-index home.
+* [Rename the repo and directory to readb](rename-repo-dir.md) - special task: no design; must run from the parent directory.
 * [Remove the __id virtual field](remove-id-virtual-field.md) - __path is already unique and can be the primary key.
 * [Drop the type mapping from `okdb schema`](schema-drop-type-mapping.md) - the original type is already shown per table.
 * [Research similar task/reader tools](research-similar-tools.md) - survey Backlog.md, taskmd, and friends.
@@ -26,6 +27,8 @@ okf_version: "0.1"
 * [Keep index.md and log.md current automatically](bundle-index-log-automation.md) - generate the index; sprint-appended log entries.
 
 # Dropped
+
+* [Default --bundle to the current directory](default-bundle-cwd.md) - implemented in sprint 001, reverted at review (silent wrong-scope operations); superseded by init + discovery.
 
 Loop-era tasks retired with the agent loop ([ADR 0001](../docs/adr/0001-sessions-sprints-workflow.md)):
 
