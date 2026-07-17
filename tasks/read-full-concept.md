@@ -2,14 +2,14 @@
 type: Task
 title: Read a full concept (frontmatter + body) via okdb
 description: No ergonomic way to read one whole concept; long bodies are unusable in table output, forcing cat fallbacks.
-status: Designed
+status: Done
 priority: high
 tags:
 - cli
 - dx
 - dogfooding
 created: 2026-07-09
-timestamp: '2026-07-10T00:00:00Z'
+timestamp: '2026-07-17T00:00:00Z'
 ---
 
 There is no good okdb way to read a whole concept. `okdb get` returns a single frontmatter

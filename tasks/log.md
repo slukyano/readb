@@ -1,5 +1,16 @@
 # Task Bundle Log
 
+## 2026-07-17
+* **Sprint 001 close-out**: All 7 delivered tasks flipped `Designed → Done`
+  ([choose-package-name](choose-package-name.md), [cli-clean-errors](cli-clean-errors.md),
+  [read-full-concept](read-full-concept.md), [query-csv-output](query-csv-output.md),
+  [remove-id-virtual-field](remove-id-virtual-field.md),
+  [schema-drop-type-mapping](schema-drop-type-mapping.md), [license-apache-2](license-apache-2.md));
+  [sprint-001](sprint-001.md) flipped `Implementing → Done` with a written sprint summary.
+  Gates re-run green (94 tests, `ruff` clean). Presented for final review + merge. Added draft
+  [name-column-unprefix](name-column-unprefix.md), formalizing the sprint-001 open question
+  (un-prefix `__name → name`) that had no backlog task.
+
 ## 2026-07-11
 * **Sprint 001 review decisions**: Dropped [default-bundle-cwd](default-bundle-cwd.md) after
   implementing it — a cwd default silently treats any directory as a bundle (human decision at

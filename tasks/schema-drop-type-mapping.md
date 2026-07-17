@@ -2,14 +2,14 @@
 type: Task
 title: Drop the type mapping from `okdb schema` output
 description: Remove the separate type-mapping section; the original type is already shown per table.
-status: Designed
+status: Done
 priority: low
 tags:
 - cli
 - schema
 created: 2026-06-29
 blocked_by: []
-timestamp: '2026-07-10T00:00:00Z'
+timestamp: '2026-07-17T00:00:00Z'
 ---
 
 `okdb schema` prints a standalone "Type mapping (table name <- original type)" section. Each
