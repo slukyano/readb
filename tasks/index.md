@@ -8,21 +8,25 @@ okf_version: "0.1"
 
 # Sprints
 
+* [Sprint 002 — Bundle init, packaging & correctness follow-ups](sprint-002.md) - Designing.
 * [Sprint 001 — CLI ergonomics, dogfooding gaps, name & license](sprint-001.md) - Done.
 
 # Tasks
 
-* [Create a distributable package](distributable-package.md) - publish under the new name (blocked by: choose a package name).
-* [Explicit readb init + upward bundle discovery](bundle-init-discovery.md) - the git model; marker doubles as the persistent-index home.
-* [Rename the repo and directory to readb](rename-repo-dir.md) - special task: no design; must run from the parent directory.
-* [Research similar task/reader tools](research-similar-tools.md) - survey Backlog.md, taskmd, and friends.
+* [Create a distributable package](distributable-package.md) - publish under the new name (sprint 002).
+* [Explicit readb init + upward bundle discovery](bundle-init-discovery.md) - the git model; marker doubles as the persistent-index home (sprint 002).
+* [Research similar task/reader tools](research-similar-tools.md) - survey Backlog.md, taskmd, and friends (sprint 002).
 * [Research structured-body querying](research-body-structured-query.md) - expose the body as JSON/YAML/DOM by headings.
 * [Keep index.md and log.md current automatically](bundle-index-log-automation.md) - generate the index; sprint-appended log entries.
-* [Consider un-prefixing __name -> name](name-column-unprefix.md) - producer-settable, inferred; sprint-001 open question.
-* [Decide zero-row csv/tsv output](csv-empty-result-header.md) - header or nothing on empty results; maybe a bug (sprint-001 review).
-* [Revisit tz-aware datetime handling](tz-aware-datetime-handling.md) - is avoiding pytz still right, or can it be TIMESTAMPTZ? (sprint-001 review).
+* [Consider un-prefixing __name -> name](name-column-unprefix.md) - producer-settable, inferred; sprint-001 open question (sprint 002).
+* [Decide zero-row csv/tsv output](csv-empty-result-header.md) - header or nothing on empty results; maybe a bug (sprint-001 review) (sprint 002).
+* [Revisit tz-aware datetime handling](tz-aware-datetime-handling.md) - is avoiding pytz still right, or can it be TIMESTAMPTZ? (sprint-001 review) (sprint 002).
 
 # Done
+
+Standalone:
+
+* [Rename the repo and directory to readb](rename-repo-dir.md) - executed by the human, verified at sprint-002 scoping.
 
 Sprint 001:
 

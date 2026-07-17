@@ -1,6 +1,15 @@
 # Task Bundle Log
 
 ## 2026-07-17
+* **Sprint 002 started**: Scope approved in chat — 7 tasks: [bundle-init-discovery](bundle-init-discovery.md),
+  [distributable-package](distributable-package.md) (unblocked by choose-package-name),
+  [csv-empty-result-header](csv-empty-result-header.md),
+  [name-column-unprefix](name-column-unprefix.md),
+  [tz-aware-datetime-handling](tz-aware-datetime-handling.md),
+  [research-similar-tools](research-similar-tools.md), plus
+  [rename-repo-dir](rename-repo-dir.md) — executed by the human beforehand, verified
+  in-session (remote, cwd, pyproject URLs, tests green) and flipped `Draft → Done`. Created
+  [sprint-002](sprint-002.md) (`Designing`, branch `sprint/002`). Design phase started.
 * **Sprint 001 close-out**: All 7 delivered tasks flipped `Designed → Done`
   ([choose-package-name](choose-package-name.md), [cli-clean-errors](cli-clean-errors.md),
   [read-full-concept](read-full-concept.md), [query-csv-output](query-csv-output.md),
