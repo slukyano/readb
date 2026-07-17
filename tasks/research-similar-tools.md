@@ -157,6 +157,30 @@ a deliberate, defensible divergence (and already a hard constraint: never write 
    These are *queries* over `blocked_by`, and readb is a read-only SQL layer — a "next unblocked
    task" recipe already lives in workflow.md. Nothing to build. Reject as an engine feature.
 
+### Adoption & maturity (checked 2026-07-17)
+
+- **Backlog.md** — **~6.2k stars, 372 forks**, TypeScript, MIT. Very active: v1.48.0 released
+  2026-07-12 (days ago), ~1,026 commits, on Homebrew (`backlog-md`), has a community VS Code
+  extension. Real traction and a
+  [Hacker News launch thread](https://news.ycombinator.com/item?id=44483530) (positive; users
+  asked for dependency management and Jira/OpenRouter integration). The most mature/adopted tool
+  in the survey by a wide margin.
+- **MarkdownDB** (`datopian/markdowndb`) — **~495 stars, 25 forks**, TypeScript, npm `mddb`.
+  But **stalled**: latest release v0.9.5 is from **March 2024** (~2.3 years stale), pre-1.0, 9
+  open issues / 0 PRs. Moderate one-time interest, little current momentum.
+- **frontmatter-mcp** (`kzmshx/frontmatter-mcp`) — **1 star, 2 forks**. Effectively zero
+  adoption; a personal project (Python, DuckDB, v0.5.3 Dec 2025). Architecturally it's the
+  closest twin to readb, but the niche is validated-yet-unclaimed in practice.
+
+**Positioning takeaway (readb's actual differentiator).** The DuckDB-SQL-over-frontmatter idea
+is *proven viable but essentially unadopted* (frontmatter-mcp), and the one tool with real users
+in the "markdown-as-SQL" space (MarkdownDB) builds a **managed on-disk index** you regenerate and
+maintain. readb's distinction is that **the index is transparent and disposable** — in-memory
+today (a wrapped `.readb/` cache later), never a database the user manages: you point at a
+directory and query. That "you never manage a DB" framing — plus read-only-load, permissive
+lossless parsing, the one narrow write path, and OKF shape — is the niche, and it's open. Folded
+into draft `readme-prior-art`.
+
 ### Sources
 
 Primary repos/docs: `github.com/MrLesk/Backlog.md` (+ `CLI-INSTRUCTIONS.md`),

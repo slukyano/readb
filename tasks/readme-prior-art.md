@@ -29,6 +29,16 @@ readb's niche: a **read-only CLI + Python API + a surgical frontmatter field edi
 and constraints (read-only load/query path, permissive lossless load, the one narrow write
 path), not a novel engine.
 
+**The sharpest differentiator (per the human, 2026-07-17):** the SQL index is **transparent and
+disposable** — you never manage a database. MarkdownDB (the only real-adoption comparable) builds
+a **managed on-disk SQLite index** you regenerate and maintain; readb's index is in-memory today
+and, when the persistent cache lands, a wrapped `.readb/` artifact you still never touch. Whether
+in memory or on disk, the user points at a directory and queries — the DB is an implementation
+detail, not a thing to operate. Adoption context (checked 2026-07-17): MarkdownDB ~495★ but
+stalled since March 2024; frontmatter-mcp (closest architectural twin, DuckDB SQL) has ~1★ — the
+approach is proven viable but effectively unclaimed. Lead the note with the transparency framing,
+not a feature list.
+
 ## Notes (to refine)
 
 - Keep it short — a "Prior art" or "How readb differs" subsection, not a survey.
