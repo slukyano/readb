@@ -5,7 +5,7 @@ description: How development runs in sessions and sprints — scoping, design, a
 tags:
 - meta
 - process
-timestamp: '2026-07-09T00:00:00Z'
+timestamp: '2026-07-17T00:00:00Z'
 ---
 
 # Overview
@@ -134,24 +134,63 @@ subagents where appropriate. Rules of the phase:
 - **Independent review** — a fresh subagent with no implementation context reviews the full
   sprint diff; findings are fixed (or explicitly presented as known issues).
 
-## 6. Presentation & final merge
+## 6. Close-out, presentation & final merge
 
-The agent presents a sprint summary to the human:
+Once the gates pass, close the sprint out **on the branch** so the human reviews the exact
+state that will merge — bookkeeping included. The only thing gated purely on approval is the
+merge itself.
 
-- features delivered (per task),
-- **breaking changes**,
-- architectural decisions made (with their ADRs),
-- difficulties encountered and open questions,
-- review findings and how they were resolved.
+### 6a. Close-out bookkeeping (committed to the branch, before presenting)
+
+1. Flip every delivered task `Designed → Done` via the field editor
+   (`readb set --bundle ./tasks <name> status=Done timestamp=<ISO>`); update the timestamp.
+2. Flip the sprint `Implementing → Done` (same editor) and update its timestamp.
+3. Write a `## Sprint summary` into the sprint body and a close-out `## Session log` line.
+4. Bring the hand-maintained `tasks/index.md` and `tasks/log.md` current (move Done tasks to a
+   `# Done` section; mark the sprint Done; add a dated log entry).
+5. **Every open question / deferred idea must have a home.** If something was left undone —
+   deliberately or by omission — it is either done now or captured as a `Draft` task. Never
+   say "carried to the backlog" without a concrete task name; create the task if none exists.
+6. Commit the bookkeeping (`chore(sprint): close out sprint-NNN ...`).
+
+### 6b. The summary artifact + independent accuracy check
+
+Write the full review to a **file** (e.g. `.scratchpad/sprint-NNN-review.md`), then have a
+**fresh reviewer subagent** (no implementation context) verify it against the real diff
+(`git diff main..sprint/NNN`) and the live gate output — commit/file counts, test numbers,
+task states, and every "what changed" / "bug fixed" / "limitation" claim. Fix any inaccuracy
+the reviewer finds **before** presenting. Do not present an unverified summary.
+
+### 6c. Presentation format (always include)
+
+Present in the chat protocol below. The summary MUST include:
+
+- **A task ledger listing *every* task involved** — Done, Dropped, created-this-sprint, and
+  planned-but-descoped. For each: its **relative weight** (`major` / `mid` / `minor` — size AND
+  importance AND future impact; e.g. a package rename is a small diff but major impact), and a
+  **⚠️ mark if it transformed significantly** during design or implementation.
+- **Per change: what changed and why, and how the task transformed** from its original framing.
+- **Explicitly what was NOT done** — deliberately or by omission — each item paired with its
+  disposition (done, or the **named** `Draft` task that now holds it).
+- **Breaking changes.**
+- **Architectural decisions** made, with their ADRs.
+- **Bugs found & fixed** (review findings & how they were resolved) — its own section.
+- **Remaining limitations & highlights** — a separate, clearly-flagged must-read section
+  (sharp edges, deliberate trade-offs, things a user will trip on), never folded into prose.
+
+Whenever the summary says something was deferred or carried forward, **name the backlog task
+that holds it** — never a bare "added to the backlog".
+
+### 6d. Final merge
 
 **Implementation approval** triggers, in order:
 
 1. New ADRs flip `Proposed → Accepted` (or are revised/rejected per the human).
-2. Completed tasks flip `Designed → Done`; the sprint flips `Implementing → Done`.
-3. The sprint branch is **merged to `main`** (final merge) and deleted.
+2. The sprint branch is **merged to `main`** (final merge, `--no-ff`) and deleted.
 
-Tasks that didn't make it stay `Designed` (or are returned to `Draft` if the design was
-invalidated) and return to the backlog for a future sprint.
+(Task/sprint status flips already happened in 6a; if the human sends changes back, revert or
+adjust the bookkeeping before merging.) Tasks that didn't make it stay `Designed` (or return to
+`Draft` if the design was invalidated) and go back to the backlog for a future sprint.
 
 # Asking for approval (chat protocol)
 
