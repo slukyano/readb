@@ -1,4 +1,4 @@
-Build `okdb`: a transparent, read-only SQL query layer over an Open Knowledge Format (OKF) bundle — a directory of markdown files with YAML frontmatter — so an agent or human can run real SQL against the wiki with no explicit database-creation step.
+Build `readb`: a transparent, read-only SQL query layer over an Open Knowledge Format (OKF) bundle — a directory of markdown files with YAML frontmatter — so an agent or human can run real SQL against the wiki with no explicit database-creation step.
 
 Start by initializing the project according to /new-project skill.
 
@@ -32,7 +32,7 @@ opened without rebuilding.
 
 A library + thin CLI. Conceptually:
 
-    db = okdb.open("./path/to/bundle")   # builds an in-memory DuckDB, no files written
+    db = readb.open("./path/to/bundle")   # builds an in-memory DuckDB, no files written
     rows = db.sql("SELECT * FROM __DOCUMENTS WHERE type = 'Metric'")
 
 ### Tables / views
@@ -61,7 +61,7 @@ A library + thin CLI. Conceptually:
 - If the result is empty, the doc routes to `__UNKNOWNTYPE`.
 - Pure deletion widens the collision surface (`big table` and `bigtable` collide). On
   collision between two distinct original types, append `_2`, `_3`, … and emit a warning.
-- Keep a mapping (normalized name ↔ original type string) callers can query via `okdb schema`.
+- Keep a mapping (normalized name ↔ original type string) callers can query via `readb schema`.
 
 ### Column type unification (the lattice — get this right)
 Per table, per column, infer ONE type at load time that losslessly holds every observed
@@ -84,9 +84,9 @@ Rules, narrowest-fit-wins:
   `tag: [1, 2, 3]` (list of int) in another → singleton-promotion gives `["1, 2, 3"]` vs
   `[1, 2, 3]`, element types don't unify → column type `LIST<JSON>`.
 
-### CLI (binary: `okdb`)
-- `okdb query "<SQL>" --bundle ./path` → results as a table (`--json` for JSON).
-- `okdb schema --bundle ./path` → detected types, their normalized table names, inferred
+### CLI (binary: `readb`)
+- `readb query "<SQL>" --bundle ./path` → results as a table (`--json` for JSON).
+- `readb schema --bundle ./path` → detected types, their normalized table names, inferred
   columns + types, and the type-name mapping.
 
 ## Explicit NON-goals for this MVP (leave seams, don't implement)
@@ -101,7 +101,7 @@ Rules, narrowest-fit-wins:
 - No write-back from SQL. The query/load path is strictly READ-ONLY: loading and querying never
   modify the markdown files. (DML-via-SQL would be asymmetric: UPDATE/DELETE map to frontmatter
   rewrites, INSERT does not map cleanly — out of scope.) The one sanctioned write path is a
-  separate, explicit frontmatter field editor (`okdb get`/`set`/`unset`, `okdb.fields`) that edits
+  separate, explicit frontmatter field editor (`readb get`/`set`/`unset`, `readb.fields`) that edits
   a single concept's `key: value` lines in place — deliberately kept out of the SQL/load path.
 - No body-structure parsing. `__body` is text; addressing it as a DOM/JSON tree by heading is
   a future, type-specific feature. Leave a hook.
@@ -127,7 +127,7 @@ Clone Google's reference bundles (real, conformant, small, multi-type, cross-lin
 
 ## Acceptance criteria (write as tests)
 1. `__DOCUMENTS` row count for `ga4` = number of `.md` files EXCLUDING every `index.md`/`log.md`.
-2. Each distinct `type` yields a table; `okdb schema` lists normalized names, columns+types,
+2. Each distinct `type` yields a table; `readb schema` lists normalized names, columns+types,
    and the original-type mapping.
 3. A doc missing an optional key a sibling has → NULL, not an error (union-of-keys is lossless).
 4. `__INDEXES` contains one row per `index.md`, with the union of their frontmatter fields.

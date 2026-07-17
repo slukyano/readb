@@ -2,14 +2,14 @@
 type: Task
 title: Print clean CLI errors instead of Python tracebacks
 description: A failed query (e.g. missing table) dumps a raw DuckDB traceback; print a one-line error and exit nonzero.
-status: Designed
+status: Done
 priority: high
 tags:
 - cli
 - dx
 - dogfooding
 created: 2026-07-09
-timestamp: '2026-07-10T00:00:00Z'
+timestamp: '2026-07-17T00:00:00Z'
 ---
 
 Any SQL error in `okdb query` surfaces as a full Python traceback ending in a

@@ -1,20 +1,20 @@
-"""okdb: a transparent, read-only SQL query layer over Open Knowledge Format (OKF) bundles.
+"""readb: a transparent, read-only SQL query layer over Open Knowledge Format (OKF) bundles.
 
 Public API
 ----------
-    import okdb
+    import readb
 
-    db = okdb.open("./path/to/bundle")   # builds an in-memory DuckDB, no files written
+    db = readb.open("./path/to/bundle")   # builds an in-memory DuckDB, no files written
     rows = db.sql("SELECT * FROM __DOCUMENTS WHERE type = 'Metric'")
 
 The bundle is loaded into an embedded DuckDB engine which executes the SQL directly;
-okdb never parses or plans SQL itself. All operations are strictly read-only with respect
+readb never parses or plans SQL itself. All operations are strictly read-only with respect
 to the source bundle.
 """
 
 from __future__ import annotations
 
-from okdb.database import Database
+from readb.database import Database
 
 __version__ = "0.0.1"
 

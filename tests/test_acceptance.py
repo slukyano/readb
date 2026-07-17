@@ -10,8 +10,8 @@ from __future__ import annotations
 import hashlib
 from pathlib import Path
 
-import okdb
-from okdb.database import Database
+import readb
+from readb.database import Database
 
 
 def _md_files(bundle: Path) -> list[Path]:
@@ -103,7 +103,7 @@ def test_unknowntype_routing_and_documents_membership(mini_db: Database) -> None
 
 
 def test_normalization_rules() -> None:
-    from okdb.schema import normalize_type
+    from readb.schema import normalize_type
 
     assert normalize_type("Big %// Table") == "bigtable"
     assert normalize_type("3D Model") == "_3dmodel"
@@ -127,11 +127,11 @@ def test_collision_gets_suffix_and_warning(mini_db: Database) -> None:
 
 def test_path_and_body_virtual_fields(mini_db: Database) -> None:
     row = mini_db.sql(
-        "SELECT __path, __id, __body FROM widget WHERE __path = 'concepts/widget_one.md'"
+        "SELECT __path, __name, __body FROM widget WHERE __path = 'concepts/widget_one.md'"
     )[0]
     assert row["__path"] == "concepts/widget_one.md"
     assert row["__path"].endswith(".md")
-    assert row["__id"] == "concepts/widget_one"  # Concept ID = __path minus .md
+    assert row["__name"] == "widget_one"  # simple file name: no directories, no .md
     assert "The first Widget" in row["__body"]
     assert "---" not in row["__body"]
     assert "type:" not in row["__body"]  # no frontmatter leaked into the body
@@ -214,9 +214,25 @@ def test_malformed_file_skipped_but_load_succeeds(mini_db: Database, caplog) -> 
 def test_malformed_file_emits_warning(mini_path: Path, caplog) -> None:
     import logging
 
-    with caplog.at_level(logging.WARNING, logger="okdb.parser"):
-        okdb.open(str(mini_path)).close()
+    with caplog.at_level(logging.WARNING, logger="readb.parser"):
+        readb.open(str(mini_path)).close()
     assert any("malformed.md" in rec.getMessage() for rec in caplog.records)
+
+
+def test_frontmatter_key_shadowing_virtual_column_warns_and_is_ignored(
+    tmp_path: Path, caplog
+) -> None:
+    import logging
+
+    (tmp_path / "x.md").write_text("---\ntype: T\n__raw: sneaky\n---\nbody\n", encoding="utf-8")
+    with caplog.at_level(logging.WARNING, logger="readb.loader"):
+        db = readb.open(str(tmp_path))
+    try:
+        row = db.sql("SELECT __raw FROM t")[0]
+        assert row["__raw"].startswith("---")  # the injected file text, not the producer value
+        assert any("shadows a virtual column" in rec.getMessage() for rec in caplog.records)
+    finally:
+        db.close()
 
 
 # --- Criterion 12: no files are created or modified in the bundle during any operation ---------
@@ -232,7 +248,7 @@ def _hash_tree(bundle: Path) -> dict[str, str]:
 
 def test_no_files_created_or_modified(mini_path: Path) -> None:
     before = _hash_tree(mini_path)
-    db = okdb.open(str(mini_path))
+    db = readb.open(str(mini_path))
     db.sql("SELECT * FROM __DOCUMENTS")
     db.sql("SELECT * FROM widget")
     db.sql("SELECT * FROM __TAGS")

@@ -1,10 +1,10 @@
-# okdb
+# readb
 
 A transparent, read-only SQL query layer over an **Open Knowledge Format (OKF)** bundle — a
 directory of markdown files with YAML frontmatter — so an agent or a human can run real SQL
 against the wiki with no explicit database-creation step.
 
-okdb loads a bundle into an embedded [DuckDB](https://duckdb.org/) engine and lets DuckDB
+readb loads a bundle into an embedded [DuckDB](https://duckdb.org/) engine and lets DuckDB
 execute the SQL. There is no custom SQL parser or query planner, and the source files are never
 modified.
 
@@ -24,19 +24,27 @@ uv sync
 Library:
 
 ```python
-import okdb
+import readb
 
-db = okdb.open("./path/to/bundle")          # builds an in-memory DuckDB; no files written
+db = readb.open("./path/to/bundle")          # builds an in-memory DuckDB; no files written
 rows = db.sql("SELECT * FROM __DOCUMENTS WHERE type = 'Metric'")
 ```
 
 CLI:
 
 ```sh
-okdb query "SELECT * FROM __DOCUMENTS" --bundle ./path       # results as a table
-okdb query "SELECT * FROM __DOCUMENTS" --bundle ./path --json
-okdb schema --bundle ./path                                  # detected types, tables, columns
+readb query "SELECT * FROM __DOCUMENTS" --bundle ./path       # results as a table
+readb query "SELECT * FROM __DOCUMENTS" --bundle ./path --format json   # or csv | tsv | raw
+readb schema --bundle ./path                                  # detected types, tables, columns
+readb show --bundle ./path some-concept                       # a concept's body, by name
 ```
+
+Concepts are addressed wiki-style: a simple file name (`some-concept`) when it is unique in
+the bundle, or the full path (`sub/some-concept.md`) — always unambiguous — when it is not.
+readb only addresses files inside the bundle root: a `../` path or a symlink that resolves
+outside the bundle is not supported and is refused with an explicit error (by name and by
+path alike). `--format raw` prints values verbatim, so
+`readb query "SELECT __raw FROM task WHERE __name = 'x'" --format raw` is exactly `cat`.
 
 ## Tables and views
 
@@ -49,8 +57,10 @@ okdb schema --bundle ./path                                  # detected types, t
 | `__UNKNOWNTYPE` | one per non-conformant concept (no / non-string / empty-normalized `type`) |
 | `__TAGS` | normalized `(concept_path, tag)` view for join-style tag filtering |
 
-Every table also carries three virtual columns: `__path` (bundle-relative path, with `.md`),
-`__id` (the Concept ID, i.e. `__path` minus `.md`), and `__body` (the markdown body).
+Every table also carries four virtual columns: `__path` (bundle-relative path, with `.md` —
+the guaranteed-unique key), `__name` (the simple file name, no directories or `.md`; wiki-style,
+assumed unique but not guaranteed), `__body` (the markdown body, frontmatter stripped), and
+`__raw` (the byte-exact file text as on disk, frontmatter included).
 
 ## Type inference
 
@@ -59,7 +69,7 @@ holds every observed value (`int`+`float` → `DOUBLE`; a scalar alongside a lis
 maps with a consistent key set → a `STRUCT`). Anything that doesn't reduce to a single engine
 type is stored as a `JSON` column — nothing is dropped, and producer intent is never guessed
 (strings are never split or parsed). The reserved `tags` field is always a `LIST`. Run
-`okdb schema` to see the inferred type of every column.
+`readb schema` to see the inferred type of every column.
 
 ## Development
 
@@ -72,4 +82,4 @@ uv run ruff format   # format
 
 ## License
 
-[MIT](LICENSE) © Stanislav Lukyanov
+[Apache 2.0](LICENSE) © 2026 Stanislav Lukyanov

@@ -5,15 +5,15 @@ description: How development runs in sessions and sprints — scoping, design, a
 tags:
 - meta
 - process
-timestamp: '2026-07-09T00:00:00Z'
+timestamp: '2026-07-17T00:00:00Z'
 ---
 
 # Overview
 
 This `tasks/` directory is the project backlog **and** an OKF bundle — one markdown file per
-concept. We dogfood okdb here: the backlog is queried with okdb itself (see
-[Querying with okdb](#querying-with-okdb)) and all frontmatter edits are made with okdb's own
-field editor (`okdb set`/`unset --bundle ./tasks <id> ...`).
+concept. We dogfood readb here: the backlog is queried with readb itself (see
+[Querying with readb](#querying-with-readb)) and all frontmatter edits are made with readb's own
+field editor (`readb set`/`unset --bundle ./tasks <id> ...`).
 
 Development happens in **sprints**, driven interactively in **sessions**:
 
@@ -33,11 +33,11 @@ Architecture Decision Records live in a separate bundle, [`docs/adr/`](../docs/a
 
 ## Dogfooding rule
 
-okdb is the interface to the local OKF bundles. Reading and querying `tasks/` and `docs/adr/`
-goes through `okdb query`/`okdb schema`/`okdb get`; edits go through `okdb set`/`unset`. Do not
-fall back to `cat`, grep, or manual file reads for what okdb should answer. When okdb fails or
+readb is the interface to the local OKF bundles. Reading and querying `tasks/` and `docs/adr/`
+goes through `readb query`/`readb schema`/`readb get`; edits go through `readb set`/`unset`. Do not
+fall back to `cat`, grep, or manual file reads for what readb should answer. When readb fails or
 can't express something needed for the workflow: **stop, immediately record a new `Draft` task**
-describing the gap, and only then use a workaround. Tasks that block dogfooding okdb take
+describing the gap, and only then use a workaround. Tasks that block dogfooding readb take
 priority over the rest of the backlog when scoping sprints.
 
 # Task lifecycle
@@ -75,7 +75,7 @@ One sprint moves through:
 Every session begins by checking for unfinished work:
 
 ```sh
-okdb query "SELECT __id, status, branch FROM sprint WHERE status NOT IN ('Done','Aborted')" --bundle ./tasks
+readb query "SELECT __name, status, branch FROM sprint WHERE status NOT IN ('Done','Aborted')" --bundle ./tasks
 ```
 
 - **An active sprint exists** → check out its branch (the branch always has the freshest
@@ -134,24 +134,63 @@ subagents where appropriate. Rules of the phase:
 - **Independent review** — a fresh subagent with no implementation context reviews the full
   sprint diff; findings are fixed (or explicitly presented as known issues).
 
-## 6. Presentation & final merge
+## 6. Close-out, presentation & final merge
 
-The agent presents a sprint summary to the human:
+Once the gates pass, close the sprint out **on the branch** so the human reviews the exact
+state that will merge — bookkeeping included. The only thing gated purely on approval is the
+merge itself.
 
-- features delivered (per task),
-- **breaking changes**,
-- architectural decisions made (with their ADRs),
-- difficulties encountered and open questions,
-- review findings and how they were resolved.
+### 6a. Close-out bookkeeping (committed to the branch, before presenting)
+
+1. Flip every delivered task `Designed → Done` via the field editor
+   (`readb set --bundle ./tasks <name> status=Done timestamp=<ISO>`); update the timestamp.
+2. Flip the sprint `Implementing → Done` (same editor) and update its timestamp.
+3. Write a `## Sprint summary` into the sprint body and a close-out `## Session log` line.
+4. Bring the hand-maintained `tasks/index.md` and `tasks/log.md` current (move Done tasks to a
+   `# Done` section; mark the sprint Done; add a dated log entry).
+5. **Every open question / deferred idea must have a home.** If something was left undone —
+   deliberately or by omission — it is either done now or captured as a `Draft` task. Never
+   say "carried to the backlog" without a concrete task name; create the task if none exists.
+6. Commit the bookkeeping (`chore(sprint): close out sprint-NNN ...`).
+
+### 6b. The summary artifact + independent accuracy check
+
+Write the full review to a **file** (e.g. `.scratchpad/sprint-NNN-review.md`), then have a
+**fresh reviewer subagent** (no implementation context) verify it against the real diff
+(`git diff main..sprint/NNN`) and the live gate output — commit/file counts, test numbers,
+task states, and every "what changed" / "bug fixed" / "limitation" claim. Fix any inaccuracy
+the reviewer finds **before** presenting. Do not present an unverified summary.
+
+### 6c. Presentation format (always include)
+
+Present in the chat protocol below. The summary MUST include:
+
+- **A task ledger listing *every* task involved** — Done, Dropped, created-this-sprint, and
+  planned-but-descoped. For each: its **relative weight** (`major` / `mid` / `minor` — size AND
+  importance AND future impact; e.g. a package rename is a small diff but major impact), and a
+  **⚠️ mark if it transformed significantly** during design or implementation.
+- **Per change: what changed and why, and how the task transformed** from its original framing.
+- **Explicitly what was NOT done** — deliberately or by omission — each item paired with its
+  disposition (done, or the **named** `Draft` task that now holds it).
+- **Breaking changes.**
+- **Architectural decisions** made, with their ADRs.
+- **Bugs found & fixed** (review findings & how they were resolved) — its own section.
+- **Remaining limitations & highlights** — a separate, clearly-flagged must-read section
+  (sharp edges, deliberate trade-offs, things a user will trip on), never folded into prose.
+
+Whenever the summary says something was deferred or carried forward, **name the backlog task
+that holds it** — never a bare "added to the backlog".
+
+### 6d. Final merge
 
 **Implementation approval** triggers, in order:
 
 1. New ADRs flip `Proposed → Accepted` (or are revised/rejected per the human).
-2. Completed tasks flip `Designed → Done`; the sprint flips `Implementing → Done`.
-3. The sprint branch is **merged to `main`** (final merge) and deleted.
+2. The sprint branch is **merged to `main`** (final merge, `--no-ff`) and deleted.
 
-Tasks that didn't make it stay `Designed` (or are returned to `Draft` if the design was
-invalidated) and return to the backlog for a future sprint.
+(Task/sprint status flips already happened in 6a; if the human sends changes back, revert or
+adjust the bookkeeping before merging.) Tasks that didn't make it stay `Designed` (or return to
+`Draft` if the design was invalidated) and go back to the backlog for a future sprint.
 
 # Asking for approval (chat protocol)
 
@@ -182,7 +221,7 @@ and stop-and-ask questions raised mid-implementation.
 | `title` | yes | string | Short theme, e.g. "CLI ergonomics". |
 | `status` | yes | string | `Designing` \| `Implementing` \| `Done` \| `Aborted`. |
 | `branch` | yes | string | The sprint branch, e.g. `sprint/001`. |
-| `tasks` | yes | list | Concept IDs of the tasks in scope. |
+| `tasks` | yes | list | concept names of the tasks in scope. |
 | `created` | yes | date | ISO date of the sprint-start commit. |
 | `timestamp` | recommended | string | OKF-reserved; ISO-8601 of the last meaningful change. |
 
@@ -202,15 +241,15 @@ current during implementation, `## Open questions` (the stop-and-ask log), and a
 | `tags` | optional | list | Cross-cutting labels (`research`, `cli`, `packaging`, …). |
 | `created` | recommended | date | ISO date the draft was created. |
 | `timestamp` | optional | string | OKF-reserved; ISO-8601 of the last meaningful change. |
-| `blocked_by` | optional | list | Concept IDs of tasks that must be `Done` first. |
+| `blocked_by` | optional | list | concept names of tasks that must be `Done` first. |
 
-Producers may add more keys — okdb's union-of-keys keeps them queryable, and columns simply
+Producers may add more keys — readb's union-of-keys keeps them queryable, and columns simply
 appear once the first task uses them. A missing `blocked_by` means unblocked; don't write
 empty lists.
 
 ## Blockers
 
-`blocked_by` lists the **Concept IDs** of prerequisite tasks (a Concept ID is the filename
+`blocked_by` lists the **concept names** of prerequisite tasks (a concept name is the filename
 without `.md`). A task is eligible for a sprint when its `status` is `Draft` (or `Designed`,
 for implementation) and every task in `blocked_by` is `Done`. A dangling or mistyped blocker
 counts as blocking (conservative — better to stall than to double-build). Tasks within one
@@ -227,8 +266,8 @@ concept per decision, named `NNNN-short-slug.md`.
 | `title` | yes | string | The decision, stated as a decision. |
 | `status` | yes | string | `Proposed` \| `Accepted` \| `Rejected` \| `Superseded`. |
 | `created` | yes | date | ISO date proposed. |
-| `sprint` | optional | string | Concept ID of the originating sprint. |
-| `superseded_by` | when superseded | string | Concept ID of the replacing ADR. |
+| `sprint` | optional | string | concept name of the originating sprint. |
+| `superseded_by` | when superseded | string | concept name of the replacing ADR. |
 
 Body: Context, Decision, Consequences (and Alternatives considered, when useful).
 
@@ -241,34 +280,34 @@ Rules:
 - Reversing an accepted decision means a new ADR that supersedes the old one, not an edit.
 
 ```sh
-okdb query "SELECT __id, status, title FROM adr ORDER BY __id" --bundle ./docs/adr
+readb query "SELECT __name, status, title FROM adr ORDER BY __name" --bundle ./docs/adr
 ```
 
-# Querying with okdb
+# Querying with readb
 
 ```sh
 # Anything in flight?
-okdb query "SELECT __id, status, branch FROM sprint WHERE status NOT IN ('Done','Aborted')" --bundle ./tasks
+readb query "SELECT __name, status, branch FROM sprint WHERE status NOT IN ('Done','Aborted')" --bundle ./tasks
 
 # The open backlog, highest priority first
-okdb query "SELECT __id, priority, title FROM task WHERE status = 'Draft'
+readb query "SELECT __name, priority, title FROM task WHERE status = 'Draft'
             ORDER BY CASE lower(priority) WHEN 'high' THEN 0 WHEN 'medium' THEN 1 ELSE 2 END, created" --bundle ./tasks
 
 # Sprint-eligible: Draft and unblocked
-okdb query "
-  SELECT t.__id, t.priority
+readb query "
+  SELECT t.__name, t.priority
   FROM task t
   WHERE t.status = 'Draft'
     AND NOT EXISTS (
       SELECT 1 FROM unnest(t.blocked_by) AS b(dep)
-      WHERE NOT EXISTS (SELECT 1 FROM task d WHERE d.__id = b.dep AND d.status = 'Done')
+      WHERE NOT EXISTS (SELECT 1 FROM task d WHERE d.__name = b.dep AND d.status = 'Done')
     )
   ORDER BY CASE lower(t.priority) WHEN 'high' THEN 0 WHEN 'medium' THEN 1 ELSE 2 END,
-           t.created NULLS LAST, t.__id
+           t.created NULLS LAST, t.__name
 " --bundle ./tasks
 
 # Count by state
-okdb query "SELECT status, count(*) AS n FROM task GROUP BY status ORDER BY n DESC" --bundle ./tasks
+readb query "SELECT status, count(*) AS n FROM task GROUP BY status ORDER BY n DESC" --bundle ./tasks
 ```
 
 # History

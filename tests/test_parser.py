@@ -1,11 +1,11 @@
-"""Unit tests for the permissive OKF file parser (okdb.parser)."""
+"""Unit tests for the permissive OKF file parser (readb.parser)."""
 
 from __future__ import annotations
 
 import logging
 from pathlib import Path
 
-from okdb.parser import parse_file
+from readb.parser import parse_file
 
 
 def _write(tmp_path: Path, name: str, text: str) -> Path:
@@ -22,7 +22,7 @@ def test_parses_frontmatter_and_body(tmp_path: Path) -> None:
     assert c.frontmatter == {"type": "Thing", "title": "T"}
     assert c.body == "Body here.\n"
     assert c.path == "a.md"
-    assert c.concept_id == "a"
+    assert c.name == "a"
 
 
 def test_no_frontmatter_is_all_body(tmp_path: Path) -> None:
@@ -44,7 +44,7 @@ def test_empty_frontmatter_block_is_empty_mapping(tmp_path: Path) -> None:
 
 def test_malformed_yaml_is_skipped(tmp_path: Path, caplog) -> None:
     f = _write(tmp_path, "bad.md", "---\nitems: [1, 2, 3\noops: : :\n---\nbody\n")
-    with caplog.at_level(logging.WARNING, logger="okdb.parser"):
+    with caplog.at_level(logging.WARNING, logger="readb.parser"):
         c = parse_file(f, bundle_root=tmp_path)
     assert c is None
     assert any("bad.md" in rec.getMessage() for rec in caplog.records)
@@ -77,4 +77,14 @@ def test_nested_path_is_posix_relative(tmp_path: Path) -> None:
     c = parse_file(f, bundle_root=tmp_path)
     assert c is not None
     assert c.path == "sub/dir/x.md"
-    assert c.concept_id == "sub/dir/x"
+    assert c.name == "x"  # wiki-style: the simple file name, directories dropped
+
+
+def test_raw_is_byte_exact_including_crlf(tmp_path: Path) -> None:
+    f = tmp_path / "c.md"
+    f.write_bytes(b"---\r\ntype: T\r\n---\r\nbody line\r\n")
+    c = parse_file(f, bundle_root=tmp_path)
+    assert c is not None
+    assert c.raw == "---\r\ntype: T\r\n---\r\nbody line\r\n"  # CRLF preserved verbatim
+    assert c.frontmatter == {"type": "T"}  # parsing still normalizes internally
+    assert "body line" in c.body

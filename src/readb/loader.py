@@ -8,7 +8,7 @@ The MVP load is a deliberate two-pass over the bundle:
 
   Pass 1 (infer): walk the tree, parse every file, route concepts to tables by normalized type,
                   and for each derived table infer the unified column types via the lattice in
-                  :mod:`okdb.schema`.
+                  :mod:`readb.schema`.
   Pass 2 (insert): create each table with explicit DDL, coerce each value to its column's
                    inferred type, and bind-insert the rows.
 
@@ -32,8 +32,8 @@ from pathlib import Path
 
 import duckdb
 
-from okdb.parser import Concept, parse_file
-from okdb.schema import (
+from readb.parser import Concept, parse_file
+from readb.schema import (
     RESERVED_FIELDS,
     SYSTEM_TABLE_NAMES,
     VIRTUAL_FIELDS,
@@ -202,7 +202,8 @@ def _build_table(
 ) -> None:
     """Infer types for ``frontmatter_columns``, create ``table_name``, and insert ``rows``.
 
-    Virtual columns (``__path``, ``__id``, ``__body``) are always appended as VARCHAR. The table
+    Virtual columns (``__path``, ``__name``, ``__body``, ``__raw``) are always appended as
+    VARCHAR. The table
     is always created even when empty, so queries against it never fail.
     """
     column_types: dict[str, LType] = {}
@@ -240,8 +241,9 @@ def _bind_row(
         for column in frontmatter_columns
     ]
     row.append(concept.path)  # __path
-    row.append(concept.concept_id)  # __id
+    row.append(concept.name)  # __name
     row.append(concept.body)  # __body
+    row.append(concept.raw)  # __raw
     return row
 
 
@@ -255,10 +257,17 @@ _NON_PRODUCER_KEYS: frozenset[str] = frozenset(RESERVED_FIELDS) | frozenset(VIRT
 def _producer_keys(rows: list[Concept]) -> list[str]:
     """Sorted union of non-reserved, non-virtual frontmatter keys across ``rows``."""
     keys: set[str] = set()
+    shadowed: set[str] = set()
     for concept in rows:
         for key in concept.frontmatter:
-            if isinstance(key, str) and key not in _NON_PRODUCER_KEYS:
+            if not isinstance(key, str):
+                continue
+            if key in VIRTUAL_FIELDS:
+                shadowed.add(key)  # the injected virtual column wins; the value is dropped
+            elif key not in _NON_PRODUCER_KEYS:
                 keys.add(key)
+    for key in sorted(shadowed):
+        logger.warning("frontmatter key %r shadows a virtual column; its values are ignored", key)
     return sorted(keys)
 
 

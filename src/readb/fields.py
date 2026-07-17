@@ -1,8 +1,8 @@
 """Surgical, line-based editor for a file's leading YAML frontmatter block.
 
-okdb is a read-only SQL layer over a bundle: loading and querying a bundle never mutate it. This
+readb is a read-only SQL layer over a bundle: loading and querying a bundle never mutate it. This
 module is the one deliberate, clearly-separated exception — an explicit frontmatter field editor
-exposed via the ``okdb get`` / ``okdb set`` / ``okdb unset`` commands, never through the
+exposed via the ``readb get`` / ``readb set`` / ``readb unset`` commands, never through the
 SQL/query path. Edits are line-based: only the targeted ``key: value`` lines change, so lists,
 the body, and unrelated formatting stay byte-for-byte intact, which keeps diffs small and
 reviewable. It intentionally does NOT round-trip through a YAML parser (that would reflow,

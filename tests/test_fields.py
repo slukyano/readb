@@ -1,4 +1,4 @@
-"""Tests for the frontmatter field editor (okdb.fields) and its CLI (okdb get/set/unset).
+"""Tests for the frontmatter field editor (readb.fields) and its CLI (readb get/set/unset).
 
 The editor is the one write path in an otherwise read-only tool, so these tests pin down two
 things: edits are surgical (only the targeted lines move; body and lists stay byte-for-byte),
@@ -12,8 +12,8 @@ from pathlib import Path
 import pytest
 from click.testing import CliRunner, Result
 
-from okdb import fields
-from okdb.cli import main
+from readb import fields
+from readb.cli import main
 
 # A representative task file: scalar fields to edit, a list and a body that must stay untouched.
 TASK = """\
@@ -33,8 +33,8 @@ Do the thing.
 """
 
 
-def _bundle(tmp_path: Path, concept_id: str = "okf-demo", text: str = TASK) -> Path:
-    path = tmp_path / f"{concept_id}.md"
+def _bundle(tmp_path: Path, name: str = "okf-demo", text: str = TASK) -> Path:
+    path = tmp_path / f"{name}.md"
     path.write_text(text, encoding="utf-8")
     return tmp_path
 
@@ -108,7 +108,7 @@ def test_set_without_frontmatter_raises(tmp_path: Path) -> None:
 
 
 # --------------------------------------------------------------------------------------------
-# CLI: okdb get / set / unset
+# CLI: readb get / set / unset
 # --------------------------------------------------------------------------------------------
 
 
@@ -175,17 +175,34 @@ def test_cli_rejects_path_escape(tmp_path: Path) -> None:
     _bundle(bundle)
     secret = tmp_path / "secret.md"
     secret.write_text("---\nstatus: Draft\n---\nbody\n", encoding="utf-8")
-    result = _run(["set", "--bundle", str(bundle), "../secret", "status=Hacked"])
+    result = _run(["set", "--bundle", str(bundle), "../secret.md", "status=Hacked"])
     assert result.exit_code != 0
     assert "escapes the bundle" in result.output
+    # The bare spelling is rejected earlier: a name has no separators, a path needs .md.
+    result = _run(["set", "--bundle", str(bundle), "../secret", "status=Hacked"])
+    assert result.exit_code != 0
+    assert "status: Hacked" not in secret.read_text()
     assert "Hacked" not in secret.read_text()  # the outside file is untouched
 
 
-def test_cli_nested_concept_id(tmp_path: Path) -> None:
-    # Concept IDs can include a subdirectory (path relative to the bundle root).
+def test_cli_nested_concept_by_path_and_by_name(tmp_path: Path) -> None:
+    # A nested concept is reachable by its full .md path or (when unique) by its simple name.
+    sub = tmp_path / "sub"
+    sub.mkdir()
+    (sub / "x.md").write_text("---\nstatus: Draft\n---\nbody\n", encoding="utf-8")
+    result = _run(["set", "--bundle", str(tmp_path), "sub/x.md", "status=Refined"])
+    assert result.exit_code == 0
+    assert "status: Refined" in (sub / "x.md").read_text()
+    result = _run(["set", "--bundle", str(tmp_path), "x", "status=Done"])
+    assert result.exit_code == 0
+    assert "status: Done" in (sub / "x.md").read_text()
+
+
+def test_cli_name_with_separator_is_rejected(tmp_path: Path) -> None:
+    # A bare name has no path separators; a path must carry its .md suffix.
     sub = tmp_path / "sub"
     sub.mkdir()
     (sub / "x.md").write_text("---\nstatus: Draft\n---\nbody\n", encoding="utf-8")
     result = _run(["set", "--bundle", str(tmp_path), "sub/x", "status=Refined"])
-    assert result.exit_code == 0
-    assert "status: Refined" in (sub / "x.md").read_text()
+    assert result.exit_code == 2
+    assert ".md" in result.output
