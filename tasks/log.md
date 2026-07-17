@@ -10,6 +10,12 @@
   Gates re-run green (94 tests, `ruff` clean). Presented for final review + merge. Added draft
   [name-column-unprefix](name-column-unprefix.md), formalizing the sprint-001 open question
   (un-prefix `__name → name`) that had no backlog task.
+* **Sprint 001 review follow-ups**: Made the symlink-escape refusal explicit (name *and* path
+  errors now name the cause) and documented in the README that symlinks/paths resolving outside
+  the bundle are unsupported. Polished NOTICE (added the product-description line). Added two
+  research drafts from review questions: [csv-empty-result-header](csv-empty-result-header.md)
+  (zero-row csv prints nothing — maybe a bug) and
+  [tz-aware-datetime-handling](tz-aware-datetime-handling.md) (is avoiding `pytz` still right?).
 
 ## 2026-07-11
 * **Sprint 001 review decisions**: Dropped [default-bundle-cwd](default-bundle-cwd.md) after

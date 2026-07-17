@@ -134,3 +134,6 @@ column names travel with the rows. Gates green at close: 94 tests pass, `ruff` c
   sprint summary written. Gates re-run green (94 tests, `ruff` clean). Final review + merge
   requested. The `__name → name` open question was formalized as draft `name-column-unprefix`
   (it had no backlog task before).
+- 2026-07-17 — Review follow-ups (human): symlink-escape errors made explicit by name and path
+  + README note; NOTICE product-description line added; drafted `csv-empty-result-header`
+  (zero-row csv may be a bug) and `tz-aware-datetime-handling` (revisit avoiding `pytz`).

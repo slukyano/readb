@@ -19,6 +19,8 @@ okf_version: "0.1"
 * [Research structured-body querying](research-body-structured-query.md) - expose the body as JSON/YAML/DOM by headings.
 * [Keep index.md and log.md current automatically](bundle-index-log-automation.md) - generate the index; sprint-appended log entries.
 * [Consider un-prefixing __name -> name](name-column-unprefix.md) - producer-settable, inferred; sprint-001 open question.
+* [Decide zero-row csv/tsv output](csv-empty-result-header.md) - header or nothing on empty results; maybe a bug (sprint-001 review).
+* [Revisit tz-aware datetime handling](tz-aware-datetime-handling.md) - is avoiding pytz still right, or can it be TIMESTAMPTZ? (sprint-001 review).
 
 # Done
 
