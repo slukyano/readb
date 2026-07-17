@@ -176,6 +176,10 @@ def _concept_path(bundle: str, name_or_path: str) -> Path:
     escaping the bundle). Anything else is a simple name — no path separators — resolved by
     searching the bundle for ``**/<name>.md``: exactly one match resolves; several raise an
     error listing the clashing paths (at most 5) so the caller can re-run with the full path.
+
+    Symlinks (or ``../`` segments) that resolve to a file *outside* the bundle are not
+    supported: they are refused with an explicit error, by name and by path alike. readb only
+    ever addresses files that live within the bundle root.
     """
     bundle_root = Path(bundle).resolve()
 
@@ -185,7 +189,9 @@ def _concept_path(bundle: str, name_or_path: str) -> Path:
             target.relative_to(bundle_root)
         except ValueError:
             raise click.BadParameter(
-                f"path escapes the bundle: {name_or_path!r}", param_hint="NAME_OR_PATH"
+                f"path escapes the bundle (a '../' segment or a symlink resolving outside the "
+                f"bundle is not supported): {name_or_path!r}",
+                param_hint="NAME_OR_PATH",
             ) from None
         if not target.is_file():
             raise click.ClickException(f"no such concept in bundle: {name_or_path!r} ({target})")
@@ -198,17 +204,21 @@ def _concept_path(bundle: str, name_or_path: str) -> Path:
             param_hint="NAME_OR_PATH",
         )
     # glob.escape: a name is a literal file name, never a pattern. Candidates must be regular
-    # files that still live inside the bundle after resolving (a symlink pointing outside the
-    # bundle must not be reachable by name any more than by path).
+    # files; a symlink whose target resolves outside the bundle is refused (unreachable by name
+    # just as by path) with an explicit error, not silently reported as "not found".
+    name_matches = [p for p in bundle_root.rglob(f"{glob.escape(name_or_path)}.md") if p.is_file()]
     matches = sorted(
-        (
-            p
-            for p in bundle_root.rglob(f"{glob.escape(name_or_path)}.md")
-            if p.is_file() and _is_inside(p.resolve(), bundle_root)
-        ),
+        (p for p in name_matches if _is_inside(p.resolve(), bundle_root)),
         key=lambda p: p.as_posix(),
     )
     if not matches:
+        escaped = [p for p in name_matches if not _is_inside(p.resolve(), bundle_root)]
+        if escaped:
+            culprit = escaped[0]
+            raise click.ClickException(
+                f"concept {name_or_path!r} resolves outside the bundle via a symlink and is "
+                f"not supported: {culprit.relative_to(bundle_root)} -> {culprit.resolve()}"
+            )
         raise click.ClickException(f"no such concept in bundle: {name_or_path!r}")
     if len(matches) > 1:
         shown = ", ".join(str(p.relative_to(bundle_root)) for p in matches[:_CLASH_LIST_CAP])

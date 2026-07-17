@@ -221,12 +221,16 @@ def test_name_resolution_refuses_symlink_escape(tmp_path: Path) -> None:
     outside = tmp_path / "outside.md"
     outside.write_text("---\ntype: T\n---\nsecret\n", encoding="utf-8")
     (bundle / "evil.md").symlink_to(outside)
+    # Both spellings are refused, and the error explicitly names the symlink-escape cause.
     by_name = _run("show", "--bundle", str(bundle), "evil")
     assert by_name.exit_code == 1
-    assert "no such concept" in by_name.output
+    assert "outside the bundle" in by_name.output
+    assert "symlink" in by_name.output
+    assert "secret" not in by_name.output
     by_path = _run("show", "--bundle", str(bundle), "evil.md")
     assert by_path.exit_code != 0
     assert "secret" not in by_path.output
+    assert "outside the bundle" in by_path.output
 
 
 def test_name_is_literal_not_a_glob_pattern(tmp_path: Path) -> None:
