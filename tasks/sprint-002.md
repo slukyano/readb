@@ -35,7 +35,7 @@ scope as bookkeeping only, already `Done`. Still deferred: `bundle-index-log-aut
 
 Design phase (a checked box = `## Design` section written and discussed):
 
-- [ ] research-similar-tools — survey Backlog.md, taskmd, Dataview & friends; comparison + ideas list
+- [x] research-similar-tools — surveyed 11 tools; `## Findings` written; ideas mapped to designs + draft `readme-prior-art`
 - [ ] bundle-init-discovery — explicit `readb init` marker + upward discovery; ADR
 - [ ] name-column-unprefix — decide `__name` vs plain producer-settable `name`; ADR 0003 ripple
 - [ ] csv-empty-result-header — research peers' zero-row csv behavior; decide header-or-nothing
@@ -55,3 +55,7 @@ Design phase (a checked box = `## Design` section written and discussed):
 
 - 2026-07-17 — Sprint scoped and approved in chat (7 tasks: 6 active + `rename-repo-dir`
   verified done and flipped). Branch `sprint/002` cut. Design phase started.
+- 2026-07-17 — `research-similar-tools` executed (human chose run-now): deep-research fan-out
+  over 11 tools, verified against primary repos/docs. `## Findings` written into the task body;
+  ideas routed to the four design tasks + a new draft `readme-prior-art` (positioning note).
+  This is a research task — its findings *are* its deliverable, so it is design-complete.
