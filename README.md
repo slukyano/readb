@@ -45,6 +45,25 @@ An ambiguous bare name is always a hard error listing the clashing paths — nev
 first match. Names are filenames: `__name` is immutable and filename-derived, and a producer
 `name:` frontmatter key is just an ordinary data column — it affects neither `__name` nor
 addressing.
+
+## readb init: skip --bundle
+
+`--bundle` may be omitted once you register your bundles (the git model — a directory is a
+bundle because you said so once):
+
+```sh
+readb init tasks docs/adr    # in the project root: writes .readb/config.toml (commit it)
+cd tasks && readb query "SELECT count(*) FROM task"   # bundle resolved by walking up
+```
+
+Commands without `--bundle` walk up from the cwd to the nearest `.readb/` registry, then pick
+the declared bundle containing the cwd (innermost wins), else the sole declared bundle, else
+the config's optional `default_bundle`. Genuine ambiguity — e.g. the root of a repo declaring
+several bundles, no default — is a hard error listing the choices, never a guess; a directory
+never silently becomes a bundle. Explicit `--bundle <dir>` always works on any directory,
+initialized or not, and never consults the registry. Re-running `init` merges new dirs and
+never removes. Besides the config, `.readb/` is reserved for readb's future persistent index —
+it is never read as bundle content.
 readb only addresses files inside the bundle root: a `../` path or a symlink that resolves
 outside the bundle is not supported and is refused with an explicit error (by name and by
 path alike). `--format raw` prints values verbatim, so
