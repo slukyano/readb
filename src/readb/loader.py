@@ -117,6 +117,9 @@ def _read_tree(root: Path) -> tuple[list[Concept], list[Concept], list[Concept]]
     for file_path in sorted(root.rglob("*.md"), key=lambda p: p.as_posix()):
         if not file_path.is_file():
             continue
+        # .readb/ is the registry marker + future cache home (ADR 0004), never concept data.
+        if ".readb" in file_path.relative_to(root).parts:
+            continue
         concept = parse_file(file_path, bundle_root=root)
         if concept is None:
             continue

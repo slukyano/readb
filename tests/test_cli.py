@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
 from click.testing import CliRunner, Result
 
 from readb.cli import main
@@ -324,11 +325,17 @@ def test_name_column_present_and_id_gone() -> None:
 
 
 # --------------------------------------------------------------------------------------------
-# --bundle is required (the cwd default was reverted: silent wrong-scope operations).
+# --bundle never defaults to the cwd (the cwd default was reverted: silent wrong-scope
+# operations). Omitting it resolves via the explicit-init registry — see test_init_discovery.py.
 # --------------------------------------------------------------------------------------------
 
 
-def test_bundle_is_required() -> None:
+def test_missing_bundle_without_registry_is_clean_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.chdir(tmp_path)  # isolated cwd: the repo itself carries a registry
     result = _run("query", "SELECT 1")
-    assert result.exit_code == 2
+    assert result.exit_code == 1
+    assert "readb init" in result.output
     assert "--bundle" in result.output
+    assert "Traceback" not in result.output
