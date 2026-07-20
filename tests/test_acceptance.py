@@ -235,6 +235,21 @@ def test_frontmatter_key_shadowing_virtual_column_warns_and_is_ignored(
         db.close()
 
 
+def test_producer_name_key_is_inert_to_virtual_name(tmp_path: Path) -> None:
+    """The name contract (sprint-002): ``__name`` is immutable and filename-derived; a producer
+    ``name:`` frontmatter key becomes an ordinary column and never affects ``__name``."""
+    (tmp_path / "actual-file.md").write_text(
+        "---\ntype: T\nname: Pretty Display Name\n---\nbody\n", encoding="utf-8"
+    )
+    db = readb.open(str(tmp_path))
+    try:
+        row = db.sql("SELECT __name, name FROM t")[0]
+        assert row["__name"] == "actual-file"
+        assert row["name"] == "Pretty Display Name"
+    finally:
+        db.close()
+
+
 # --- Criterion 12: no files are created or modified in the bundle during any operation ---------
 
 

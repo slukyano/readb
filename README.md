@@ -41,6 +41,10 @@ readb show --bundle ./path some-concept                       # a concept's body
 
 Concepts are addressed wiki-style: a simple file name (`some-concept`) when it is unique in
 the bundle, or the full path (`sub/some-concept.md`) — always unambiguous — when it is not.
+An ambiguous bare name is always a hard error listing the clashing paths — never a silent
+first match. Names are filenames: `__name` is immutable and filename-derived, and a producer
+`name:` frontmatter key is just an ordinary data column — it affects neither `__name` nor
+addressing.
 readb only addresses files inside the bundle root: a `../` path or a symlink that resolves
 outside the bundle is not supported and is refused with an explicit error (by name and by
 path alike). `--format raw` prints values verbatim, so

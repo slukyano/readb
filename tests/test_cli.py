@@ -198,6 +198,33 @@ def test_show_name_clash_lists_paths(tmp_path: Path) -> None:
     assert "full path" in result.output
 
 
+def test_full_path_resolves_despite_name_clash(tmp_path: Path) -> None:
+    bundle = _clashing_bundle(tmp_path, 2)
+    result = _run("show", "--bundle", str(bundle), "dir1/dup.md")
+    assert result.exit_code == 0
+    assert result.output.strip() == "body 1"
+
+
+def test_get_name_clash_also_raises(tmp_path: Path) -> None:
+    # Every doc-addressing command routes through the same uniqueness-checked resolver.
+    bundle = _clashing_bundle(tmp_path, 2)
+    result = _run("get", "--bundle", str(bundle), "dup", "type")
+    assert result.exit_code == 1
+    assert "ambiguous" in result.output
+
+
+def test_producer_name_key_does_not_affect_addressing(tmp_path: Path) -> None:
+    # A producer `name:` frontmatter key is inert: addressing goes by filename, always.
+    content = "---\ntype: T\nname: alias\n---\nthe body\n"
+    (tmp_path / "real.md").write_text(content, encoding="utf-8")
+    by_filename = _run("show", "--bundle", str(tmp_path), "real")
+    assert by_filename.exit_code == 0
+    assert by_filename.output.strip() == "the body"
+    by_alias = _run("show", "--bundle", str(tmp_path), "alias")
+    assert by_alias.exit_code == 1
+    assert "no such concept" in by_alias.output
+
+
 def test_name_clash_list_is_capped_at_five(tmp_path: Path) -> None:
     bundle = _clashing_bundle(tmp_path, 7)
     result = _run("show", "--bundle", str(bundle), "dup")
