@@ -25,8 +25,12 @@ result losslessly holds both operands, following the brief's narrowest-fit-wins 
 
 Temporal handling: YAML may parse unquoted ISO values into ``date``/``datetime`` objects.
 ``date`` -> DATE and naive ``datetime`` -> TIMESTAMP (both bind to DuckDB without extra deps).
-A timezone-aware ``datetime`` would require ``pytz`` to bind, so it routes to the JSON fallback
-(serialized via ISO-8601, which is lossless) to keep the dependency surface minimal.
+A timezone-aware ``datetime`` routes to the JSON fallback (serialized via ISO-8601, which is
+lossless) because duckdb's Python client requires ``pytz`` to *fetch* any TIMESTAMPTZ value —
+binding one in works, but every subsequent read of the column raises ``InvalidInputException``
+without pytz, even for pure-SQL literals (verified against duckdb 1.5.4, 2026-07-20; the
+revisit canary in ``tests/test_lattice.py`` fails if a future duckdb lifts this). Keeping the
+dependency surface minimal wins over a native TIMESTAMPTZ column.
 """
 
 from __future__ import annotations
@@ -172,6 +176,7 @@ def type_of_value(value: Any) -> LType:
     if isinstance(value, str):
         return VARCHAR
     if isinstance(value, datetime):  # datetime is a subclass of date; must precede date
+        # tz-aware -> JSON: fetching any TIMESTAMPTZ needs pytz (see module docstring).
         return TIMESTAMP if value.tzinfo is None else JSON
     if isinstance(value, date):
         return DATE

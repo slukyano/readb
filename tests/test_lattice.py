@@ -103,3 +103,28 @@ def test_coerce_list_promotes_scalar() -> None:
 def test_coerce_double_casts_int() -> None:
     assert s.coerce(1, s.DOUBLE) == 1.0
     assert isinstance(s.coerce(1, s.DOUBLE), float)
+
+
+def test_pytz_canary_timestamptz_fetch_still_requires_pytz() -> None:
+    """Revisit signal for the tz-aware -> JSON routing (see the schema module docstring).
+
+    duckdb's Python client requires pytz to fetch ANY TIMESTAMPTZ value (verified 1.5.4).
+    If this canary fails, a future duckdb has lifted the requirement: reconsider giving the
+    lattice a native TIMESTAMPTZ node (tasks/tz-aware-datetime-handling.md). Skipped when
+    pytz happens to be importable, since then the premise cannot be observed.
+    """
+    try:
+        import pytz  # noqa: F401
+    except ImportError:
+        pass
+    else:
+        pytest.skip("pytz is importable here; the fetch failure cannot be observed")
+
+    import duckdb
+
+    con = duckdb.connect()
+    try:
+        with pytest.raises(duckdb.Error, match="pytz"):
+            con.execute("SELECT TIMESTAMPTZ '2026-01-01 00:00:00+00'").fetchall()
+    finally:
+        con.close()
