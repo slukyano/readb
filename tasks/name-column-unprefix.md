@@ -2,7 +2,7 @@
 type: Task
 title: Consider un-prefixing __name -> name (producer-settable, inferred)
 description: __name is inferred from the filename but conceptually producer-settable; weigh dropping the __ prefix to a plain, overridable name column.
-status: Designed
+status: Done
 priority: low
 tags:
 - schema

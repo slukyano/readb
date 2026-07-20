@@ -2,7 +2,7 @@
 type: Task
 title: Research similar markdown+frontmatter task/reader tools
 description: Survey Backlog.md, taskmd, and similar wrappers for ideas worth adopting.
-status: Designed
+status: Done
 priority: low
 tags:
 - research

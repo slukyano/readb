@@ -8,19 +8,13 @@ okf_version: "0.1"
 
 # Sprints
 
-* [Sprint 002 — Bundle init, packaging & correctness follow-ups](sprint-002.md) - Designing.
+* [Sprint 002 — Bundle init, packaging & correctness follow-ups](sprint-002.md) - Done.
 * [Sprint 001 — CLI ergonomics, dogfooding gaps, name & license](sprint-001.md) - Done.
 
 # Tasks
 
-* [Create a distributable package](distributable-package.md) - publish under the new name (sprint 002).
-* [Explicit readb init + upward bundle discovery](bundle-init-discovery.md) - the git model; marker doubles as the persistent-index home (sprint 002).
-* [Research similar task/reader tools](research-similar-tools.md) - survey Backlog.md, taskmd, and friends (sprint 002).
 * [Research structured-body querying](research-body-structured-query.md) - expose the body as JSON/YAML/DOM by headings.
 * [Keep index.md and log.md current automatically](bundle-index-log-automation.md) - generate the index; sprint-appended log entries.
-* [Consider un-prefixing __name -> name](name-column-unprefix.md) - producer-settable, inferred; sprint-001 open question (sprint 002).
-* [Decide zero-row csv/tsv output](csv-empty-result-header.md) - header or nothing on empty results; maybe a bug (sprint-001 review) (sprint 002).
-* [Revisit tz-aware datetime handling](tz-aware-datetime-handling.md) - is avoiding pytz still right, or can it be TIMESTAMPTZ? (sprint-001 review) (sprint 002).
 * [Add a prior-art note to the README](readme-prior-art.md) - frontmatter-mcp, MarkdownDB, Dataview; the transparent-disposable-index differentiator.
 * [Research field-editor type inference](field-editor-type-inference.md) - typed `set` (marad-style) vs. the string-literal stance; maybe an opt-in flag.
 * [Research frontmatter schema checking](frontmatter-schema-checking.md) - opt-in declare/check (`readb check`); load stays permissive.
@@ -33,6 +27,15 @@ okf_version: "0.1"
 Standalone:
 
 * [Rename the repo and directory to readb](rename-repo-dir.md) - executed by the human, verified at sprint-002 scoping.
+
+Sprint 002:
+
+* [Explicit readb init + upward bundle discovery](bundle-init-discovery.md) - `.readb/config.toml` registry + upward discovery (ADR 0004).
+* [Decide zero-row csv/tsv output](csv-empty-result-header.md) - it was a bug; header always, via `Database.sql_table`.
+* [Consider un-prefixing __name -> name](name-column-unprefix.md) - decided against; `__name` immutable, `name:` inert, pinned by tests.
+* [Revisit tz-aware datetime handling](tz-aware-datetime-handling.md) - pytz still required to fetch TIMESTAMPTZ; JSON fallback stays, canary added.
+* [Research similar task/reader tools](research-similar-tools.md) - 11 tools surveyed; findings + adopt/reject calls in the task body.
+* [Create a distributable package](distributable-package.md) - 0.1.0 wheel/sdist built and smoke-tested; publishing → publish-readb-0-1-0.
 
 Sprint 001:
 

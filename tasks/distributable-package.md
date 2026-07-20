@@ -2,7 +2,7 @@
 type: Task
 title: Create a distributable package
 description: Publish okdb (under its new name) as an installable distribution.
-status: Designed
+status: Done
 priority: medium
 tags:
 - packaging

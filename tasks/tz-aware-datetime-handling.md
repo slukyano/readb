@@ -2,7 +2,7 @@
 type: Task
 title: Revisit tz-aware datetime handling (is avoiding pytz still right?)
 description: Timezone-aware datetimes route to the JSON fallback to avoid a pytz dep; reassess whether they could bind as TIMESTAMPTZ with stdlib-only, and whether that is better.
-status: Designed
+status: Done
 priority: low
 tags:
 - schema
