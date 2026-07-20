@@ -37,7 +37,7 @@ Design phase (a checked box = `## Design` section written and discussed):
 
 - [x] research-similar-tools — surveyed 11 tools; `## Findings` written; ideas mapped to designs + draft `readme-prior-art`
 - [ ] bundle-init-discovery — explicit `readb init` marker + upward discovery; ADR
-- [ ] name-column-unprefix — decide `__name` vs plain producer-settable `name`; ADR 0003 ripple
+- [x] name-column-unprefix — decided: keep `__name` immutable, `name:` inert, name-or-path addressing w/ mandatory uniqueness; no un-prefix, no ADR change
 - [ ] csv-empty-result-header — research peers' zero-row csv behavior; decide header-or-nothing
 - [ ] tz-aware-datetime-handling — verify TIMESTAMPTZ binding; lattice node or comment fix
 - [ ] distributable-package — target index, release flow, clean-env install verification
@@ -59,3 +59,10 @@ Design phase (a checked box = `## Design` section written and discussed):
   over 11 tools, verified against primary repos/docs. `## Findings` written into the task body;
   ideas routed to the four design tasks + a new draft `readme-prior-art` (positioning note).
   This is a research task — its findings *are* its deliverable, so it is design-complete.
+- 2026-07-20 — Discussed adoption/chatter of the prior-art tools (Backlog.md ~6.2k★ active;
+  MarkdownDB ~495★ stalled; frontmatter-mcp ~1★) and recorded the human's transparent-disposable-
+  index differentiator. Spun off drafts `field-editor-type-inference` and
+  `frontmatter-schema-checking`. Designed `name-column-unprefix`: **rejected the un-prefix** —
+  keep `__name` immutable/filename-derived, producer `name:` inert, doc access always name-or-path
+  with mandatory uniqueness (no Obsidian-style silent first-match). Behavior already matches;
+  deliverable is regression tests + a doc line, no production code change and no ADR amendment.
