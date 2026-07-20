@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from readb.database import Database
 
-__version__ = "0.0.1"
+__version__ = "0.1.0"
 
 __all__ = ["Database", "open", "__version__"]
 

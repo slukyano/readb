@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "readb"
-version = "0.0.1"
+version = "0.1.0"
 description = "A transparent, read-only SQL query layer over Open Knowledge Format (OKF) bundles."
 readme = "README.md"
 requires-python = ">=3.11"
