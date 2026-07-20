@@ -1,5 +1,23 @@
 # Task Bundle Log
 
+## 2026-07-20
+* **Sprint 002 design approved**: All six active tasks flipped `Draft → Designed`; sprint
+  `Designing → Implementing`; [ADR 0004](../docs/adr/0004-init-registry-discovery.md)
+  `Proposed → Accepted` (human, in chat). `distributable-package` design: manual `uv publish`,
+  version 0.1.0; the outward-facing publishing split into special standalone task
+  [publish-readb-0-1-0](publish-readb-0-1-0.md) (after the sprint, not a sprint), with
+  [release-automation](release-automation.md) drafted for the eventual CI path. Design merge to
+  `main`; implementation phase started.
+* **Sprint 002 design phase**: `name-column-unprefix` designed — un-prefix **rejected**; `__name`
+  stays immutable/filename-derived, producer `name:` is inert, name-or-path addressing with
+  mandatory uniqueness (ADR 0003 affirmed, not amended). `bundle-init-discovery` designed — the
+  **registry model**: one `readb init` writes `.readb/config.toml` declaring bundles; discovery
+  walks up; `--bundle` stays explicit consent ([ADR 0004](../docs/adr/0004-init-registry-discovery.md),
+  Proposed). New drafts from the discussions: [readme-prior-art](readme-prior-art.md),
+  [field-editor-type-inference](field-editor-type-inference.md),
+  [frontmatter-schema-checking](frontmatter-schema-checking.md),
+  [cross-bundle-querying](cross-bundle-querying.md).
+
 ## 2026-07-17
 * **Sprint 002 started**: Scope approved in chat — 7 tasks: [bundle-init-discovery](bundle-init-discovery.md),
   [distributable-package](distributable-package.md) (unblocked by choose-package-name),
