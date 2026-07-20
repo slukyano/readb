@@ -25,6 +25,8 @@ okf_version: "0.1"
 * [Research field-editor type inference](field-editor-type-inference.md) - typed `set` (marad-style) vs. the string-literal stance; maybe an opt-in flag.
 * [Research frontmatter schema checking](frontmatter-schema-checking.md) - opt-in declare/check (`readb check`); load stays permissive.
 * [Research cross-bundle querying](cross-bundle-querying.md) - registry bundles as DuckDB schemas; joins across bundles.
+* [Publish readb 0.1.0 to PyPI](publish-readb-0-1-0.md) - special standalone task after sprint 002; TestPyPI rehearsal + publish + tag.
+* [Automate releases](release-automation.md) - GitHub Actions + Trusted Publishing, once releases are routine.
 
 # Done
 

@@ -2,14 +2,14 @@
 type: Task
 title: Decide zero-row csv/tsv output (header or nothing?)
 description: readb query --format csv/tsv prints nothing (no header) for an empty result; research what similar tools do and decide whether that is a bug.
-status: Draft
+status: Designed
 priority: medium
 tags:
 - cli
 - output
 - research
 created: 2026-07-17
-timestamp: '2026-07-17T00:00:00Z'
+timestamp: '2026-07-20T00:00:00Z'
 ---
 
 `readb query --format csv|tsv` currently prints **nothing at all** — not even a header row —

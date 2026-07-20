@@ -2,14 +2,14 @@
 type: Task
 title: Consider un-prefixing __name -> name (producer-settable, inferred)
 description: __name is inferred from the filename but conceptually producer-settable; weigh dropping the __ prefix to a plain, overridable name column.
-status: Draft
+status: Designed
 priority: low
 tags:
 - schema
 - naming
 - design-question
 created: 2026-07-17
-timestamp: '2026-07-17T00:00:00Z'
+timestamp: '2026-07-20T00:00:00Z'
 ---
 
 Open design question raised at sprint-001 implementation review (see

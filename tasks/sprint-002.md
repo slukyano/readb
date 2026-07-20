@@ -2,7 +2,7 @@
 type: Sprint
 title: Bundle init, packaging & correctness follow-ups
 description: readb init + upward discovery, distributable package, zero-row csv, name un-prefix, tz-aware datetimes, similar-tools research.
-status: Designing
+status: Implementing
 branch: sprint/002
 tasks:
 - bundle-init-discovery
@@ -13,7 +13,7 @@ tasks:
 - research-similar-tools
 - rename-repo-dir
 created: 2026-07-17
-timestamp: '2026-07-17T00:00:00Z'
+timestamp: '2026-07-20T00:00:00Z'
 ---
 
 Second sprint under the session/sprint workflow
@@ -40,12 +40,18 @@ Design phase (a checked box = `## Design` section written and discussed):
 - [x] name-column-unprefix — decided: keep `__name` immutable, `name:` inert, name-or-path addressing w/ mandatory uniqueness; no un-prefix, no ADR change
 - [x] csv-empty-result-header — decided: bug; header on zero rows via new `Database.sql_table` (DuckDB/psql/pandas precedent, sqlite3 sole dissenter)
 - [x] tz-aware-datetime-handling — verified: pytz still required to FETCH any TIMESTAMPTZ (duckdb 1.5.4); keep JSON fallback, fix comment, add revisit canary
-- [ ] distributable-package — target index, release flow, clean-env install verification
+- [x] distributable-package — manual `uv publish` (0.1.0); in-sprint = build + clean-env/3.11 smoke; uploads live in special task `publish-readb-0-1-0`
 - [x] rename-repo-dir — no design (special task; already Done)
 
-## Implementation checklist
+## Implementation checklist (in order)
 
-(ordered at design approval)
+1. [ ] name-column-unprefix — regression tests pinning the contract + doc line (no prod code expected)
+2. [ ] csv-empty-result-header — `Database.sql_table` + csv/tsv header on zero rows; tests
+3. [ ] tz-aware-datetime-handling — schema.py rationale fix + pytz revisit canary + JSON-fallback pin
+4. [ ] bundle-init-discovery — `readb init` + registry discovery + loader skips `.readb/`; tests
+5. [ ] dogfood init — `readb init tasks docs/adr` in this repo; commit config; docs ripple (README/CLAUDE.md/workflow.md; no `default_bundle` — explicit over magic)
+6. [ ] distributable-package — bump 0.1.0; `uv build`; `twine check`; clean-venv + 3.11 smoke (no uploads)
+7. [ ] Gates: full `pytest` + `ruff` + independent subagent review of the sprint diff
 
 ## Open questions
 
@@ -80,3 +86,12 @@ Design phase (a checked box = `## Design` section written and discussed):
   requires pytz to *fetch* (not bind) any TIMESTAMPTZ, verified live; keep the JSON fallback,
   correct the schema.py rationale, add a skipped-if-pytz revisit canary; no ADR. Both designs
   pending batch design approval.
+- 2026-07-20 — `distributable-package` designed (manual publish, 0.1.0, TestPyPI rehearsal; the
+  actual publishing split into special standalone task `publish-readb-0-1-0` per the human —
+  run after this sprint, not as a sprint; draft `release-automation` records the CI path).
+  **Design approved** (human, in chat: "proceed with implementation"). ADR 0004 Accepted; six
+  tasks flipped `Draft → Designed`; sprint `Designing → Implementing`; design merge to `main`.
+  Implementation phase started (order: name, csv, tz, init, dogfood-init, package, gates).
+  Decided at implementation per design note: our repo's registry gets **no** `default_bundle`
+  (explicit over magic, matching the human's ambiguity-errs preference); docs keep `--bundle`
+  where needed.

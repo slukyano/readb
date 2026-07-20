@@ -2,14 +2,14 @@
 type: Task
 title: Revisit tz-aware datetime handling (is avoiding pytz still right?)
 description: Timezone-aware datetimes route to the JSON fallback to avoid a pytz dep; reassess whether they could bind as TIMESTAMPTZ with stdlib-only, and whether that is better.
-status: Draft
+status: Designed
 priority: low
 tags:
 - schema
 - lattice
 - research
 created: 2026-07-17
-timestamp: '2026-07-17T00:00:00Z'
+timestamp: '2026-07-20T00:00:00Z'
 ---
 
 The lattice in `src/readb/schema.py` classifies a timezone-*naive* `datetime` as `TIMESTAMP`

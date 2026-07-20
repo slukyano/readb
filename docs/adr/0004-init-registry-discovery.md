@@ -1,7 +1,7 @@
 ---
 type: ADR
 title: 'Explicit readb init writes a bundle registry; discovery walks up to it; --bundle stays explicit consent'
-status: Proposed
+status: Accepted
 created: 2026-07-20
 sprint: sprint-002
 timestamp: '2026-07-20T00:00:00Z'

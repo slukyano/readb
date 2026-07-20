@@ -1,6 +1,13 @@
 # Task Bundle Log
 
 ## 2026-07-20
+* **Sprint 002 design approved**: All six active tasks flipped `Draft → Designed`; sprint
+  `Designing → Implementing`; [ADR 0004](../docs/adr/0004-init-registry-discovery.md)
+  `Proposed → Accepted` (human, in chat). `distributable-package` design: manual `uv publish`,
+  version 0.1.0; the outward-facing publishing split into special standalone task
+  [publish-readb-0-1-0](publish-readb-0-1-0.md) (after the sprint, not a sprint), with
+  [release-automation](release-automation.md) drafted for the eventual CI path. Design merge to
+  `main`; implementation phase started.
 * **Sprint 002 design phase**: `name-column-unprefix` designed — un-prefix **rejected**; `__name`
   stays immutable/filename-derived, producer `name:` is inert, name-or-path addressing with
   mandatory uniqueness (ADR 0003 affirmed, not amended). `bundle-init-discovery` designed — the

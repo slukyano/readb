@@ -2,14 +2,14 @@
 type: Task
 title: Explicit readb init + upward bundle discovery
 description: An init command marks a directory as a bundle; commands without --bundle walk up to the marker (git-style). The marker doubles as the persistent-index home.
-status: Draft
+status: Designed
 priority: medium
 tags:
 - cli
 - dx
 - index
 created: 2026-07-11
-timestamp: '2026-07-11T00:00:00Z'
+timestamp: '2026-07-20T00:00:00Z'
 ---
 
 Replace the reverted cwd-defaulting of `--bundle` ([default-bundle-cwd](default-bundle-cwd.md),
