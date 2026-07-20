@@ -235,6 +235,17 @@ def test_frontmatter_key_shadowing_virtual_column_warns_and_is_ignored(
         db.close()
 
 
+def test_sql_table_carries_columns_on_empty_result(mini_db: Database) -> None:
+    """``Database.sql_table`` returns column names even when the result has zero rows."""
+    columns, rows = mini_db.sql_table("SELECT __name, __path FROM __DOCUMENTS WHERE false")
+    assert columns == ["__name", "__path"]
+    assert rows == []
+    # And the dict-shaped sibling stays consistent with it on non-empty results.
+    columns, rows = mini_db.sql_table("SELECT __path FROM __DOCUMENTS ORDER BY __path LIMIT 1")
+    dicts = mini_db.sql("SELECT __path FROM __DOCUMENTS ORDER BY __path LIMIT 1")
+    assert dicts == [dict(zip(columns, row, strict=True)) for row in rows]
+
+
 def test_producer_name_key_is_inert_to_virtual_name(tmp_path: Path) -> None:
     """The name contract (sprint-002): ``__name`` is immutable and filename-derived; a producer
     ``name:`` frontmatter key becomes an ordinary column and never affects ``__name``."""

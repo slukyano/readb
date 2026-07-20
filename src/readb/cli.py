@@ -64,13 +64,15 @@ def query(sql: str, bundle: str, output_format: str | None, as_json: bool) -> No
     output_format = "json" if as_json else (output_format or "table")
     try:
         with readb.open(bundle) as db:
-            rows = db.sql(sql)
+            columns, raw_rows = db.sql_table(sql)
     except duckdb.Error as exc:
         raise click.ClickException(str(exc)) from exc
+    rows = [dict(zip(columns, row, strict=True)) for row in raw_rows]
     if output_format == "json":
         click.echo(json.dumps(rows, indent=2, default=_json_default, ensure_ascii=False))
     elif output_format in ("csv", "tsv"):
-        click.echo(_format_csv(rows, delimiter="," if output_format == "csv" else "\t"), nl=False)
+        delimiter = "," if output_format == "csv" else "\t"
+        click.echo(_format_csv(columns, raw_rows, delimiter=delimiter), nl=False)
     elif output_format == "raw":
         _echo_raw(rows)
     else:
@@ -249,18 +251,19 @@ def _json_default(obj: Any) -> str:
     return str(obj)
 
 
-def _format_csv(rows: list[dict[str, Any]], *, delimiter: str) -> str:
-    """Render rows as CSV/TSV: header row, stdlib-csv quoting, NULL as an empty field.
+def _format_csv(columns: list[str], rows: list[tuple[Any, ...]], *, delimiter: str) -> str:
+    """Render a result as CSV/TSV: header row, stdlib-csv quoting, NULL as an empty field.
 
-    A zero-row result prints nothing, header included — column names travel with the rows
-    (``Database.sql`` returns dicts), so there is nothing to name an empty result with.
+    The header is written whenever the result has columns — a zero-row result prints exactly
+    the header line, matching DuckDB's own csv writers (and psql/pandas; ``Database.sql_table``
+    carries the column names independently of the rows to make that possible).
     """
     buffer = io.StringIO()
     writer = csv.writer(buffer, delimiter=delimiter, lineterminator="\n")
-    if rows:
-        writer.writerow(rows[0].keys())
-        for row in rows:
-            writer.writerow("" if v is None else _text_value(v) for v in row.values())
+    if columns:
+        writer.writerow(columns)
+    for row in rows:
+        writer.writerow("" if v is None else _text_value(v) for v in row)
     return buffer.getvalue()
 
 

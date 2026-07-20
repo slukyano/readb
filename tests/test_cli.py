@@ -99,10 +99,45 @@ def test_json_flag_with_format_json_is_allowed() -> None:
     assert result.exit_code == 0, result.output
 
 
-def test_format_csv_zero_rows_prints_nothing() -> None:
-    # Documented: column names travel with rows, so an empty result has no header to print.
+def test_format_csv_zero_rows_prints_header() -> None:
+    # A zero-row result prints exactly the header line (like DuckDB's own csv writers).
     result = _run(
-        "query", "SELECT 1 AS n WHERE false", "--bundle", str(MINI_BUNDLE), "--format", "csv"
+        "query",
+        "SELECT 1 AS n, 'x' AS s WHERE false",
+        "--bundle",
+        str(MINI_BUNDLE),
+        "--format",
+        "csv",
+    )
+    assert result.exit_code == 0, result.output
+    assert result.output == "n,s\n"
+
+
+def test_format_tsv_zero_rows_prints_header() -> None:
+    result = _run(
+        "query",
+        "SELECT 1 AS n, 'x' AS s WHERE false",
+        "--bundle",
+        str(MINI_BUNDLE),
+        "--format",
+        "tsv",
+    )
+    assert result.exit_code == 0, result.output
+    assert result.output == "n\ts\n"
+
+
+def test_format_json_zero_rows_is_empty_list() -> None:
+    result = _run(
+        "query", "SELECT 1 AS n WHERE false", "--bundle", str(MINI_BUNDLE), "--format", "json"
+    )
+    assert result.exit_code == 0, result.output
+    assert result.output.strip() == "[]"
+
+
+def test_format_raw_zero_rows_prints_nothing() -> None:
+    # raw is values-only by design; zero rows correctly yield zero output.
+    result = _run(
+        "query", "SELECT 1 AS n WHERE false", "--bundle", str(MINI_BUNDLE), "--format", "raw"
     )
     assert result.exit_code == 0, result.output
     assert result.output == ""
