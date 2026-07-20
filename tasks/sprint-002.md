@@ -38,8 +38,8 @@ Design phase (a checked box = `## Design` section written and discussed):
 - [x] research-similar-tools — surveyed 11 tools; `## Findings` written; ideas mapped to designs + draft `readme-prior-art`
 - [x] bundle-init-discovery — registry model designed: `readb init` writes `.readb/config.toml` declaring bundles; discovery walks up; ADR 0004 Proposed
 - [x] name-column-unprefix — decided: keep `__name` immutable, `name:` inert, name-or-path addressing w/ mandatory uniqueness; no un-prefix, no ADR change
-- [ ] csv-empty-result-header — research peers' zero-row csv behavior; decide header-or-nothing
-- [ ] tz-aware-datetime-handling — verify TIMESTAMPTZ binding; lattice node or comment fix
+- [x] csv-empty-result-header — decided: bug; header on zero rows via new `Database.sql_table` (DuckDB/psql/pandas precedent, sqlite3 sole dissenter)
+- [x] tz-aware-datetime-handling — verified: pytz still required to FETCH any TIMESTAMPTZ (duckdb 1.5.4); keep JSON fallback, fix comment, add revisit canary
 - [ ] distributable-package — target index, release flow, clean-env install verification
 - [x] rename-repo-dir — no design (special task; already Done)
 
@@ -73,3 +73,10 @@ Design phase (a checked box = `## Design` section written and discussed):
   bundle → default → hard error listing bundles; `--bundle` never consults the registry; loader
   skips `.readb/`. ADR 0004 written (Proposed). Spun off draft `cross-bundle-querying`
   (bundles as DuckDB schemas). Fixed a typo in `docs/adr/index.md` (0003: "__id removed").
+- 2026-07-20 — Empirical designs for the two correctness tasks. `csv-empty-result-header`:
+  verified DuckDB emits headers on zero rows (COPY/write_csv) while sqlite3 emits nothing —
+  decided header-always via a new `Database.sql_table() -> (columns, rows)` sibling; json/table/
+  raw unchanged; no ADR. `tz-aware-datetime-handling`: hypothesis refuted — duckdb 1.5.4 still
+  requires pytz to *fetch* (not bind) any TIMESTAMPTZ, verified live; keep the JSON fallback,
+  correct the schema.py rationale, add a skipped-if-pytz revisit canary; no ADR. Both designs
+  pending batch design approval.
