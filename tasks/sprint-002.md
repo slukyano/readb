@@ -36,7 +36,7 @@ scope as bookkeeping only, already `Done`. Still deferred: `bundle-index-log-aut
 Design phase (a checked box = `## Design` section written and discussed):
 
 - [x] research-similar-tools — surveyed 11 tools; `## Findings` written; ideas mapped to designs + draft `readme-prior-art`
-- [ ] bundle-init-discovery — explicit `readb init` marker + upward discovery; ADR
+- [x] bundle-init-discovery — registry model designed: `readb init` writes `.readb/config.toml` declaring bundles; discovery walks up; ADR 0004 Proposed
 - [x] name-column-unprefix — decided: keep `__name` immutable, `name:` inert, name-or-path addressing w/ mandatory uniqueness; no un-prefix, no ADR change
 - [ ] csv-empty-result-header — research peers' zero-row csv behavior; decide header-or-nothing
 - [ ] tz-aware-datetime-handling — verify TIMESTAMPTZ binding; lattice node or comment fix
@@ -66,3 +66,10 @@ Design phase (a checked box = `## Design` section written and discussed):
   keep `__name` immutable/filename-derived, producer `name:` inert, doc access always name-or-path
   with mandatory uniqueness (no Obsidian-style silent first-match). Behavior already matches;
   deliverable is regression tests + a doc line, no production code change and no ADR amendment.
+- 2026-07-20 — `bundle-init-discovery` designed against the real common case (one repo, several
+  bundles — ours: `tasks/` + `docs/adr/`). Human approved the **registry model**: single
+  `readb init [DIRS...]` writes `.readb/config.toml` (`version`, `bundles`, optional
+  `default_bundle`); discovery walks up to the nearest registry, picks by containment → sole
+  bundle → default → hard error listing bundles; `--bundle` never consults the registry; loader
+  skips `.readb/`. ADR 0004 written (Proposed). Spun off draft `cross-bundle-querying`
+  (bundles as DuckDB schemas). Fixed a typo in `docs/adr/index.md` (0003: "__id removed").

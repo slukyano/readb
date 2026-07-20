@@ -21,6 +21,10 @@ okf_version: "0.1"
 * [Consider un-prefixing __name -> name](name-column-unprefix.md) - producer-settable, inferred; sprint-001 open question (sprint 002).
 * [Decide zero-row csv/tsv output](csv-empty-result-header.md) - header or nothing on empty results; maybe a bug (sprint-001 review) (sprint 002).
 * [Revisit tz-aware datetime handling](tz-aware-datetime-handling.md) - is avoiding pytz still right, or can it be TIMESTAMPTZ? (sprint-001 review) (sprint 002).
+* [Add a prior-art note to the README](readme-prior-art.md) - frontmatter-mcp, MarkdownDB, Dataview; the transparent-disposable-index differentiator.
+* [Research field-editor type inference](field-editor-type-inference.md) - typed `set` (marad-style) vs. the string-literal stance; maybe an opt-in flag.
+* [Research frontmatter schema checking](frontmatter-schema-checking.md) - opt-in declare/check (`readb check`); load stays permissive.
+* [Research cross-bundle querying](cross-bundle-querying.md) - registry bundles as DuckDB schemas; joins across bundles.
 
 # Done
 
