@@ -242,6 +242,109 @@ def test_nested_registries_nearest_wins(tmp_path: Path, monkeypatch: pytest.Monk
 
 
 # --------------------------------------------------------------------------------------------
+# Containment: the resolve path refuses what init refuses (review finding, sprint-002).
+# --------------------------------------------------------------------------------------------
+
+
+def test_config_with_dotdot_bundle_is_refused(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    victim = _bundle(tmp_path, "victim")
+    root = tmp_path / "project"
+    root.mkdir()
+    (root / ".readb").mkdir()
+    (root / ".readb" / "config.toml").write_text(
+        'version = 1\nbundles = ["../victim"]\n', encoding="utf-8"
+    )
+    monkeypatch.chdir(root)
+    for args in (
+        ("query", "SELECT 1"),
+        ("set", "doc", "status=pwned"),
+    ):
+        result = _run(*args)
+        assert result.exit_code == 1, result.output
+        assert "outside the registry root" in result.output
+    assert "pwned" not in (victim / "doc.md").read_text(encoding="utf-8")
+
+
+def test_config_with_absolute_bundle_is_refused(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _bundle(tmp_path, "elsewhere")
+    root = tmp_path / "project"
+    root.mkdir()
+    (root / ".readb").mkdir()
+    (root / ".readb" / "config.toml").write_text(
+        f'version = 1\nbundles = ["{tmp_path / "elsewhere"}"]\n', encoding="utf-8"
+    )
+    monkeypatch.chdir(root)
+    result = _run("query", "SELECT 1")
+    assert result.exit_code == 1
+    assert "outside the registry root" in result.output
+
+
+def test_config_with_symlinked_escape_is_refused(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _bundle(tmp_path, "victim")
+    root = tmp_path / "project"
+    root.mkdir()
+    (root / "link").symlink_to(tmp_path / "victim", target_is_directory=True)
+    (root / ".readb").mkdir()
+    (root / ".readb" / "config.toml").write_text(
+        'version = 1\nbundles = ["link"]\n', encoding="utf-8"
+    )
+    monkeypatch.chdir(root)
+    result = _run("query", "SELECT 1")
+    assert result.exit_code == 1
+    assert "outside the registry root" in result.output
+
+
+def test_default_bundle_not_declared_is_clean_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _bundle(tmp_path, "tasks")
+    _bundle(tmp_path, "docs")
+    monkeypatch.chdir(tmp_path)
+    assert _run("init", "tasks", "docs").exit_code == 0
+    path = config_path(tmp_path)
+    path.write_text(
+        path.read_text(encoding="utf-8") + 'default_bundle = "nope"\n', encoding="utf-8"
+    )
+    result = _run("query", "SELECT 1")
+    assert result.exit_code == 1
+    assert "not one of the declared bundles" in result.output
+
+
+def test_non_string_default_bundle_is_clean_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _bundle(tmp_path, "tasks")
+    monkeypatch.chdir(tmp_path)
+    assert _run("init", "tasks").exit_code == 0
+    path = config_path(tmp_path)
+    path.write_text(path.read_text(encoding="utf-8") + "default_bundle = 3\n", encoding="utf-8")
+    result = _run("query", "SELECT 1")
+    assert result.exit_code == 1
+    assert "default_bundle" in result.output
+
+
+def test_merge_into_multiline_array_is_clean_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _bundle(tmp_path, "tasks")
+    _bundle(tmp_path, "extra")
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / ".readb").mkdir()
+    config_path(tmp_path).write_text('version = 1\nbundles = [\n  "tasks",\n]\n', encoding="utf-8")
+    result = _run("init", "extra")
+    assert result.exit_code == 1
+    assert "edit the file by hand" in result.output
+    # And the file was not touched.
+    assert '"extra"' not in config_path(tmp_path).read_text(encoding="utf-8")
+
+
+# --------------------------------------------------------------------------------------------
 # The loader never sees .readb/.
 # --------------------------------------------------------------------------------------------
 

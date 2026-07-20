@@ -76,6 +76,17 @@ def load_config(root: Path) -> RegistryConfig:
     default = data.get("default_bundle")
     if default is not None and not isinstance(default, str):
         raise RegistryError(f"registry config {path}: 'default_bundle' must be a string")
+    # Containment: the resolve path must refuse what init refuses — a checked-in config the
+    # invoking user did not author must never point reads (or set/unset writes) outside the
+    # registry root, via '..', absolute paths, or symlinked bundle dirs.
+    root_resolved = root.resolve()
+    for entry in bundles:
+        target = (root_resolved / entry).resolve()
+        if not target.is_relative_to(root_resolved):
+            raise RegistryError(
+                f"registry config {path}: bundle {entry!r} resolves outside the registry "
+                f"root ({target}); declared bundles must live within it"
+            )
     return RegistryConfig(root=root, bundles=tuple(bundles), default_bundle=default)
 
 
@@ -165,13 +176,16 @@ def init_registry(root: Path, bundle_dirs: list[str]) -> str:
     merged = [*existing.bundles, *new_entries]
     lines = path.read_text(encoding="utf-8").splitlines(keepends=True)
     for index, line in enumerate(lines):
-        if line.split("=")[0].strip() == "bundles":
+        key, equals, value = line.partition("=")
+        # Only a complete single-line array is safely replaceable; the opening line of a
+        # multi-line array also starts with 'bundles =' and must NOT match (silent corruption).
+        if key.strip() == "bundles" and equals and value.strip().endswith("]"):
             newline = "\n" if line.endswith("\n") else ""
             lines[index] = _bundles_line(merged) + newline
             break
     else:
         raise RegistryError(
-            f"cannot merge into {path}: no 'bundles = [...]' line found "
+            f"cannot merge into {path}: no single-line 'bundles = [...]' found "
             f"(multi-line arrays are not supported by the surgical merge; edit the file by hand)"
         )
     path.write_text("".join(lines), encoding="utf-8")
