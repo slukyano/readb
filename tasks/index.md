@@ -20,6 +20,7 @@ okf_version: "0.1"
 * [Research frontmatter schema checking](frontmatter-schema-checking.md) - opt-in declare/check (`readb check`); load stays permissive.
 * [Research cross-bundle querying](cross-bundle-querying.md) - registry bundles as DuckDB schemas; joins across bundles.
 * [Automate releases](release-automation.md) - GitHub Actions + Trusted Publishing, once releases are routine; unblocked by the 0.1.0 publish.
+* [Ship a readb usage skill with the repo](ship-usage-skill.md) - agent-consumable "how to use readb", shipped by the tool itself.
 
 # Done
 
