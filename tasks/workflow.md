@@ -133,6 +133,13 @@ subagents where appropriate. Rules of the phase:
   behavior is covered by tests.
 - **Independent review** — a fresh subagent with no implementation context reviews the full
   sprint diff; findings are fixed (or explicitly presented as known issues).
+- **Publication hygiene** — everything committed must be publishable as-is, since the repo
+  (history included) is public-bound. The review checks the sprint diff for: conversational or
+  second-person prose ("you asked…", chat-transcript style — write in third-person project
+  voice; role terms like "the human"/"the agent" and project "we" are fine); references to
+  people beyond the intended author/copyright identity; claims about other projects that are
+  not factual, dated, and sourced (state facts, never disparage); and local paths, credentials,
+  private links, or other environment leakage.
 
 ## 6. Close-out, presentation & final merge
 

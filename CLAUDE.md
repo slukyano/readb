@@ -74,7 +74,9 @@ committing `tasks/sprint-NNN.md` to `main` and cutting branch `sprint/NNN`. Then
 interactive design phase (per-task `## Design` sections + `Proposed` ADRs; human approval →
 design merge to `main`), an autonomous implementation phase (commit throughout; **stop and
 ask** on any decision that belongs to the human — never guess), gates (`pytest` + `ruff` +
-an independent subagent review of the diff), a sprint summary, and on human approval the final
+an independent subagent review of the diff + a publication-hygiene check: third-person
+project voice, factual/dated/sourced claims about other projects, no personal or environment
+leakage — see `tasks/workflow.md` §5), a sprint summary, and on human approval the final
 merge. Task lifecycle: `Draft → Designed → Done` (+ `Dropped`). ADRs live in `docs/adr/` (an
 OKF bundle); **only the human approves ADRs**. All approvals happen in chat: present a
 separator, a short summary, the complete self-contained decision context (quote what matters;
