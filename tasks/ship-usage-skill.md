@@ -26,5 +26,5 @@ layer has no home readb itself provides.
 - Decide the distribution shape at design time: a `skills/` directory in the repo, packaging
   into the wheel, or both — and how installs reference it (e.g. a directory-level link per the
   emerging agent-skills conventions).
-- Keep it usage-only: development-process docs (`tasks/workflow.md`, `CLAUDE.md`) stay
+- Keep it usage-only: development-process docs (`tasks/workflow.md`, `AGENTS.md`) stay
   separate; the skill targets readb *users*.
