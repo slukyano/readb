@@ -1,6 +1,22 @@
 # Task Bundle Log
 
 ## 2026-07-20
+* **Research bundle**: Created `docs/research/` (a third OKF bundle, `type: Research`) at the
+  human's call during final review — durable research artifacts live there, dated point-in-time
+  data kept with its date. Moved the similar-tools survey into it
+  ([docs/research/similar-tools.md](../docs/research/similar-tools.md));
+  [research-similar-tools](research-similar-tools.md) keeps a pointer + short version.
+  Registered via `readb init docs/research` (dogfooding the registry merge path live).
+* **Sprint 002 close-out**: All 6 active tasks flipped `Designed → Done`
+  ([bundle-init-discovery](bundle-init-discovery.md), [csv-empty-result-header](csv-empty-result-header.md),
+  [name-column-unprefix](name-column-unprefix.md), [tz-aware-datetime-handling](tz-aware-datetime-handling.md),
+  [research-similar-tools](research-similar-tools.md), [distributable-package](distributable-package.md));
+  [sprint-002](sprint-002.md) flipped `Implementing → Done` with a written summary. Implementation:
+  `readb init` + registry discovery (ADR 0004, dogfooded — this repo's `.readb/config.toml` committed),
+  zero-row csv header via `Database.sql_table`, name contract pinned by tests, tz rationale corrected +
+  pytz canary, version 0.1.0 built and clean-venv smoke-tested (3.14 + 3.11). Independent review: 1
+  medium (registry resolve-path containment) fixed + a merge-corruption bug caught by its suggested
+  test, also fixed. Gates green: 129 tests, ruff clean. Presented for final review + merge.
 * **Sprint 002 design approved**: All six active tasks flipped `Draft → Designed`; sprint
   `Designing → Implementing`; [ADR 0004](../docs/adr/0004-init-registry-discovery.md)
   `Proposed → Accepted` (human, in chat). `distributable-package` design: manual `uv publish`,

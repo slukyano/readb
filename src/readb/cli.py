@@ -12,6 +12,10 @@ the one, deliberately separate, write path: a surgical frontmatter field editor 
 readb get   --bundle ./path <name-or-path> <key>              # print one frontmatter field
 readb set   --bundle ./path <name-or-path> key=value ...      # set fields in place
 readb unset --bundle ./path <name-or-path> <key> ...          # remove fields in place
+
+``--bundle`` may be omitted once a registry exists: ``readb init [DIR...]`` (the third
+sanctioned write) marks the cwd as a registry root declaring its bundles, and commands run
+anywhere below it resolve the bundle by walking up to the nearest ``.readb/`` (ADR 0004).
 """
 
 from __future__ import annotations
@@ -27,17 +31,27 @@ import click
 import duckdb
 
 import readb
-from readb import fields, parser
+from readb import fields, parser, registry
 
-# --bundle is deliberately required: defaulting to the cwd silently treats any directory
-# (a repo root, $HOME) as a bundle — wrong-scope reads and misdirected name-resolved writes.
-# The ergonomic replacement is explicit init + upward discovery (task: bundle-init-discovery).
+# --bundle never defaults to the cwd: that silently treats any directory (a repo root, $HOME)
+# as a bundle — wrong-scope reads and misdirected name-resolved writes. Omitting it instead
+# resolves through the explicit-init registry (ADR 0004); naming a path bypasses the registry.
 _BUNDLE_OPTION = click.option(
     "--bundle",
-    required=True,
+    default=None,
     type=click.Path(exists=True, file_okay=False, dir_okay=True),
-    help="Path to the OKF bundle directory.",
+    help="Path to the OKF bundle directory (default: resolve via the .readb registry).",
 )
+
+
+def _resolve_bundle(bundle: str | None) -> str:
+    """An explicit --bundle wins untouched; otherwise resolve via the registry (ADR 0004)."""
+    if bundle is not None:
+        return bundle
+    try:
+        return str(registry.resolve_bundle(Path.cwd()))
+    except registry.RegistryError as exc:
+        raise click.ClickException(str(exc)) from exc
 
 
 @click.group()
@@ -57,20 +71,23 @@ def main() -> None:
     help="Output format (default: table). raw prints values verbatim, one per line.",
 )
 @click.option("--json", "as_json", is_flag=True, help="Alias for --format json.")
-def query(sql: str, bundle: str, output_format: str | None, as_json: bool) -> None:
+def query(sql: str, bundle: str | None, output_format: str | None, as_json: bool) -> None:
     """Execute SQL against the bundle and print the result rows."""
     if as_json and output_format not in (None, "json"):
         raise click.UsageError(f"--json conflicts with --format {output_format}")
     output_format = "json" if as_json else (output_format or "table")
+    bundle = _resolve_bundle(bundle)
     try:
         with readb.open(bundle) as db:
-            rows = db.sql(sql)
+            columns, raw_rows = db.sql_table(sql)
     except duckdb.Error as exc:
         raise click.ClickException(str(exc)) from exc
+    rows = [dict(zip(columns, row, strict=True)) for row in raw_rows]
     if output_format == "json":
         click.echo(json.dumps(rows, indent=2, default=_json_default, ensure_ascii=False))
     elif output_format in ("csv", "tsv"):
-        click.echo(_format_csv(rows, delimiter="," if output_format == "csv" else "\t"), nl=False)
+        delimiter = "," if output_format == "csv" else "\t"
+        click.echo(_format_csv(columns, raw_rows, delimiter=delimiter), nl=False)
     elif output_format == "raw":
         _echo_raw(rows)
     else:
@@ -79,8 +96,9 @@ def query(sql: str, bundle: str, output_format: str | None, as_json: bool) -> No
 
 @main.command()
 @_BUNDLE_OPTION
-def schema(bundle: str) -> None:
+def schema(bundle: str | None) -> None:
     """Print detected types, their normalized table names, and columns + types."""
+    bundle = _resolve_bundle(bundle)
     try:
         with readb.open(bundle) as db:
             bundle_schema = db.schema()
@@ -92,13 +110,14 @@ def schema(bundle: str) -> None:
 @main.command()
 @_BUNDLE_OPTION
 @click.argument("names", nargs=-1, required=True)
-def show(bundle: str, names: tuple[str, ...]) -> None:
+def show(bundle: str | None, names: tuple[str, ...]) -> None:
     """Print the body of one or more concepts (frontmatter stripped).
 
     The CLI alias for ``SELECT __body``: same parser, same semantics. Accepts a simple name or
     a full ``.md`` path per concept; also works for the reserved index/log files. Does not load
     the bundle — only the addressed files are parsed.
     """
+    bundle = _resolve_bundle(bundle)
     bundle_root = Path(bundle).resolve()
     resolved = [_concept_path(bundle, name) for name in names]
     for name, file_path in zip(names, resolved, strict=True):
@@ -109,6 +128,23 @@ def show(bundle: str, names: tuple[str, ...]) -> None:
             click.echo(f"==> {concept.path} <==")
         # The body is printed verbatim; add a newline only when the file lacks a trailing one.
         click.echo(concept.body, nl=not concept.body.endswith("\n"))
+
+
+@main.command()
+@click.argument("bundle_dirs", nargs=-1)
+def init(bundle_dirs: tuple[str, ...]) -> None:
+    """Mark the current directory as a readb registry root, declaring its bundle dirs.
+
+    Writes ``.readb/config.toml`` here listing BUNDLE_DIRS (relative paths; default: ``.`` —
+    this directory is itself the bundle). Commands run without ``--bundle`` anywhere below the
+    registry resolve their bundle from it (ADR 0004). Re-running merges new dirs and never
+    removes; edit the config by hand to remove entries or set ``default_bundle``.
+    """
+    try:
+        message = registry.init_registry(Path.cwd(), list(bundle_dirs) or ["."])
+    except registry.RegistryError as exc:
+        raise click.ClickException(str(exc)) from exc
+    click.echo(message)
 
 
 # --------------------------------------------------------------------------------------------
@@ -124,8 +160,9 @@ def show(bundle: str, names: tuple[str, ...]) -> None:
 @_BUNDLE_OPTION
 @click.argument("name_or_path")
 @click.argument("key")
-def get(bundle: str, name_or_path: str, key: str) -> None:
+def get(bundle: str | None, name_or_path: str, key: str) -> None:
     """Print one frontmatter field of a concept (nothing if the field is absent)."""
+    bundle = _resolve_bundle(bundle)
     value = fields.get_field(_concept_path(bundle, name_or_path), key)
     if value is not None:
         click.echo(value)
@@ -135,8 +172,9 @@ def get(bundle: str, name_or_path: str, key: str) -> None:
 @_BUNDLE_OPTION
 @click.argument("name_or_path")
 @click.argument("assignments", nargs=-1, required=True)
-def set_(bundle: str, name_or_path: str, assignments: tuple[str, ...]) -> None:
+def set_(bundle: str | None, name_or_path: str, assignments: tuple[str, ...]) -> None:
     """Set one or more frontmatter fields (KEY=VALUE ...) on a concept, in place."""
+    bundle = _resolve_bundle(bundle)
     pairs: list[tuple[str, str]] = []
     for item in assignments:
         if "=" not in item:
@@ -152,8 +190,9 @@ def set_(bundle: str, name_or_path: str, assignments: tuple[str, ...]) -> None:
 @_BUNDLE_OPTION
 @click.argument("name_or_path")
 @click.argument("keys", nargs=-1, required=True)
-def unset(bundle: str, name_or_path: str, keys: tuple[str, ...]) -> None:
+def unset(bundle: str | None, name_or_path: str, keys: tuple[str, ...]) -> None:
     """Remove one or more frontmatter fields (KEY ...) from a concept, in place."""
+    bundle = _resolve_bundle(bundle)
     _edit(lambda path: fields.unset_fields(path, list(keys)), bundle, name_or_path)
 
 
@@ -249,18 +288,19 @@ def _json_default(obj: Any) -> str:
     return str(obj)
 
 
-def _format_csv(rows: list[dict[str, Any]], *, delimiter: str) -> str:
-    """Render rows as CSV/TSV: header row, stdlib-csv quoting, NULL as an empty field.
+def _format_csv(columns: list[str], rows: list[tuple[Any, ...]], *, delimiter: str) -> str:
+    """Render a result as CSV/TSV: header row, stdlib-csv quoting, NULL as an empty field.
 
-    A zero-row result prints nothing, header included — column names travel with the rows
-    (``Database.sql`` returns dicts), so there is nothing to name an empty result with.
+    The header is written whenever the result has columns — a zero-row result prints exactly
+    the header line, matching DuckDB's own csv writers (and psql/pandas; ``Database.sql_table``
+    carries the column names independently of the rows to make that possible).
     """
     buffer = io.StringIO()
     writer = csv.writer(buffer, delimiter=delimiter, lineterminator="\n")
-    if rows:
-        writer.writerow(rows[0].keys())
-        for row in rows:
-            writer.writerow("" if v is None else _text_value(v) for v in row.values())
+    if columns:
+        writer.writerow(columns)
+    for row in rows:
+        writer.writerow("" if v is None else _text_value(v) for v in row)
     return buffer.getvalue()
 
 

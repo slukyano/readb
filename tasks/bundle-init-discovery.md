@@ -2,7 +2,7 @@
 type: Task
 title: Explicit readb init + upward bundle discovery
 description: An init command marks a directory as a bundle; commands without --bundle walk up to the marker (git-style). The marker doubles as the persistent-index home.
-status: Designed
+status: Done
 priority: medium
 tags:
 - cli

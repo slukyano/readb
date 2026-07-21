@@ -2,7 +2,7 @@
 type: Task
 title: Decide zero-row csv/tsv output (header or nothing?)
 description: readb query --format csv/tsv prints nothing (no header) for an empty result; research what similar tools do and decide whether that is a bug.
-status: Designed
+status: Done
 priority: medium
 tags:
 - cli

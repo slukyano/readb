@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
 from click.testing import CliRunner, Result
 
 from readb.cli import main
@@ -99,10 +100,45 @@ def test_json_flag_with_format_json_is_allowed() -> None:
     assert result.exit_code == 0, result.output
 
 
-def test_format_csv_zero_rows_prints_nothing() -> None:
-    # Documented: column names travel with rows, so an empty result has no header to print.
+def test_format_csv_zero_rows_prints_header() -> None:
+    # A zero-row result prints exactly the header line (like DuckDB's own csv writers).
     result = _run(
-        "query", "SELECT 1 AS n WHERE false", "--bundle", str(MINI_BUNDLE), "--format", "csv"
+        "query",
+        "SELECT 1 AS n, 'x' AS s WHERE false",
+        "--bundle",
+        str(MINI_BUNDLE),
+        "--format",
+        "csv",
+    )
+    assert result.exit_code == 0, result.output
+    assert result.output == "n,s\n"
+
+
+def test_format_tsv_zero_rows_prints_header() -> None:
+    result = _run(
+        "query",
+        "SELECT 1 AS n, 'x' AS s WHERE false",
+        "--bundle",
+        str(MINI_BUNDLE),
+        "--format",
+        "tsv",
+    )
+    assert result.exit_code == 0, result.output
+    assert result.output == "n\ts\n"
+
+
+def test_format_json_zero_rows_is_empty_list() -> None:
+    result = _run(
+        "query", "SELECT 1 AS n WHERE false", "--bundle", str(MINI_BUNDLE), "--format", "json"
+    )
+    assert result.exit_code == 0, result.output
+    assert result.output.strip() == "[]"
+
+
+def test_format_raw_zero_rows_prints_nothing() -> None:
+    # raw is values-only by design; zero rows correctly yield zero output.
+    result = _run(
+        "query", "SELECT 1 AS n WHERE false", "--bundle", str(MINI_BUNDLE), "--format", "raw"
     )
     assert result.exit_code == 0, result.output
     assert result.output == ""
@@ -198,6 +234,33 @@ def test_show_name_clash_lists_paths(tmp_path: Path) -> None:
     assert "full path" in result.output
 
 
+def test_full_path_resolves_despite_name_clash(tmp_path: Path) -> None:
+    bundle = _clashing_bundle(tmp_path, 2)
+    result = _run("show", "--bundle", str(bundle), "dir1/dup.md")
+    assert result.exit_code == 0
+    assert result.output.strip() == "body 1"
+
+
+def test_get_name_clash_also_raises(tmp_path: Path) -> None:
+    # Every doc-addressing command routes through the same uniqueness-checked resolver.
+    bundle = _clashing_bundle(tmp_path, 2)
+    result = _run("get", "--bundle", str(bundle), "dup", "type")
+    assert result.exit_code == 1
+    assert "ambiguous" in result.output
+
+
+def test_producer_name_key_does_not_affect_addressing(tmp_path: Path) -> None:
+    # A producer `name:` frontmatter key is inert: addressing goes by filename, always.
+    content = "---\ntype: T\nname: alias\n---\nthe body\n"
+    (tmp_path / "real.md").write_text(content, encoding="utf-8")
+    by_filename = _run("show", "--bundle", str(tmp_path), "real")
+    assert by_filename.exit_code == 0
+    assert by_filename.output.strip() == "the body"
+    by_alias = _run("show", "--bundle", str(tmp_path), "alias")
+    assert by_alias.exit_code == 1
+    assert "no such concept" in by_alias.output
+
+
 def test_name_clash_list_is_capped_at_five(tmp_path: Path) -> None:
     bundle = _clashing_bundle(tmp_path, 7)
     result = _run("show", "--bundle", str(bundle), "dup")
@@ -262,11 +325,17 @@ def test_name_column_present_and_id_gone() -> None:
 
 
 # --------------------------------------------------------------------------------------------
-# --bundle is required (the cwd default was reverted: silent wrong-scope operations).
+# --bundle never defaults to the cwd (the cwd default was reverted: silent wrong-scope
+# operations). Omitting it resolves via the explicit-init registry — see test_init_discovery.py.
 # --------------------------------------------------------------------------------------------
 
 
-def test_bundle_is_required() -> None:
+def test_missing_bundle_without_registry_is_clean_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.chdir(tmp_path)  # isolated cwd: the repo itself carries a registry
     result = _run("query", "SELECT 1")
-    assert result.exit_code == 2
+    assert result.exit_code == 1
+    assert "readb init" in result.output
     assert "--bundle" in result.output
+    assert "Traceback" not in result.output

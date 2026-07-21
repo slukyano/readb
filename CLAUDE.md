@@ -28,6 +28,10 @@ uv run readb --help   # exercise the CLI
   YAML — only the targeted `key: value` lines change.
 - `src/readb/cli.py` — click CLI: `readb query`/`readb schema` (read-only) and `readb get`/`set`/
   `unset` (the frontmatter editor, addressed by `--bundle <dir> <concept-id>`).
+- `src/readb/registry.py` — `readb init` + upward bundle discovery (ADR 0004): `.readb/config.toml`
+  at the repo root declares the bundles; commands without `--bundle` resolve through it. From the
+  multi-bundle repo root, keep passing `--bundle` explicitly (no `default_bundle` is set —
+  deliberate).
 
 ## Hard constraints
 
@@ -57,7 +61,7 @@ file, plus one `Sprint` concept per sprint). Query it with readb:
 through readb's own field editor — `readb set`/`unset --bundle ./tasks <id> ...`.
 
 **Dogfooding rule:** always prefer readb itself for reading and querying the local OKF bundles
-(`tasks/`, `docs/adr/`) — do not fall back to `cat`/grep/manual file reads for what readb should
+(`tasks/`, `docs/adr/`, `docs/research/`) — do not fall back to `cat`/grep/manual file reads for what readb should
 answer. When readb fails or can't express what you need: stop, immediately record a new `Draft`
 task for the gap, and only then work around it. Tasks that block dogfooding readb take priority
 over the rest of the backlog.

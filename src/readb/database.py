@@ -42,11 +42,23 @@ class Database:
         bound through DuckDB's prepared-statement interface. A statement that returns no result
         set (rare for this read-only layer) yields an empty list.
         """
+        columns, rows = self.sql_table(query, parameters)
+        return [dict(zip(columns, row, strict=True)) for row in rows]
+
+    def sql_table(
+        self, query: str, parameters: list[Any] | None = None
+    ) -> tuple[list[str], list[tuple[Any, ...]]]:
+        """Execute ``query`` and return ``(column_names, rows)`` — columns survive empty results.
+
+        The tabular sibling of :meth:`sql`: a zero-row result still carries its column names
+        (so e.g. csv output can print a header), which the dict-shaped ``sql`` cannot convey.
+        A statement that returns no result set yields ``([], [])``.
+        """
         cursor = self._conn.execute(query, parameters) if parameters else self._conn.execute(query)
         if cursor.description is None:
-            return []
+            return [], []
         columns = [descriptor[0] for descriptor in cursor.description]
-        return [dict(zip(columns, row, strict=True)) for row in cursor.fetchall()]
+        return columns, cursor.fetchall()
 
     def schema(self) -> BundleSchema:
         """Return the detected schema: types, normalized table names, columns + inferred types."""
