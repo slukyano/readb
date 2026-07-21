@@ -1,6 +1,12 @@
 # Task Bundle Log
 
 ## 2026-07-20
+* **Publication-hygiene sweep** (pre-publication): a new hygiene gate joined the sprint reviews
+  (`workflow.md` §5 — third-person project voice; factual, dated, sourced claims about other
+  projects; no personal or environment leakage). Docs swept to maintainer/agent role voice; the
+  eight retired loop-era task files were removed (their retirement stays recorded in
+  [ADR 0001](../docs/adr/0001-sessions-sprints-workflow.md) and this log); stale loop-era
+  branches were deleted; commit history was rewritten to drop private-link trailers.
 * **Research bundle**: Created `docs/research/` (a third OKF bundle, `type: Research`) at the
   maintainer's call during final review — durable research artifacts live there, dated point-in-time
   data kept with its date. Moved the similar-tools survey into it
