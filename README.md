@@ -15,9 +15,15 @@ modified.
 
 ## Install
 
+From [PyPI](https://pypi.org/project/readb/) (Python >= 3.11):
+
 ```sh
-uv sync
+uv tool install readb    # the CLI as a standalone tool
+# or
+pip install readb        # the library + CLI into an environment
 ```
+
+For development from a clone, see [Development](#development).
 
 ## Usage
 

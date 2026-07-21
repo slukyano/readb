@@ -37,3 +37,7 @@ tests/fixtures/upstream/
 
 # Claude Code local overrides
 .claude/settings.local.json
+
+# local secrets (never commit env files)
+.env
+.env.*

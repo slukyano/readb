@@ -1,5 +1,13 @@
 # Task Bundle Log
 
+## 2026-07-21
+* **Published**: The repo went public (github.com/slukyano/readb) after the hygiene pass, and
+  [publish-readb-0-1-0](publish-readb-0-1-0.md) executed standalone: TestPyPI rehearsal,
+  PyPI publish (readb 0.1.0 live), tag `v0.1.0` + GitHub release, post-publish
+  `uv tool install` smoke, README install section now PyPI-first. Task flipped
+  `Draft → Done` (execution record in the task body);
+  [release-automation](release-automation.md) is now unblocked.
+
 ## 2026-07-20
 * **Publication-hygiene sweep** (pre-publication): a new hygiene gate joined the sprint reviews
   (`workflow.md` §5 — third-person project voice; factual, dated, sourced claims about other
