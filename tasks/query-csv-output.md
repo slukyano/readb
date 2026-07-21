@@ -11,15 +11,12 @@ created: 2026-07-02
 timestamp: '2026-07-17T00:00:00Z'
 ---
 
-`okdb query` emits a pretty table or `--json`. Shell consumers (like the agent loop's
-`select_next`) currently need a python one-liner just to pull two fields out of the JSON. A
-machine-readable plain-text mode (`--csv` or `--tsv`) would let them use `read -r`/`cut`
-directly.
+`okdb query` emits a pretty table or `--json`. Shell consumers currently need a python
+one-liner just to pull two fields out of the JSON. A machine-readable plain-text mode
+(`--csv` or `--tsv`) would let them use `read -r`/`cut` directly.
 
 ## Context
 
-- `scripts/agent-loop.sh` pipes `--json` through `$PY -c 'import json...'` solely for this;
-  a text mode deletes the loop's `PY` dependency entirely.
 - DuckDB can already produce CSV natively — prefer delegating to the engine over hand-rolling
   escaping.
 
@@ -28,8 +25,6 @@ directly.
 - Decide the flag surface: `--csv`, `--tsv`, or `--format table|json|csv` (one enum flag may age
   better than accumulating booleans; keep `--json` as an alias either way).
 - Define NULL and list/JSON-value representation in text output; document it.
-- Update the loop's `select_next` to use it once available.
-  (Obsolete: the agent loop was retired with ADR 0001; the consumer is now any shell caller.)
 
 ## Design
 

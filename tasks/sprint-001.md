@@ -16,7 +16,7 @@ created: 2026-07-09
 timestamp: '2026-07-17T00:00:00Z'
 ---
 
-First sprint under the session/sprint workflow ([ADR 0001](../docs/adr/0001-sessions-sprints-workflow.md)).
+First sprint under the [session/sprint workflow](workflow.md).
 
 ## Scope rationale
 

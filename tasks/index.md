@@ -50,6 +50,3 @@ Sprint 001:
 # Dropped
 
 * [Default --bundle to the current directory](default-bundle-cwd.md) - implemented in sprint 001, reverted at review (silent wrong-scope operations); superseded by init + discovery.
-
-Eight loop-era tasks were retired with the agent loop
-([ADR 0001](../docs/adr/0001-sessions-sprints-workflow.md)) and their files later removed.

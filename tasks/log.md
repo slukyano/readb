@@ -3,10 +3,9 @@
 ## 2026-07-20
 * **Publication-hygiene sweep** (pre-publication): a new hygiene gate joined the sprint reviews
   (`workflow.md` §5 — third-person project voice; factual, dated, sourced claims about other
-  projects; no personal or environment leakage). Docs swept to maintainer/agent role voice; the
-  eight retired loop-era task files were removed (their retirement stays recorded in
-  [ADR 0001](../docs/adr/0001-sessions-sprints-workflow.md) and this log); stale loop-era
-  branches were deleted; commit history was rewritten to drop private-link trailers.
+  projects; no personal or environment leakage). Docs swept to maintainer/agent role voice;
+  pre-sprint-era process artifacts and stale branches were removed; commit history was
+  rewritten to drop private-link trailers.
 * **Research bundle**: Created `docs/research/` (a third OKF bundle, `type: Research`) at the
   maintainer's call during final review — durable research artifacts live there, dated point-in-time
   data kept with its date. Moved the similar-tools survey into it
@@ -82,18 +81,10 @@
   for the local bundles; when okdb fails, stop and record a task; okdb-blocking tasks take
   priority). Added two high-priority gap tasks found while dogfooding:
   [clean CLI errors](cli-clean-errors.md) and [read a full concept](read-full-concept.md).
-* **Workflow change**: Replaced the PR-per-step agent loop with the session/sprint workflow
-  ([ADR 0001](../docs/adr/0001-sessions-sprints-workflow.md)). Rewrote `workflow.md`; task
-  lifecycle is now `Draft → Designed → Done` (+ `Dropped`), sprint state lives in `Sprint`
-  concepts. Deleted `scripts/agent-loop.sh`, closed the 15 open refine PRs unmerged (branches
-  kept as design input), reset the surviving claimed tasks to `Draft`, and dropped the eight
-  loop-era tasks.
-
-## 2026-07-02
-* **Agent-loop review**: Added seven draft tasks from a review of the agent loop and the task
-  workflow — correctness fixes, a loop test harness, non-intrusive claiming, unattended-run
-  hardening, plain-text query output, index/log automation, and workflow-doc alignment.
+* **Workflow committed**: Adopted the session/sprint workflow — task lifecycle
+  `Draft → Designed → Done` (+ `Dropped`), sprint state in `Sprint` concepts, approvals in
+  chat. Rewrote `workflow.md` accordingly and reset the open tasks to `Draft`.
 
 ## 2026-06-29
 * **Initialization**: Created the `tasks/` OKF bundle, the [task workflow](/workflow.md), and the
-  first seven draft tasks. We dogfood okdb by querying this backlog with okdb itself.
+  first draft tasks. We dogfood okdb by querying this backlog with okdb itself.

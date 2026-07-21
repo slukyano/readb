@@ -317,9 +317,3 @@ readb query "
 # Count by state
 readb query "SELECT status, count(*) AS n FROM task GROUP BY status ORDER BY n DESC" --bundle ./tasks
 ```
-
-# History
-
-Until 2026-07-09 the backlog ran on a PR-per-step agent loop (`scripts/agent-loop.sh`, statuses
-`Refining`/`Refined`/`Implementing`, claim/lease locks). It was replaced by this
-session/sprint workflow — see [ADR 0001](../docs/adr/0001-sessions-sprints-workflow.md).
