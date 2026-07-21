@@ -31,7 +31,7 @@ open file handles, tool state).
 
 ## Completion (verified 2026-07-17, sprint-002 scoping)
 
-Executed by the human before sprint-002; verified in-session and flipped `Draft → Done`:
+Executed by the maintainer before sprint-002; verified in-session and flipped `Draft → Done`:
 
 - cwd is `~/workspaces/personal/readb`; `git remote -v` shows
   `https://github.com/slukyano/readb.git`.

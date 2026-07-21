@@ -29,7 +29,7 @@ readb's niche: a **read-only CLI + Python API + a surgical frontmatter field edi
 and constraints (read-only load/query path, permissive lossless load, the one narrow write
 path), not a novel engine.
 
-**The sharpest differentiator (per the human, 2026-07-17):** the SQL index is **transparent and
+**The sharpest differentiator (per the maintainer, 2026-07-17):** the SQL index is **transparent and
 disposable** — you never manage a database. MarkdownDB (the only real-adoption comparable) builds
 a **managed on-disk SQLite index** you regenerate and maintain; readb's index is in-memory today
 and, when the persistent cache lands, a wrapped `.readb/` artifact you still never touch. Whether

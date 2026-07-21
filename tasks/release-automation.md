@@ -15,7 +15,7 @@ timestamp: '2026-07-20T00:00:00Z'
 ---
 
 Deferred from the [distributable-package](distributable-package.md) design (sprint-002): 0.1.0
-ships via manual `uv publish` with a human-held token. When releases become routine, automate:
+ships via manual `uv publish` with a maintainer-held token. When releases become routine, automate:
 
 - GitHub Actions workflow triggered on `v*` tag push: build, `twine check`, run the test suite,
   publish to PyPI via **Trusted Publishing** (OIDC — no long-lived token secrets).

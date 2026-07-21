@@ -40,7 +40,7 @@ Dropped) with the git model: a directory is a bundle because the user said so on
 
 ## Design (2026-07-20, sprint-002)
 
-**Decision (human-approved in chat): the registry model.** One `readb init` at a root directory
+**Decision (maintainer-approved in chat): the registry model.** One `readb init` at a root directory
 (typically the repo root) creates a single `.readb/` marker whose config *declares the bundles*
 by relative path. Not one marker per bundle (tool droppings inside a publishable artifact; no
 help from the repo root), and never "whole repo as one bundle" (phantom concepts from README/
@@ -116,7 +116,7 @@ After implementation: run `readb init tasks docs/adr` in this repo and commit
 `.readb/config.toml`, then drop the now-redundant `--bundle ./tasks` from the documented
 common commands (CLAUDE.md / workflow.md examples can use bare discovery from the repo root
 only where unambiguous — with two bundles declared and no default, keep explicit `--bundle`
-in examples, or set `default_bundle = "tasks"`; decide at implementation with the human if it
+in examples, or set `default_bundle = "tasks"`; decide at implementation with the maintainer if it
 matters).
 
 **Spun off:** cross-bundle querying (attach each declared bundle as a DuckDB schema; join

@@ -1,6 +1,6 @@
 Build `readb`: a transparent, read-only SQL query layer over an Open Knowledge Format (OKF) bundle — a directory of markdown files with YAML frontmatter — so an agent or human can run real SQL against the wiki with no explicit database-creation step.
 
-Start by initializing the project according to /new-project skill.
+Start by initializing the project with the maintainer's standard new-project scaffolding.
 
 ## Context: what OKF is
 
@@ -19,8 +19,8 @@ Read the spec first. Essentials you must honor:
 
 ## Stack
 
-Python. Defer to my local skills/toolchain for libraries, test framework, project layout,
-and packaging — DO NOT prescribe specific versions or dependencies here.
+Python. Defer to the maintainer's local toolchain conventions for libraries, test framework,
+project layout, and packaging — DO NOT prescribe specific versions or dependencies here.
 
 One hard architectural constraint: do NOT write a SQL parser or query planner. Load the
 bundle into an embedded engine that supports JSON/nested values AND joins, and let it execute

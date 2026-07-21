@@ -17,8 +17,9 @@ field editor (`readb set`/`unset --bundle ./tasks <id> ...`).
 
 Development happens in **sprints**, driven interactively in **sessions**:
 
-- A **session** is one sitting with the human: open the repo, tell the agent to start or
-  continue development.
+- A **session** is one sitting with the **maintainer** (the project's human owner — the two
+  roles throughout this workflow are the maintainer and the coding **agent**): open the repo,
+  tell the agent to start or continue development.
 - A **sprint** is one batch of tasks taken from scope approval through design and
   implementation to a final merge. A sprint usually spans several sessions.
 
@@ -49,10 +50,10 @@ priority over the rest of the backlog when scoping sprints.
 
 | `status` | Meaning | Set when |
 |----------|---------|----------|
-| `Draft` | A seed — a few words to a short description. | Authored directly on `main`, anytime, by human or agent. |
+| `Draft` | A seed — a few words to a short description. | Authored directly on `main`, anytime, by maintainer or agent. |
 | `Designed` | The task body carries an approved design (a `## Design` section). | The sprint's **design merge** lands on `main`. |
 | `Done` | Implemented, gated, approved. | The sprint's **final merge** lands on `main`. |
-| `Dropped` | Abandoned; the body records why. | Human decision, anytime. |
+| `Dropped` | Abandoned; the body records why. | Maintainer decision, anytime. |
 
 There are no lock/claim states and no lease fields: sprints are single-flight, and "in a
 sprint" is recorded in the sprint concept, not on the task.
@@ -67,7 +68,7 @@ One sprint moves through:
         ▼                          ▼                            ▼
     Designing ──────────────► Implementing ──────────────────► Done
         │                          │
-        └────────── Aborted ◄──────┘   (human decision; record why)
+        └────────── Aborted ◄──────┘   (maintainer decision; record why)
 ```
 
 ## 1. Session start
@@ -90,7 +91,7 @@ branch.)
 ## 2. Scoping
 
 The agent reviews the open backlog (`Draft` tasks, unblocked) and proposes a set for the
-sprint — proposing *all* open tasks is fine when the scope feels right. The human adjusts and
+sprint — proposing *all* open tasks is fine when the scope feels right. The maintainer adjusts and
 approves.
 
 **Scope approval is the sprint-start commit on `main`**: create `tasks/sprint-NNN.md`
@@ -99,7 +100,7 @@ sprint branch `sprint/NNN` from it. All subsequent work happens on the branch.
 
 ## 3. Design phase (interactive)
 
-On the sprint branch, the agent and the human design the tasks **one by one**. The human acts
+On the sprint branch, the agent and the maintainer design the tasks **one by one**. The maintainer acts
 as stakeholder, product owner, and senior architect; the agent drives — proposes a design,
 asks questions, records decisions. Per task, the outcome is:
 
@@ -107,10 +108,10 @@ asks questions, records decisions. Per task, the outcome is:
 - zero or more **ADRs** in `docs/adr/` (status `Proposed`) for decisions of architectural
   weight. See [ADRs](#adrs).
 
-Commit throughout the phase. When all tasks in scope are designed, the human reviews the
+Commit throughout the phase. When all tasks in scope are designed, the maintainer reviews the
 batch. **Design approval** triggers, in order:
 
-1. ADRs from this phase flip `Proposed → Accepted` (only the human approves ADRs).
+1. ADRs from this phase flip `Proposed → Accepted` (only the maintainer approves ADRs).
 2. Tasks flip `Draft → Designed`; the sprint flips `Designing → Implementing`.
 3. The sprint branch is **merged to `main`** (design merge). The branch stays alive.
 
@@ -121,7 +122,7 @@ subagents where appropriate. Rules of the phase:
 
 - **Commit throughout**, per coherent step, on the sprint branch.
 - **Track progress** in the sprint body (per-task checklist), so any session can resume.
-- **Stop and ask**: if a decision surfaces that belongs to the human — a product call or an
+- **Stop and ask**: if a decision surfaces that belongs to the maintainer — a product call or an
   architectural fork the design doesn't cover — do **not** guess. Record the open question in
   the sprint body (`## Open questions`), commit, and stop that task (or the sprint, if it
   blocks everything). Fidelity over throughput.
@@ -136,14 +137,14 @@ subagents where appropriate. Rules of the phase:
 - **Publication hygiene** — everything committed must be publishable as-is, since the repo
   (history included) is public-bound. The review checks the sprint diff for: conversational or
   second-person prose ("you asked…", chat-transcript style — write in third-person project
-  voice; role terms like "the human"/"the agent" and project "we" are fine); references to
+  voice; role terms like "the maintainer"/"the agent" and project "we" are fine); references to
   people beyond the intended author/copyright identity; claims about other projects that are
   not factual, dated, and sourced (state facts, never disparage); and local paths, credentials,
   private links, or other environment leakage.
 
 ## 6. Close-out, presentation & final merge
 
-Once the gates pass, close the sprint out **on the branch** so the human reviews the exact
+Once the gates pass, close the sprint out **on the branch** so the maintainer reviews the exact
 state that will merge — bookkeeping included. The only thing gated purely on approval is the
 merge itself.
 
@@ -192,16 +193,16 @@ that holds it** — never a bare "added to the backlog".
 
 **Implementation approval** triggers, in order:
 
-1. New ADRs flip `Proposed → Accepted` (or are revised/rejected per the human).
+1. New ADRs flip `Proposed → Accepted` (or are revised/rejected per the maintainer).
 2. The sprint branch is **merged to `main`** (final merge, `--no-ff`) and deleted.
 
-(Task/sprint status flips already happened in 6a; if the human sends changes back, revert or
+(Task/sprint status flips already happened in 6a; if the maintainer sends changes back, revert or
 adjust the bookkeeping before merging.) Tasks that didn't make it stay `Designed` (or return to
 `Draft` if the design was invalidated) and go back to the backlog for a future sprint.
 
 # Asking for approval (chat protocol)
 
-All approvals happen **in the chat**. The human decides from what's presented there — files
+All approvals happen **in the chat**. The maintainer decides from what's presented there — files
 are for double-clicking into details, never required reading for a decision. Whenever the
 agent finishes an iteration or needs a decision, it formats the ask as:
 
@@ -213,7 +214,7 @@ agent finishes an iteration or needs a decision, it formats the ask as:
    the batch with at least a one-line description** — never a bare task name, never "as
    presented before",
 4. **references to the key files** touched or decided on (paths, with line numbers where it
-   helps), so the human can double-click into any detail,
+   helps), so the maintainer can double-click into any detail,
 5. the **explicit list of questions** to answer (or the single question), each answerable
    with a short reply.
 
@@ -282,7 +283,7 @@ Rules:
 
 - The agent **proposes** ADRs — during design sessions and during implementation — as part of
   the change itself, committed on the sprint branch.
-- **Only the human approves ADRs.** `Proposed → Accepted` happens at the batch approval
+- **Only the maintainer approves ADRs.** `Proposed → Accepted` happens at the batch approval
   (design or implementation), never unilaterally.
 - Reversing an accepted decision means a new ADR that supersedes the old one, not an edit.
 

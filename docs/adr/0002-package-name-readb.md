@@ -11,7 +11,7 @@ timestamp: '2026-07-10T00:00:00Z'
 
 `okdb` is taken on PyPI, so the project needs a different distribution name before it can
 publish ([choose-package-name](../../tasks/choose-package-name.md), blocking
-[distributable-package](../../tasks/distributable-package.md)). The human set the naming
+[distributable-package](../../tasks/distributable-package.md)). The maintainer set the naming
 direction — "DB to read my markdown/OKF bundles"; keywords *markdown, knowledge, read, plain,
 human-readable, simple*; explicitly no `-ql` names (we are not building a query language — DuckDB
 executes all SQL).
@@ -28,7 +28,7 @@ Candidates were checked against PyPI, npm, crates.io, GitHub repo names, and the
 - **knowdb** — registries free, but two active claimants in exactly our space (an agent-native
   knowledge-database prototype, 26★, active; an MCP/DuckDB semantic layer already listed in MCP
   directories), and search drowns in generic "knowledge database" content.
-- **okfdb** and friends — free, but OKF-literal; direction rejected by the human.
+- **okfdb** and friends — free, but OKF-literal; direction rejected by the maintainer.
 
 # Decision
 
@@ -45,7 +45,7 @@ papercut, and pre-publish with zero users is the cheapest moment to rename.
 
 - `pyproject.toml` name + `[project.scripts]`, `src/okdb/` → `src/readb/`, tests, README,
   CLAUDE.md, and workflow/task docs all rename (this sprint, task `choose-package-name`).
-- The GitHub repo / local directory rename is the human's call and out of code scope; nothing
+- The GitHub repo / local directory rename is the maintainer's call and out of code scope; nothing
   in the code depends on it.
 - The dormant `readb` Rust crate is an accepted, low-risk neighbor; crates.io would need
   another name if a Rust port ever exists.

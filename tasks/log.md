@@ -2,7 +2,7 @@
 
 ## 2026-07-20
 * **Research bundle**: Created `docs/research/` (a third OKF bundle, `type: Research`) at the
-  human's call during final review — durable research artifacts live there, dated point-in-time
+  maintainer's call during final review — durable research artifacts live there, dated point-in-time
   data kept with its date. Moved the similar-tools survey into it
   ([docs/research/similar-tools.md](../docs/research/similar-tools.md));
   [research-similar-tools](research-similar-tools.md) keeps a pointer + short version.
@@ -19,7 +19,7 @@
   test, also fixed. Gates green: 129 tests, ruff clean. Presented for final review + merge.
 * **Sprint 002 design approved**: All six active tasks flipped `Draft → Designed`; sprint
   `Designing → Implementing`; [ADR 0004](../docs/adr/0004-init-registry-discovery.md)
-  `Proposed → Accepted` (human, in chat). `distributable-package` design: manual `uv publish`,
+  `Proposed → Accepted` (maintainer, in chat). `distributable-package` design: manual `uv publish`,
   version 0.1.0; the outward-facing publishing split into special standalone task
   [publish-readb-0-1-0](publish-readb-0-1-0.md) (after the sprint, not a sprint), with
   [release-automation](release-automation.md) drafted for the eventual CI path. Design merge to
@@ -41,7 +41,7 @@
   [name-column-unprefix](name-column-unprefix.md),
   [tz-aware-datetime-handling](tz-aware-datetime-handling.md),
   [research-similar-tools](research-similar-tools.md), plus
-  [rename-repo-dir](rename-repo-dir.md) — executed by the human beforehand, verified
+  [rename-repo-dir](rename-repo-dir.md) — executed by the maintainer beforehand, verified
   in-session (remote, cwd, pyproject URLs, tests green) and flipped `Draft → Done`. Created
   [sprint-002](sprint-002.md) (`Designing`, branch `sprint/002`). Design phase started.
 * **Sprint 001 close-out**: All 7 delivered tasks flipped `Designed → Done`
@@ -62,7 +62,7 @@
 
 ## 2026-07-11
 * **Sprint 001 review decisions**: Dropped [default-bundle-cwd](default-bundle-cwd.md) after
-  implementing it — a cwd default silently treats any directory as a bundle (human decision at
+  implementing it — a cwd default silently treats any directory as a bundle (maintainer decision at
   implementation review; change reverted). Added drafts:
   [bundle-init-discovery](bundle-init-discovery.md) (explicit `readb init` + git-style upward
   discovery, marker doubles as the persistent-index home) and

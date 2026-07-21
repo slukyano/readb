@@ -40,7 +40,7 @@ Design phase should decide:
 **Decision: do NOT un-prefix. Keep `__name` immutable and reader-injected; a producer `name:`
 frontmatter key has no effect on it.** ADR 0003's `__` invariant stands unchanged.
 
-Rationale (human call, 2026-07-20). The question that unlocked this was "where does *name* even
+Rationale (maintainer call, 2026-07-20). The question that unlocked this was "where does *name* even
 appear on user surfaces?" There are exactly two, and both are already correct:
 
 1. **The `__name` virtual column** in `readb query`/`readb schema` output — value is the filename

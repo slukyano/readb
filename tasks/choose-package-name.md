@@ -47,5 +47,5 @@ name):
    command examples, `tasks/index.md` prose.
 5. `uv sync` (regenerate the entry point), then full gates.
 
-Out of scope: renaming the GitHub repo / local directory (human's call; nothing in the code
+Out of scope: renaming the GitHub repo / local directory (maintainer's call; nothing in the code
 depends on it), and staking the PyPI name (first step of `distributable-package`).

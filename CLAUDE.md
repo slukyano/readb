@@ -71,14 +71,14 @@ Development runs in **sprints** (no PRs). At session start, check for an unfinis
 `sprint` table means no sprint ever ran) and resume it from its branch; otherwise propose a
 scope from the `Draft` backlog. Scope approval =
 committing `tasks/sprint-NNN.md` to `main` and cutting branch `sprint/NNN`. Then: an
-interactive design phase (per-task `## Design` sections + `Proposed` ADRs; human approval →
+interactive design phase (per-task `## Design` sections + `Proposed` ADRs; maintainer approval →
 design merge to `main`), an autonomous implementation phase (commit throughout; **stop and
-ask** on any decision that belongs to the human — never guess), gates (`pytest` + `ruff` +
+ask** on any decision that belongs to the maintainer — never guess), gates (`pytest` + `ruff` +
 an independent subagent review of the diff + a publication-hygiene check: third-person
 project voice, factual/dated/sourced claims about other projects, no personal or environment
-leakage — see `tasks/workflow.md` §5), a sprint summary, and on human approval the final
+leakage — see `tasks/workflow.md` §5), a sprint summary, and on maintainer approval the final
 merge. Task lifecycle: `Draft → Designed → Done` (+ `Dropped`). ADRs live in `docs/adr/` (an
-OKF bundle); **only the human approves ADRs**. All approvals happen in chat: present a
+OKF bundle); **only the maintainer approves ADRs**. All approvals happen in chat: present a
 separator, a short summary, the complete self-contained decision context (quote what matters;
 don't require reading files; batch approvals list every task with at least a one-line
 description), key-file references for double-clicking, then the explicit question(s). Full
@@ -97,3 +97,5 @@ Conventional Commits (`feat`, `fix`, `docs`, `refactor`, `test`, `chore`, `perf`
 Scopes match components (e.g. `loader`, `schema`, `cli`). If Claude helped write code in a
 commit, add a `Co-Authored-By` trailer for the model that helped (e.g.
 `Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>`); otherwise no attribution.
+Never add `Claude-Session:` or other private-link trailers — the repo and its history are
+public-bound (publication-hygiene gate, `tasks/workflow.md` §5).

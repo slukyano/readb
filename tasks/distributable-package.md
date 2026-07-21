@@ -29,16 +29,16 @@ distribution name is settled.
 - Verify the wheel/sdist build, smoke-test an install in a clean environment.
 - Consider a tagged release + changelog.
 
-## Design (2026-07-20, sprint-002; human-approved)
+## Design (2026-07-20, sprint-002; maintainer-approved)
 
 Metadata in `pyproject.toml` is already complete (name/description/readme/Apache-2.0/authors/
 keywords/classifiers/URLs/`[project.scripts]`). Decisions:
 
 - **Version**: bump `0.0.1 → 0.1.0` for the first public release (stays 0.x / Alpha classifier).
-- **Publishing mechanics**: **manual `uv publish` with a PyPI token** held by the human — no CI.
+- **Publishing mechanics**: **manual `uv publish` with a PyPI token** held by the maintainer — no CI.
   GitHub Actions + Trusted Publishing recorded as draft
   [release-automation](release-automation.md) for when releases become routine.
-- **Split with the publish step** (human call at approval): the actual publishing is **not part
+- **Split with the publish step** (maintainer call at approval): the actual publishing is **not part
   of this sprint** — it is the special standalone task
   [publish-readb-0-1-0](publish-readb-0-1-0.md), run after sprint-002's final merge, from
   tagged `main`. Everything upload-shaped (TestPyPI rehearsal included — it needs external

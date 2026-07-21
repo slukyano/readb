@@ -26,7 +26,7 @@ okf_version: "0.1"
 
 Standalone:
 
-* [Rename the repo and directory to readb](rename-repo-dir.md) - executed by the human, verified at sprint-002 scoping.
+* [Rename the repo and directory to readb](rename-repo-dir.md) - executed by the maintainer, verified at sprint-002 scoping.
 
 Sprint 002:
 
@@ -51,13 +51,5 @@ Sprint 001:
 
 * [Default --bundle to the current directory](default-bundle-cwd.md) - implemented in sprint 001, reverted at review (silent wrong-scope operations); superseded by init + discovery.
 
-Loop-era tasks retired with the agent loop ([ADR 0001](../docs/adr/0001-sessions-sprints-workflow.md)):
-
-* [Drive the agent until done or blocked](agent-run-until-done.md)
-* [Let the agent request human input](agent-request-human-input.md)
-* [Handle agent unreliability](agent-reliability.md)
-* [Fix agent-loop correctness bugs](loop-fix-correctness-bugs.md)
-* [Add a test harness for the agent loop](loop-test-harness.md)
-* [Make claiming non-intrusive](loop-nonintrusive-claim.md)
-* [Harden the loop for unattended runs](loop-unattended-hardening.md)
-* [Align workflow.md with the loop](workflow-doc-alignment.md)
+Eight loop-era tasks were retired with the agent loop
+([ADR 0001](../docs/adr/0001-sessions-sprints-workflow.md)) and their files later removed.

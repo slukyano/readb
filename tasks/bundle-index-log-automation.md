@@ -20,8 +20,8 @@ transitions it never records.
 
 - Both writes extend the sanctioned write path (the `okdb.fields` precedent): explicit
   commands, never a side effect of load/query.
-- The loop already commits to main at claim/release time, so appending one log line there is
-  free and doubles as the audit trail [agent-reliability](agent-reliability.md) asks for.
+- Appending a dated `log.md` line at sprint events (scope approval, close-out) would double
+  as an audit trail for the bundle.
 
 ## Notes (to refine)
 

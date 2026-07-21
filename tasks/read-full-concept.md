@@ -35,7 +35,7 @@ Found while dogfooding: reviewing Draft task bodies for sprint scoping was done 
 
 ## Design
 
-Designed 2026-07-10 (human decision: do both `show` and `--format`; add a whole-file virtual
+Designed 2026-07-10 (maintainer decision: do both `show` and `--format`; add a whole-file virtual
 column).
 
 Three pieces:

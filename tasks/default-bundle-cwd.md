@@ -46,7 +46,7 @@ consistency; flagged for the design review.
 
 ## Dropped (2026-07-11)
 
-Implemented in sprint 001, then reverted at implementation review, by human decision. A cwd
+Implemented in sprint 001, then reverted at implementation review, by maintainer decision. A cwd
 default turns scoping mistakes into silent wrong-scope operations: any directory (a repo root,
 `$HOME`) quietly loads as a bundle, queries return wrong-scope data, and — sharpest — a
 name-resolved `set` can write into a bundle the caller never named. Verified live from the

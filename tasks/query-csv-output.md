@@ -33,7 +33,7 @@ directly.
 
 ## Design
 
-Designed 2026-07-10 (human decision: one `--format` enum; also serves
+Designed 2026-07-10 (maintainer decision: one `--format` enum; also serves
 [read-full-concept](read-full-concept.md)).
 
 `okdb query` grows `--format table|json|csv|tsv|raw` (default `table`). `--json` stays as a
