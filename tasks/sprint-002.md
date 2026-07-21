@@ -84,10 +84,13 @@ and smoke-tested as an installable 0.1.0 wheel on Python 3.14 and the 3.11 floor
   comment corrected; a revisit canary test (skipped when pytz importable) fails the day duckdb
   lifts the requirement.
 - `research-similar-tools` — 11 tools surveyed (fan-out web research verified against primary
-  repos/docs); `## Findings` in the task body: comparison across frontmatter/lifecycle/
-  dependencies/query/CLI dimensions, adoption data (Backlog.md ~6.2k★ active; MarkdownDB ~495★
-  stalled; frontmatter-mcp — readb's architectural twin — ~1★), the transparent-disposable-index
-  differentiator, and explicit adopt/reject calls. Ideas fed the four design tasks.
+  repos/docs); the full survey lives as a durable artifact in the new **`docs/research/` OKF
+  bundle** ([similar-tools](../docs/research/similar-tools.md), registered in
+  `.readb/config.toml` via the live `init` merge path; the task body keeps a pointer):
+  comparison across frontmatter/lifecycle/dependencies/query/CLI dimensions, dated adoption
+  data (Backlog.md ~6.2k★ active; MarkdownDB ~495★ stalled; frontmatter-mcp — readb's
+  architectural twin — ~1★), the transparent-disposable-index differentiator, and explicit
+  adopt/reject calls. Ideas fed the four design tasks.
 - `distributable-package` — version 0.1.0; `uv build` wheel+sdist, `twine check` PASSED;
   clean-venv smokes (CLI + API + init/discovery) on 3.14 and 3.11. No uploads — publishing is
   the special post-sprint task [publish-readb-0-1-0](publish-readb-0-1-0.md).

@@ -1,6 +1,12 @@
 # Task Bundle Log
 
 ## 2026-07-20
+* **Research bundle**: Created `docs/research/` (a third OKF bundle, `type: Research`) at the
+  human's call during final review — durable research artifacts live there, dated point-in-time
+  data kept with its date. Moved the similar-tools survey into it
+  ([docs/research/similar-tools.md](../docs/research/similar-tools.md));
+  [research-similar-tools](research-similar-tools.md) keeps a pointer + short version.
+  Registered via `readb init docs/research` (dogfooding the registry merge path live).
 * **Sprint 002 close-out**: All 6 active tasks flipped `Designed → Done`
   ([bundle-init-discovery](bundle-init-discovery.md), [csv-empty-result-header](csv-empty-result-header.md),
   [name-column-unprefix](name-column-unprefix.md), [tz-aware-datetime-handling](tz-aware-datetime-handling.md),

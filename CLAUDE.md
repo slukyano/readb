@@ -61,7 +61,7 @@ file, plus one `Sprint` concept per sprint). Query it with readb:
 through readb's own field editor — `readb set`/`unset --bundle ./tasks <id> ...`.
 
 **Dogfooding rule:** always prefer readb itself for reading and querying the local OKF bundles
-(`tasks/`, `docs/adr/`) — do not fall back to `cat`/grep/manual file reads for what readb should
+(`tasks/`, `docs/adr/`, `docs/research/`) — do not fall back to `cat`/grep/manual file reads for what readb should
 answer. When readb fails or can't express what you need: stop, immediately record a new `Draft`
 task for the gap, and only then work around it. Tasks that block dogfooding readb take priority
 over the rest of the backlog.
