@@ -66,6 +66,11 @@ answer. When readb fails or can't express what you need: stop, immediately recor
 task for the gap, and only then work around it. Tasks that block dogfooding readb take priority
 over the rest of the backlog.
 
+**Use the global readb on the project's own state:** manipulating this repo's bundles
+(`tasks/`, `docs/adr/`, `docs/research/`) is done with the globally run readb — `uvx readb` —
+never `uv run readb` from the working copy: code mid-change must not operate on the repo's own
+backlog. `uv run readb` is for exercising the code under development.
+
 Development runs in **sprints** (no PRs). At session start, check for an unfinished sprint
 (`SELECT __name, status, branch FROM sprint WHERE status NOT IN ('Done','Aborted')`; a missing
 `sprint` table means no sprint ever ran) and resume it from its branch; otherwise propose a
