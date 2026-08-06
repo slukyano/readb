@@ -1,5 +1,9 @@
 # readb
 
+[![CI](https://github.com/slukyano/readb/actions/workflows/ci.yml/badge.svg)](https://github.com/slukyano/readb/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/readb)](https://pypi.org/project/readb/)
+[![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE)
+
 A transparent, read-only SQL query layer over an **Open Knowledge Format (OKF)** bundle — a
 directory of markdown files with YAML frontmatter — so an agent or a human can run real SQL
 against the wiki with no explicit database-creation step.
@@ -7,6 +11,16 @@ against the wiki with no explicit database-creation step.
 readb loads a bundle into an embedded [DuckDB](https://duckdb.org/) engine and lets DuckDB
 execute the SQL. There is no custom SQL parser or query planner, and the source files are never
 modified.
+
+- **Zero setup** — point readb at a bundle directory and query; no database to create,
+  migrate, or clean up.
+- **Real SQL** — DuckDB executes every query: joins, aggregates, window functions, the works.
+- **Read-only by construction** — loading and querying never write a file; the one write path
+  is the explicit, surgical frontmatter editor (`readb get`/`set`/`unset`).
+- **Lossless and permissive** — every frontmatter key of every concept stays queryable
+  (union-of-keys, `JSON` fallback); malformed files are skipped, never fatal.
+- **Library and CLI** — `readb.open()` in Python, or `readb query`/`schema`/`show` in the
+  shell.
 
 > Status: MVP implemented. Bundle loading, type inference, the library API, and the CLI all
 > work; the 12 acceptance criteria in [`docs/dev/design.md`](docs/dev/design.md) are covered
@@ -102,9 +116,10 @@ type is stored as a `JSON` column — nothing is dropped, and producer intent is
 
 ## Development
 
-See [`DEVELOPMENT.md`](DEVELOPMENT.md) for the repository map, commands, and checks.
-Development runs in maintainer-approved sprints; the backlog and the developer documentation
-(including Architecture Decision Records) are
+Contributions are welcome — see [`CONTRIBUTING.md`](CONTRIBUTING.md); release history is in
+[`CHANGELOG.md`](CHANGELOG.md). See [`DEVELOPMENT.md`](DEVELOPMENT.md) for the repository map,
+commands, and checks. Development runs in maintainer-approved sprints; the backlog and the
+developer documentation (including Architecture Decision Records) are
 [OKF](https://github.com/GoogleCloudPlatform/knowledge-catalog/tree/main/okf) bundles in
 [`backlog/`](backlog/index.md) and [`docs/dev/`](docs/dev/index.md). Process:
 [`backlog/workflow.md`](backlog/workflow.md).
