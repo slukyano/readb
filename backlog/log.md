@@ -5,6 +5,12 @@
   `tasks/`, closed ones in `archive/`, sprint records in `sprints/`; task concepts renamed to
   numbered `NNN-slug` names (by creation date). The [task workflow](workflow.md) and all
   internal links updated; the bundle registry now lists `backlog`.
+* **Docs and entry points**: Developer docs consolidated into one `docs/dev/` bundle (design
+  brief, ADRs, research; its `index.md` owns the ADR lifecycle; docs no longer link into the
+  backlog). A root `DEVELOPMENT.md` now declares the map, commands, and checks once — the
+  workflow's validation gate points there. Publishing surface added: `CONTRIBUTING.md`
+  (discloses and waives this workflow for contributors, carries the release procedure),
+  `CHANGELOG.md`, CI running the declared checks, README badges.
 
 ## 2026-07-21
 * **Published**: The repo went public (github.com/slukyano/readb) after the hygiene pass, and
