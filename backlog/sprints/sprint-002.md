@@ -66,7 +66,7 @@ and smoke-tested as an installable 0.1.0 wheel on Python 3.14 and the 3.11 floor
   wins → sole bundle → `default_bundle` → hard error listing bundles). Explicit `--bundle`
   never consults the registry; the loader skips `.readb/`. Dogfooded: this repo's registry
   (`tasks`, `docs/adr`) is committed, deliberately without `default_bundle`
-  ([ADR 0004](../../docs/adr/0004-init-registry-discovery.md)).
+  ([ADR 0004](../../docs/dev/adr/0004-init-registry-discovery.md)).
 - `csv-empty-result-header` — the sprint-001 "zero-row csv prints nothing" limitation is fixed
   as a bug: new `Database.sql_table(query) -> (columns, rows)` carries column names
   independently of rows (`sql()` is now a wrapper over it), and csv/tsv always print the
@@ -84,7 +84,7 @@ and smoke-tested as an installable 0.1.0 wheel on Python 3.14 and the 3.11 floor
   lifts the requirement.
 - `research-similar-tools` — 11 tools surveyed (fan-out web research verified against primary
   repos/docs); the full survey lives as a durable artifact in the new **`docs/research/` OKF
-  bundle** ([similar-tools](../../docs/research/similar-tools.md), registered in
+  bundle** ([similar-tools](../../docs/dev/research/similar-tools.md), registered in
   `.readb/config.toml` via the live `init` merge path; the task body keeps a pointer):
   comparison across frontmatter/lifecycle/dependencies/query/CLI dimensions, dated adoption
   data (Backlog.md ~6.2k★ active; MarkdownDB ~495★ stalled; frontmatter-mcp — readb's

@@ -46,7 +46,7 @@ by relative path. Not one marker per bundle (tool droppings inside a publishable
 help from the repo root), and never "whole repo as one bundle" (phantom concepts from README/
 docs; per-bundle `index.md`/`log.md` semantics). The single-bundle case is the same model, not a
 special case: `readb init` inside a bundle writes `bundles = ["."]`.
-See [ADR 0004](../../docs/adr/0004-init-registry-discovery.md).
+See [ADR 0004](../../docs/dev/adr/0004-init-registry-discovery.md).
 
 ### The command
 

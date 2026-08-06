@@ -15,7 +15,7 @@ timestamp: '2026-07-20T00:00:00Z'
 Open design question raised at sprint-001 implementation review (see
 [sprint-001](../sprints/sprint-001.md) session log, 2026-07-11).
 
-The virtual columns settled by [ADR 0003](../../docs/adr/0003-virtual-columns.md) all use the
+The virtual columns settled by [ADR 0003](../../docs/dev/adr/0003-virtual-columns.md) all use the
 `__` prefix to mark them as reader-injected, non-producer fields (`__path`, `__name`, `__body`,
 `__raw`). But `__name` is not quite like the others: unlike `__path`/`__body`/`__raw`, which
 are purely mechanical projections of the file, a name is the kind of thing a producer might

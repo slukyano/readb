@@ -10,8 +10,8 @@ timestamp: '2026-07-10T00:00:00Z'
 # Context
 
 `okdb` is taken on PyPI, so the project needs a different distribution name before it can
-publish ([choose-package-name](../../backlog/archive/001-choose-package-name.md), blocking
-[distributable-package](../../backlog/archive/003-distributable-package.md)). The maintainer set the naming
+publish (backlog task `choose-package-name`, blocking
+`distributable-package`). The maintainer set the naming
 direction — "DB to read my markdown/OKF bundles"; keywords *markdown, knowledge, read, plain,
 human-readable, simple*; explicitly no `-ql` names (we are not building a query language — DuckDB
 executes all SQL).

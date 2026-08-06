@@ -1,3 +1,10 @@
+---
+type: Design
+title: readb design brief
+description: The binding MVP spec — goals, non-goals, architecture constraints, and the 12 acceptance criteria.
+created: 2026-06-29
+---
+
 Build `readb`: a transparent, read-only SQL query layer over an Open Knowledge Format (OKF) bundle — a directory of markdown files with YAML frontmatter — so an agent or human can run real SQL against the wiki with no explicit database-creation step.
 
 Start by initializing the project with the maintainer's standard new-project scaffolding.

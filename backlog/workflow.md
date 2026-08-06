@@ -32,11 +32,12 @@ The bundle holds three concept types:
 - `Process` — this document.
 
 `index.md` and `log.md` are OKF-reserved (a listing and a change log); they are not concepts.
-Architecture Decision Records live in a separate bundle, [`docs/adr/`](../docs/adr/index.md).
+Architecture Decision Records live in the developer-docs bundle,
+[`docs/dev/adr/`](../docs/dev/index.md).
 
 ## Dogfooding rule
 
-readb is the interface to the local OKF bundles. Reading and querying `backlog/` and `docs/adr/`
+readb is the interface to the local OKF bundles. Reading and querying `backlog/` and `docs/dev/`
 goes through `readb query`/`readb schema`/`readb get`; edits go through `readb set`/`unset`. Do not
 fall back to `cat`, grep, or manual file reads for what readb should answer. When readb fails or
 can't express something needed for the workflow: **stop, immediately record a new `Draft` task**
@@ -107,7 +108,7 @@ as stakeholder, product owner, and senior architect; the agent drives — propos
 asks questions, records decisions. Per task, the outcome is:
 
 - a `## Design` section written into the task body — the executable plan; and
-- zero or more **ADRs** in `docs/adr/` (status `Proposed`) for decisions of architectural
+- zero or more **ADRs** in `docs/dev/adr/` (status `Proposed`) for decisions of architectural
   weight. See [ADRs](#adrs).
 
 Commit throughout the phase. When all tasks in scope are designed, the maintainer reviews the
@@ -268,8 +269,10 @@ sprint may depend on each other; the design phase orders them.
 
 # ADRs
 
-Architecture Decision Records live in [`docs/adr/`](../docs/adr/) — itself an OKF bundle, one
-concept per decision, named `NNNN-short-slug.md`.
+Architecture Decision Records live in [`docs/dev/adr/`](../docs/dev/adr/) — a concept
+directory in the developer-docs bundle, one concept per decision, named `NNNN-short-slug.md`.
+The bundle's [`index.md`](../docs/dev/index.md) owns the ADR schema and lifecycle; the summary
+below mirrors it.
 
 | Field | Required | Type | Notes |
 |-------|----------|------|-------|
@@ -291,7 +294,7 @@ Rules:
 - Reversing an accepted decision means a new ADR that supersedes the old one, not an edit.
 
 ```sh
-readb query "SELECT __name, status, title FROM adr ORDER BY __name" --bundle ./docs/adr
+readb query "SELECT __name, status, title FROM adr ORDER BY __name" --bundle ./docs/dev
 ```
 
 # Querying with readb

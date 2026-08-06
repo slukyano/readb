@@ -30,7 +30,7 @@ redundant.
 ## Design
 
 Designed 2026-07-10 (revised same day: wiki-style naming). The contract change is
-[ADR 0003](../../docs/adr/0003-virtual-columns.md) (which also adds `__raw` from
+[ADR 0003](../../docs/dev/adr/0003-virtual-columns.md) (which also adds `__raw` from
 [read-full-concept](012-read-full-concept.md)).
 
 **`__id` is dropped and replaced by `__name`** — the simple file name (no directories, no

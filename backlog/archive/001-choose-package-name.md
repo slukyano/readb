@@ -29,7 +29,7 @@ This task **blocks** [Create a distributable package](003-distributable-package.
 
 ## Design
 
-Decided 2026-07-10 — see [ADR 0002](../../docs/adr/0002-package-name-readb.md) for the full
+Decided 2026-07-10 — see [ADR 0002](../../docs/dev/adr/0002-package-name-readb.md) for the full
 research (PyPI/npm/crates/GitHub/web) and rationale.
 
 **The name is `readb`** ("readable / reads your files + db"), aligned across dist, import, and

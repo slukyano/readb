@@ -9,7 +9,7 @@ execute the SQL. There is no custom SQL parser or query planner, and the source 
 modified.
 
 > Status: MVP implemented. Bundle loading, type inference, the library API, and the CLI all
-> work; the 12 acceptance criteria in [`docs/design-brief.md`](docs/design-brief.md) are covered
+> work; the 12 acceptance criteria in [`docs/dev/design.md`](docs/dev/design.md) are covered
 > by tests. Not yet built (left as clean seams): persistent on-disk index, git-aware incremental
 > rebuild, and write-back — all explicit non-goals for this MVP.
 

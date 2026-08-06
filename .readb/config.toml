@@ -1,3 +1,3 @@
 # readb bundle registry (readb init; see ADR 0004)
 version = 1
-bundles = ["backlog", "docs/adr", "docs/research"]
+bundles = ["backlog", "docs/dev"]

@@ -45,11 +45,11 @@ Three pieces:
    table (`schema.py` `VIRTUAL_*`, `loader.py` row assembly). `parser.Concept` gains a `raw`
    attribute carrying the full text it already read. `SELECT __raw` is *the* way to get the
    exact document; `__body` stays body-only. Contract change recorded in
-   [ADR 0003](../../docs/adr/0003-virtual-columns.md) together with the `__id` removal.
+   [ADR 0003](../../docs/dev/adr/0003-virtual-columns.md) together with the `__id` removal.
 2. **`okdb show [--bundle <dir>] <name-or-path> [...]`** — a read-only CLI alias for "get
    `__body`": prints each concept's body (frontmatter stripped), semantics identical to
    `__body` by construction (same parser). Arguments follow the wiki-style resolution of
-   [ADR 0003](../../docs/adr/0003-virtual-columns.md): a simple name (assumed unique; clash →
+   [ADR 0003](../../docs/dev/adr/0003-virtual-columns.md): a simple name (assumed unique; clash →
    the listing exception) or a full `.md` path (always unambiguous). `okdb show index`/`log`
    work too — file-level and permissive. Does **not** load the bundle into DuckDB (parses
    just the addressed files, like `get`). Multiple arguments are separated by

@@ -32,12 +32,12 @@ standalone tasks at scope approval: `choose-package-name` and `license-apache-2`
 
 Design phase (a checked box = `## Design` section written and discussed):
 
-- [x] choose-package-name — `readb`, aligned dist/import/CLI ([ADR 0002](../../docs/adr/0002-package-name-readb.md), Proposed)
+- [x] choose-package-name — `readb`, aligned dist/import/CLI ([ADR 0002](../../docs/dev/adr/0002-package-name-readb.md), Proposed)
 - [x] cli-clean-errors — CLI-layer try/except → `click.ClickException`; DuckDB message verbatim
 - [x] read-full-concept — `__raw` virtual column + `okdb show` (body); raw SQL output via `--format`
 - [x] default-bundle-cwd — `--bundle` optional, default `.`, all five commands
 - [x] query-csv-output — `--format table|json|csv|tsv|raw`; stdlib csv; `--json` alias kept
-- [x] remove-id-virtual-field — `__id` → wiki-style `__name` + clash exception ([ADR 0003](../../docs/adr/0003-virtual-columns.md), Proposed); docs ripple
+- [x] remove-id-virtual-field — `__id` → wiki-style `__name` + clash exception ([ADR 0003](../../docs/dev/adr/0003-virtual-columns.md), Proposed); docs ripple
 - [x] schema-drop-type-mapping — CLI section removed; `BundleSchema.type_mapping` stays
 - [x] license-apache-2 — Apache 2.0 text + SPDX metadata; no NOTICE
 
@@ -62,7 +62,7 @@ Delivered 7 of the 8 scoped tasks; `default-bundle-cwd` was implemented then rev
 **Features delivered (per task):**
 
 - `choose-package-name` — package renamed `okdb → readb` across dist name, import package
-  (`src/readb/`), CLI binary, URLs, and all docs/tests ([ADR 0002](../../docs/adr/0002-package-name-readb.md)).
+  (`src/readb/`), CLI binary, URLs, and all docs/tests ([ADR 0002](../../docs/dev/adr/0002-package-name-readb.md)).
 - `cli-clean-errors` — `query`/`schema` translate `duckdb.Error` into a one-line
   `click.ClickException` (exit 1); DuckDB's own message is preserved verbatim, no traceback.
 - `read-full-concept` — new `__raw` virtual column (byte-exact file text) and `readb show`
@@ -71,7 +71,7 @@ Delivered 7 of the 8 scoped tasks; `default-bundle-cwd` was implemented then rev
   kept as an alias for `--format json`, and conflicting `--json`/`--format` errors.
 - `remove-id-virtual-field` — `__id` removed; four virtual columns now: `__path` (the
   guaranteed key), `__name` (wiki-style, assumed-unique), `__body`, `__raw`. CLI addresses
-  concepts by name or full `.md` path ([ADR 0003](../../docs/adr/0003-virtual-columns.md)).
+  concepts by name or full `.md` path ([ADR 0003](../../docs/dev/adr/0003-virtual-columns.md)).
 - `schema-drop-type-mapping` — the redundant type→table mapping section removed from
   `readb schema` output; `BundleSchema.type_mapping` stays in the API.
 - `license-apache-2` — MIT → Apache 2.0: full `LICENSE`, SPDX `license`/`license-files` in

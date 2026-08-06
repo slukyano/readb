@@ -23,7 +23,7 @@
 * **Research bundle**: Created `docs/research/` (a third OKF bundle, `type: Research`) at the
   maintainer's call during final review — durable research artifacts live there, dated point-in-time
   data kept with its date. Moved the similar-tools survey into it
-  ([docs/research/similar-tools.md](../docs/research/similar-tools.md));
+  ([docs/research/similar-tools.md](../docs/dev/research/similar-tools.md));
   [research-similar-tools](archive/006-research-similar-tools.md) keeps a pointer + short version.
   Registered via `readb init docs/research` (dogfooding the registry merge path live).
 * **Sprint 002 close-out**: All 6 active tasks flipped `Designed → Done`
@@ -37,7 +37,7 @@
   medium (registry resolve-path containment) fixed + a merge-corruption bug caught by its suggested
   test, also fixed. Gates green: 129 tests, ruff clean. Presented for final review + merge.
 * **Sprint 002 design approved**: All six active tasks flipped `Draft → Designed`; sprint
-  `Designing → Implementing`; [ADR 0004](../docs/adr/0004-init-registry-discovery.md)
+  `Designing → Implementing`; [ADR 0004](../docs/dev/adr/0004-init-registry-discovery.md)
   `Proposed → Accepted` (maintainer, in chat). `distributable-package` design: manual `uv publish`,
   version 0.1.0; the outward-facing publishing split into special standalone task
   [publish-readb-0-1-0](archive/022-publish-readb-0-1-0.md) (after the sprint, not a sprint), with
@@ -47,7 +47,7 @@
   stays immutable/filename-derived, producer `name:` is inert, name-or-path addressing with
   mandatory uniqueness (ADR 0003 affirmed, not amended). `bundle-init-discovery` designed — the
   **registry model**: one `readb init` writes `.readb/config.toml` declaring bundles; discovery
-  walks up; `--bundle` stays explicit consent ([ADR 0004](../docs/adr/0004-init-registry-discovery.md),
+  walks up; `--bundle` stays explicit consent ([ADR 0004](../docs/dev/adr/0004-init-registry-discovery.md),
   Proposed). New drafts from the discussions: [readme-prior-art](tasks/019-readme-prior-art.md),
   [field-editor-type-inference](tasks/016-field-editor-type-inference.md),
   [frontmatter-schema-checking](tasks/017-frontmatter-schema-checking.md),

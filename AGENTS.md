@@ -2,7 +2,7 @@
 
 Read-only SQL query layer over an OKF (Open Knowledge Format) bundle — a directory of markdown
 files with YAML frontmatter. The bundle is loaded into an in-memory DuckDB; DuckDB executes the
-SQL. Full design and acceptance criteria: `docs/design-brief.md`. OKF spec:
+SQL. Full design and acceptance criteria: `docs/dev/design.md`. OKF spec:
 https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md
 
 ## Commands
@@ -61,13 +61,13 @@ file, plus one `Sprint` concept per sprint). Query it with readb:
 through readb's own field editor — `readb set`/`unset --bundle ./backlog <id> ...`.
 
 **Dogfooding rule:** always prefer readb itself for reading and querying the local OKF bundles
-(`backlog/`, `docs/adr/`, `docs/research/`) — do not fall back to `cat`/grep/manual file reads for what readb should
+(`backlog/`, `docs/dev/`) — do not fall back to `cat`/grep/manual file reads for what readb should
 answer. When readb fails or can't express what you need: stop, immediately record a new `Draft`
 task for the gap, and only then work around it. Tasks that block dogfooding readb take priority
 over the rest of the backlog.
 
 **Use the global readb on the project's own state:** manipulating this repo's bundles
-(`backlog/`, `docs/adr/`, `docs/research/`) is done with the globally run readb — `uvx readb` —
+(`backlog/`, `docs/dev/`) is done with the globally run readb — `uvx readb` —
 never `uv run readb` from the working copy: code mid-change must not operate on the repo's own
 backlog. `uv run readb` is for exercising the code under development.
 
@@ -82,8 +82,8 @@ ask** on any decision that belongs to the maintainer — never guess), gates (`p
 an independent subagent review of the diff + a publication-hygiene check: third-person
 project voice, factual/dated/sourced claims about other projects, no personal or environment
 leakage — see `backlog/workflow.md` §5), a sprint summary, and on maintainer approval the final
-merge. Task lifecycle: `Draft → Designed → Done` (+ `Dropped`). ADRs live in `docs/adr/` (an
-OKF bundle); **only the maintainer approves ADRs**. All approvals happen in chat: present a
+merge. Task lifecycle: `Draft → Designed → Done` (+ `Dropped`). ADRs live in `docs/dev/adr/` (in the
+developer-docs bundle); **only the maintainer approves ADRs**. All approvals happen in chat: present a
 separator, a short summary, the complete self-contained decision context (quote what matters;
 don't require reading files; batch approvals list every task with at least a one-line
 description), key-file references for double-clicking, then the explicit question(s). Full

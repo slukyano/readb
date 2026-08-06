@@ -34,5 +34,5 @@ backlogs like this repo's `tasks/` may be answerable in a couple of reads either
 - Possible third arm: readb plus the shipped usage skill
   ([ship-usage-skill](025-ship-usage-skill.md)), to measure what the skill adds over bare
   tool availability.
-- Output: a durable `Research` concept in `docs/research/` with the numbers, setup, and
+- Output: a durable `Research` concept in `docs/dev/research/` with the numbers, setup, and
   date; headline figures could feed the README.

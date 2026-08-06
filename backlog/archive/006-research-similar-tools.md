@@ -30,7 +30,7 @@ knowledge-base readers) to see what conventions and features we should adopt.
 Executed 2026-07-17 during the sprint-002 design phase (fan-out web survey, claims verified
 against primary repos/docs). The full survey — landscape, five-dimension comparison, dated
 adoption data, adopt/reject calls, sources — lives as a durable research artifact:
-**[docs/research/similar-tools.md](../../docs/research/similar-tools.md)** (the `research` OKF
+**[docs/research/similar-tools.md](../../docs/dev/research/similar-tools.md)** (the `research` OKF
 bundle, registered in `.readb/config.toml`).
 
 Short version: two tools sit on readb's exact spot — frontmatter-mcp (same DuckDB-SQL engine,
