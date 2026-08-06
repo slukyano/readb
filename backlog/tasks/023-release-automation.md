@@ -9,9 +9,7 @@ tags:
 - release
 - ci
 created: 2026-07-20
-blocked_by:
-- publish-readb-0-1-0
-timestamp: '2026-07-20T00:00:00Z'
+timestamp: '2026-08-06T00:00:00Z'
 ---
 
 Deferred from the [distributable-package](../archive/003-distributable-package.md) design (sprint-002): 0.1.0

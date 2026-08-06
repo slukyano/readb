@@ -47,6 +47,11 @@ via the lattice; pass 2 coerces values and inserts into DuckDB.
 - JSON is the top of the type lattice and the universal fallback; nothing is dropped. Never
   guess producer intent (don't split comma-strings into lists, don't parse strings to numbers).
 - `index.md` / `log.md` are reserved filenames, NOT concept docs.
+- readb is a general-purpose tool over any OKF bundle. Its public surfaces — README, CLI help,
+  shipped skills/docs, package metadata, examples — must never present this project's own
+  development process (sprints, the `backlog/` bundle, the task lifecycle) as part of readb.
+  Examples there use neutral domains; process material stays in `AGENTS.md`, `backlog/`, and
+  `docs/dev/`.
 
 ## Verification
 

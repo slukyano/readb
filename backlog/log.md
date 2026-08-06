@@ -1,6 +1,22 @@
 # Task Bundle Log
 
 ## 2026-08-06
+* **Sprint 003 started**: Scope approved in chat — [ship-usage-skill](tasks/025-ship-usage-skill.md),
+  [readme-prior-art](tasks/019-readme-prior-art.md),
+  [release-automation](tasks/023-release-automation.md); the agent added
+  [field-editor-multiline-corruption](tasks/026-field-editor-multiline-corruption.md) at sprint start
+  (pending confirmation). Created [sprint-003](sprints/sprint-003.md) (`Designing`, branch `sprint/003`).
+* **Dogfooding gap → new task**: `readb set`/`unset` corrupt any frontmatter key whose value spans
+  multiple lines (block list, block scalar, nested mapping) — the continuation lines are orphaned,
+  the file stops parsing, and the permissive load then skips the concept silently. Recorded as
+  [026](tasks/026-field-editor-multiline-corruption.md) (high). Hit while fixing
+  `release-automation`'s dangling `blocked_by` (`publish-readb-0-1-0` — a name that never existed,
+  so the eligibility query hid the task); the blocker was satisfied and removed by hand, since
+  readb cannot make that edit today.
+* **Public surfaces stay general-purpose**: recorded in `AGENTS.md` — README, CLI help, shipped
+  skills and package metadata must never present this project's own development process (sprints,
+  the backlog bundle, the task lifecycle) as part of readb. Binding on `ship-usage-skill` and
+  `readme-prior-art`.
 * **Backlog restructure**: The flat `tasks/` bundle became `backlog/` — active tasks in
   `tasks/`, closed ones in `archive/`, sprint records in `sprints/`; task concepts renamed to
   numbered `NNN-slug` names (by creation date). The [task workflow](workflow.md) and all

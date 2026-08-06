@@ -8,11 +8,13 @@ okf_version: "0.1"
 
 # Sprints
 
+* [Sprint 003 — Post-0.1.0 adoption: usage skill, prior art, release automation](sprints/sprint-003.md) - Designing.
 * [Sprint 002 — Bundle init, packaging & correctness follow-ups](sprints/sprint-002.md) - Done.
 * [Sprint 001 — CLI ergonomics, dogfooding gaps, name & license](sprints/sprint-001.md) - Done.
 
 # Tasks
 
+* [Fix set/unset corrupting multi-line frontmatter values](tasks/026-field-editor-multiline-corruption.md) - orphaned continuation lines make the file invalid YAML; the concept then silently disappears.
 * [Research structured-body querying](tasks/005-research-body-structured-query.md) - expose the body as JSON/YAML/DOM by headings.
 * [Keep index.md and log.md current automatically](tasks/009-bundle-index-log-automation.md) - generate the index; sprint-appended log entries.
 * [Add a prior-art note to the README](tasks/019-readme-prior-art.md) - frontmatter-mcp, MarkdownDB, Dataview; the transparent-disposable-index differentiator.
