@@ -14,7 +14,7 @@ timestamp: '2026-07-17T00:00:00Z'
 
 `okdb` is taken on PyPI, so we need a different distribution name before we can publish.
 
-This task **blocks** [Create a distributable package](/distributable-package.md).
+This task **blocks** [Create a distributable package](003-distributable-package.md).
 
 ## Context
 
@@ -29,7 +29,7 @@ This task **blocks** [Create a distributable package](/distributable-package.md)
 
 ## Design
 
-Decided 2026-07-10 — see [ADR 0002](../docs/adr/0002-package-name-readb.md) for the full
+Decided 2026-07-10 — see [ADR 0002](../../docs/adr/0002-package-name-readb.md) for the full
 research (PyPI/npm/crates/GitHub/web) and rationale.
 
 **The name is `readb`** ("readable / reads your files + db"), aligned across dist, import, and

@@ -5,18 +5,18 @@ description: readb init + upward discovery, distributable package, zero-row csv,
 status: Done
 branch: sprint/002
 tasks:
-- bundle-init-discovery
-- distributable-package
-- csv-empty-result-header
-- name-column-unprefix
-- tz-aware-datetime-handling
-- research-similar-tools
-- rename-repo-dir
+- 013-bundle-init-discovery
+- 003-distributable-package
+- 015-csv-empty-result-header
+- 018-name-column-unprefix
+- 020-tz-aware-datetime-handling
+- 006-research-similar-tools
+- 014-rename-repo-dir
 created: 2026-07-17
 timestamp: '2026-07-20T00:00:00Z'
 ---
 
-Second sprint under the [session/sprint workflow](workflow.md).
+Second sprint under the [session/sprint workflow](../workflow.md).
 
 ## Scope rationale
 
@@ -66,7 +66,7 @@ and smoke-tested as an installable 0.1.0 wheel on Python 3.14 and the 3.11 floor
   wins → sole bundle → `default_bundle` → hard error listing bundles). Explicit `--bundle`
   never consults the registry; the loader skips `.readb/`. Dogfooded: this repo's registry
   (`tasks`, `docs/adr`) is committed, deliberately without `default_bundle`
-  ([ADR 0004](../docs/adr/0004-init-registry-discovery.md)).
+  ([ADR 0004](../../docs/adr/0004-init-registry-discovery.md)).
 - `csv-empty-result-header` — the sprint-001 "zero-row csv prints nothing" limitation is fixed
   as a bug: new `Database.sql_table(query) -> (columns, rows)` carries column names
   independently of rows (`sql()` is now a wrapper over it), and csv/tsv always print the
@@ -84,7 +84,7 @@ and smoke-tested as an installable 0.1.0 wheel on Python 3.14 and the 3.11 floor
   lifts the requirement.
 - `research-similar-tools` — 11 tools surveyed (fan-out web research verified against primary
   repos/docs); the full survey lives as a durable artifact in the new **`docs/research/` OKF
-  bundle** ([similar-tools](../docs/research/similar-tools.md), registered in
+  bundle** ([similar-tools](../../docs/research/similar-tools.md), registered in
   `.readb/config.toml` via the live `init` merge path; the task body keeps a pointer):
   comparison across frontmatter/lifecycle/dependencies/query/CLI dimensions, dated adoption
   data (Backlog.md ~6.2k★ active; MarkdownDB ~495★ stalled; frontmatter-mcp — readb's
@@ -92,7 +92,7 @@ and smoke-tested as an installable 0.1.0 wheel on Python 3.14 and the 3.11 floor
   adopt/reject calls. Ideas fed the four design tasks.
 - `distributable-package` — version 0.1.0; `uv build` wheel+sdist, `twine check` PASSED;
   clean-venv smokes (CLI + API + init/discovery) on 3.14 and 3.11. No uploads — publishing is
-  the special post-sprint task [publish-readb-0-1-0](publish-readb-0-1-0.md).
+  the special post-sprint task [publish-readb-0-1-0](../archive/022-publish-readb-0-1-0.md).
 
 **Breaking changes:** none for existing invocations (`--bundle` keeps working everywhere);
 zero-row csv/tsv output gains a header line (was: empty output) — strictly-empty-output

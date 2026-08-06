@@ -11,8 +11,8 @@ created: 2026-07-20
 timestamp: '2026-07-20T00:00:00Z'
 ---
 
-Spun off from the [bundle-init-discovery](bundle-init-discovery.md) design (sprint-002,
-[ADR 0004](../docs/adr/0004-init-registry-discovery.md)). The registry knows every bundle in a
+Spun off from the [bundle-init-discovery](../archive/013-bundle-init-discovery.md) design (sprint-002,
+[ADR 0004](../../docs/adr/0004-init-registry-discovery.md)). The registry knows every bundle in a
 repo; DuckDB supports multiple schemas in one in-memory database. That opens real cross-bundle
 SQL — e.g. join this repo's backlog against its ADRs:
 

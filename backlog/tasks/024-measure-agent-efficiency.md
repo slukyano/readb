@@ -32,7 +32,7 @@ backlogs like this repo's `tasks/` may be answerable in a couple of reads either
 - Harness: scripted runs per arm with captured token counts and timings; repeat runs to
   average out variance; keep prompts identical except for the readb instruction.
 - Possible third arm: readb plus the shipped usage skill
-  ([ship-usage-skill](ship-usage-skill.md)), to measure what the skill adds over bare
+  ([ship-usage-skill](025-ship-usage-skill.md)), to measure what the skill adds over bare
   tool availability.
 - Output: a durable `Research` concept in `docs/research/` with the numbers, setup, and
   date; headline figures could feed the README.

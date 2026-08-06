@@ -12,8 +12,8 @@ timestamp: '2026-07-10T00:00:00Z'
 Every concept table carries virtual columns beside the frontmatter-derived ones. Today they
 are `__path` (bundle-relative path, with `.md`), `__id` (`__path` minus `.md`), and `__body`
 (markdown body, frontmatter stripped). Two sprint-001 tasks touch the contract:
-[remove-id-virtual-field](../../tasks/remove-id-virtual-field.md) (the `__id`/`__path`
-duplication) and [read-full-concept](../../tasks/read-full-concept.md) (needs a byte-exact
+[remove-id-virtual-field](../../backlog/archive/004-remove-id-virtual-field.md) (the `__id`/`__path`
+duplication) and [read-full-concept](../../backlog/archive/012-read-full-concept.md) (needs a byte-exact
 whole-file value). Discussion exposed a terminology problem: `__id` is not an *ID* — "ID"
 implies guaranteed uniqueness, which only the path provides. The bundle walk is recursive
 (`rglob`), so concepts can live in subdirectories and simple-name clashes are genuinely

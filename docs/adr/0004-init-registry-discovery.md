@@ -10,9 +10,9 @@ timestamp: '2026-07-20T00:00:00Z'
 # Context
 
 Sprint-001 implemented, then reverted, defaulting `--bundle` to the cwd
-([default-bundle-cwd](../../tasks/default-bundle-cwd.md), Dropped): a cwd default silently
+([default-bundle-cwd](../../backlog/archive/002-default-bundle-cwd.md), Dropped): a cwd default silently
 treats *any* directory as a bundle — wrong-scope reads and misdirected name-resolved writes.
-The successor idea ([bundle-init-discovery](../../tasks/bundle-init-discovery.md)) is the git
+The successor idea ([bundle-init-discovery](../../backlog/archive/013-bundle-init-discovery.md)) is the git
 model: a directory is a bundle because the user said so once, via an explicit `init`, and
 commands without `--bundle` walk up to that marker.
 
@@ -25,7 +25,7 @@ entries, N future cache homes. Treating the whole repo as one bundle is worse: e
 
 Prior art: Backlog.md's explicit `init` (choose folder, config preserved on re-init, scriptable
 flags); the `.obsidian/`/`.backlog/` dotdir-marker norm
-([research-similar-tools](../../tasks/research-similar-tools.md)).
+([research-similar-tools](../../backlog/archive/006-research-similar-tools.md)).
 
 # Decision
 
@@ -69,7 +69,7 @@ the marker is the cache's home arriving early.
   ambiguous multi-bundle root — all clear errors at use, none load-time-fatal for `--bundle`
   users.
 - Registry names open a path to cross-bundle querying (attach each bundle as a DuckDB schema)
-  — deferred to [cross-bundle-querying](../../tasks/cross-bundle-querying.md).
+  — deferred to [cross-bundle-querying](../../backlog/tasks/021-cross-bundle-querying.md).
 
 # Alternatives considered
 

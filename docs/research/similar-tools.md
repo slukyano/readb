@@ -10,7 +10,7 @@ created: 2026-07-20
 timestamp: '2026-07-20T00:00:00Z'
 ---
 
-Produced by [research-similar-tools](../../tasks/research-similar-tools.md) (sprint-002) via a
+Produced by [research-similar-tools](../../backlog/archive/006-research-similar-tools.md) (sprint-002) via a
 fan-out web survey verified against each tool's own repo/docs. Point-in-time data (star counts,
 maintenance status) is dated inline — true as of the date given, worth keeping *with* the date.
 

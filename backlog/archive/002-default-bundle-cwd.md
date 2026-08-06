@@ -39,7 +39,7 @@ consistency; flagged for the design review.
 - **No "is this really a bundle?" heuristic.** An empty/markdown-free directory loads as zero
   tables (the permissive-load constraint says that's a valid bundle); a query against it then
   fails with the clean missing-table catalog error from
-  [cli-clean-errors](cli-clean-errors.md), which names what exists. `okdb schema` on it shows
+  [cli-clean-errors](011-cli-clean-errors.md), which names what exists. `okdb schema` on it shows
   no tables — that *is* the clear message.
 - Tests: CliRunner with `chdir` into a fixture bundle, no `--bundle` flag, for a query and an
   editor command; default shown in `--help` output.
@@ -52,6 +52,6 @@ default turns scoping mistakes into silent wrong-scope operations: any directory
 name-resolved `set` can write into a bundle the caller never named. Verified live from the
 repo root: the whole repository loaded and a `task` table materialized.
 
-The ergonomic goal returns as [bundle-init-discovery](bundle-init-discovery.md): explicit
+The ergonomic goal returns as [bundle-init-discovery](013-bundle-init-discovery.md): explicit
 `readb init` + git-style upward discovery, with the marker doubling as the future
 persistent-index home.

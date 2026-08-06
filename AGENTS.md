@@ -55,19 +55,19 @@ written as tests.
 
 ## Development workflow (sessions + sprints, dogfooding)
 
-The project backlog lives in `tasks/`, which is itself an OKF bundle (one `Task` concept per
+The project backlog lives in `backlog/`, which is itself an OKF bundle (one `Task` concept per
 file, plus one `Sprint` concept per sprint). Query it with readb:
-`readb query "SELECT status, title FROM task" --bundle ./tasks`. All frontmatter edits go
-through readb's own field editor — `readb set`/`unset --bundle ./tasks <id> ...`.
+`readb query "SELECT status, title FROM task" --bundle ./backlog`. All frontmatter edits go
+through readb's own field editor — `readb set`/`unset --bundle ./backlog <id> ...`.
 
 **Dogfooding rule:** always prefer readb itself for reading and querying the local OKF bundles
-(`tasks/`, `docs/adr/`, `docs/research/`) — do not fall back to `cat`/grep/manual file reads for what readb should
+(`backlog/`, `docs/adr/`, `docs/research/`) — do not fall back to `cat`/grep/manual file reads for what readb should
 answer. When readb fails or can't express what you need: stop, immediately record a new `Draft`
 task for the gap, and only then work around it. Tasks that block dogfooding readb take priority
 over the rest of the backlog.
 
 **Use the global readb on the project's own state:** manipulating this repo's bundles
-(`tasks/`, `docs/adr/`, `docs/research/`) is done with the globally run readb — `uvx readb` —
+(`backlog/`, `docs/adr/`, `docs/research/`) is done with the globally run readb — `uvx readb` —
 never `uv run readb` from the working copy: code mid-change must not operate on the repo's own
 backlog. `uv run readb` is for exercising the code under development.
 
@@ -75,19 +75,19 @@ Development runs in **sprints** (no PRs). At session start, check for an unfinis
 (`SELECT __name, status, branch FROM sprint WHERE status NOT IN ('Done','Aborted')`; a missing
 `sprint` table means no sprint ever ran) and resume it from its branch; otherwise propose a
 scope from the `Draft` backlog. Scope approval =
-committing `tasks/sprint-NNN.md` to `main` and cutting branch `sprint/NNN`. Then: an
+committing `backlog/sprints/sprint-NNN.md` to `main` and cutting branch `sprint/NNN`. Then: an
 interactive design phase (per-task `## Design` sections + `Proposed` ADRs; maintainer approval →
 design merge to `main`), an autonomous implementation phase (commit throughout; **stop and
 ask** on any decision that belongs to the maintainer — never guess), gates (`pytest` + `ruff` +
 an independent subagent review of the diff + a publication-hygiene check: third-person
 project voice, factual/dated/sourced claims about other projects, no personal or environment
-leakage — see `tasks/workflow.md` §5), a sprint summary, and on maintainer approval the final
+leakage — see `backlog/workflow.md` §5), a sprint summary, and on maintainer approval the final
 merge. Task lifecycle: `Draft → Designed → Done` (+ `Dropped`). ADRs live in `docs/adr/` (an
 OKF bundle); **only the maintainer approves ADRs**. All approvals happen in chat: present a
 separator, a short summary, the complete self-contained decision context (quote what matters;
 don't require reading files; batch approvals list every task with at least a one-line
 description), key-file references for double-clicking, then the explicit question(s). Full
-workflow: `tasks/workflow.md`.
+workflow: `backlog/workflow.md`.
 
 ## Stack
 
@@ -104,4 +104,4 @@ ADRs). Scopes match components (e.g. `loader`, `schema`, `cli`). If a coding age
 write a commit, add a `Co-Authored-By` trailer for the model that helped (e.g.
 `Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>`); otherwise no attribution.
 Never add `Claude-Session:` or other private session-link trailers — the repo and its history
-are public-bound (publication-hygiene gate, `tasks/workflow.md` §5).
+are public-bound (publication-hygiene gate, `backlog/workflow.md` §5).

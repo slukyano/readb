@@ -11,7 +11,7 @@ created: 2026-07-17
 timestamp: '2026-07-17T00:00:00Z'
 ---
 
-Surfaced by [research-similar-tools](research-similar-tools.md) (sprint-002). Several surveyed
+Surfaced by [research-similar-tools](../archive/006-research-similar-tools.md) (sprint-002). Several surveyed
 tools give producers a way to *declare and check* structure, which readb currently does not:
 
 - **Backlog.md** declares its allowed `statuses` (and `default_status`) centrally in a config
@@ -32,11 +32,11 @@ against it — a `readb check`/`readb lint` that reports violations without touc
 - Is this readb's job at all, or a separate linter? (readb is a *reader*; a validator is a new
   role.) Weigh against scope creep.
 - If in scope: where does the schema live (a file in the `.readb/` marker dir from
-  [bundle-init-discovery](bundle-init-discovery.md)? per-type schema docs in the bundle?), and
+  [bundle-init-discovery](../archive/013-bundle-init-discovery.md)? per-type schema docs in the bundle?), and
   what vocabulary (required keys, type per key, allowed-value sets/enums, cross-link checks)?
 - Hard invariant: **read/query stays permissive and lossless**. Any schema check is a distinct,
   explicit command that never rejects a load or mutates files — it only reports.
-- Interaction with [field-editor-type-inference](field-editor-type-inference.md): a declared
+- Interaction with [field-editor-type-inference](016-field-editor-type-inference.md): a declared
   schema could drive typed `set` (write the value in the type the schema says), which is a
   cleaner answer than syntax-guessing.
 - Likely an ADR (new capability + where schemas live) and a multi-task effort if pursued.

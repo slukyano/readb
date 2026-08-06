@@ -10,7 +10,7 @@ created: 2026-07-17
 timestamp: '2026-07-17T00:00:00Z'
 ---
 
-Surfaced by [research-similar-tools](research-similar-tools.md) (sprint-002): the survey found
+Surfaced by [research-similar-tools](../archive/006-research-similar-tools.md) (sprint-002): the survey found
 that readb's core approach is not novel — two maintained tools sit almost exactly on its spot —
 so the README should place readb honestly among them and state what actually differentiates it.
 

@@ -12,7 +12,7 @@ created: 2026-07-11
 timestamp: '2026-07-20T00:00:00Z'
 ---
 
-Replace the reverted cwd-defaulting of `--bundle` ([default-bundle-cwd](default-bundle-cwd.md),
+Replace the reverted cwd-defaulting of `--bundle` ([default-bundle-cwd](002-default-bundle-cwd.md),
 Dropped) with the git model: a directory is a bundle because the user said so once.
 
 ## Context
@@ -46,7 +46,7 @@ by relative path. Not one marker per bundle (tool droppings inside a publishable
 help from the repo root), and never "whole repo as one bundle" (phantom concepts from README/
 docs; per-bundle `index.md`/`log.md` semantics). The single-bundle case is the same model, not a
 special case: `readb init` inside a bundle writes `bundles = ["."]`.
-See [ADR 0004](../docs/adr/0004-init-registry-discovery.md).
+See [ADR 0004](../../docs/adr/0004-init-registry-discovery.md).
 
 ### The command
 
@@ -120,4 +120,4 @@ in examples, or set `default_bundle = "tasks"`; decide at implementation with th
 matters).
 
 **Spun off:** cross-bundle querying (attach each declared bundle as a DuckDB schema; join
-`tasks.task` × `adr.adr`) → draft [cross-bundle-querying](cross-bundle-querying.md).
+`tasks.task` × `adr.adr`) → draft [cross-bundle-querying](../tasks/021-cross-bundle-querying.md).

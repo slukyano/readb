@@ -12,7 +12,7 @@ created: 2026-07-17
 timestamp: '2026-07-17T00:00:00Z'
 ---
 
-Surfaced by [research-similar-tools](research-similar-tools.md) (sprint-002). The nearest
+Surfaced by [research-similar-tools](../archive/006-research-similar-tools.md) (sprint-002). The nearest
 analogue to readb's field editor, **marad/frontmatter** (Go `get`/`set`/`delete`), **infers YAML
 types from CLI argument syntax**: `count=42` → int, `price=19.99` → float, `published=true` →
 bool, `tags=[a,b,c]` → list, inline JSON → object. readb's `set`/`unset` today is deliberately

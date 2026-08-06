@@ -6,7 +6,7 @@ okf_version: "0.1"
 
 An OKF bundle of durable research artifacts: one `type: Research` concept per study. Dated
 point-in-time observations (adoption numbers, version checks) are kept *with* their dates.
-Produced by research tasks in [`tasks/`](../../tasks/index.md); registered in the repo's
+Produced by research tasks in [`tasks/`](../../backlog/index.md); registered in the repo's
 `.readb/config.toml`.
 
 ```sh

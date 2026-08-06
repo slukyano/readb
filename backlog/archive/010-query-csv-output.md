@@ -29,7 +29,7 @@ one-liner just to pull two fields out of the JSON. A machine-readable plain-text
 ## Design
 
 Designed 2026-07-10 (maintainer decision: one `--format` enum; also serves
-[read-full-concept](read-full-concept.md)).
+[read-full-concept](012-read-full-concept.md)).
 
 `okdb query` grows `--format table|json|csv|tsv|raw` (default `table`). `--json` stays as a
 compatibility alias for `--format json`; combining `--json` with a conflicting `--format` is a

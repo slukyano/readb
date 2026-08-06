@@ -14,7 +14,7 @@ timestamp: '2026-07-20T00:00:00Z'
 
 `readb query --format csv|tsv` currently prints **nothing at all** — not even a header row —
 when the result set is empty (see `_format_csv` in `src/readb/cli.py` and the
-`## Sprint summary` in [sprint-001](sprint-001.md)). The reason is structural: `Database.sql`
+`## Sprint summary` in [sprint-001](../sprints/sprint-001.md)). The reason is structural: `Database.sql`
 returns a list of row dicts, so an empty result carries no column names to print a header from.
 It was shipped as a documented limitation, but it may well be a **bug** — a shell caller
 piping `readb query ... --format csv` into another tool likely expects a header line even on

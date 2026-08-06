@@ -10,10 +10,12 @@ timestamp: '2026-07-17T00:00:00Z'
 
 # Overview
 
-This `tasks/` directory is the project backlog **and** an OKF bundle — one markdown file per
-concept. We dogfood readb here: the backlog is queried with readb itself (see
-[Querying with readb](#querying-with-readb)) and all frontmatter edits are made with readb's own
-field editor (`readb set`/`unset --bundle ./tasks <id> ...`).
+This `backlog/` directory is the project backlog **and** an OKF bundle — one markdown file per
+concept. Active tasks live in `tasks/` (named `NNN-slug.md`, numbered sequentially), closed
+tasks move to `archive/` at close-out, and sprint records live in `sprints/`; `workflow.md`,
+`index.md`, and `log.md` stay at the bundle root. We dogfood readb here: the backlog is queried
+with readb itself (see [Querying with readb](#querying-with-readb)) and all frontmatter edits
+are made with readb's own field editor (`readb set`/`unset --bundle ./backlog <id> ...`).
 
 Development happens in **sprints**, driven interactively in **sessions**:
 
@@ -26,7 +28,7 @@ Development happens in **sprints**, driven interactively in **sessions**:
 The bundle holds three concept types:
 
 - `Task` — one backlog item per file.
-- `Sprint` — one `sprint-NNN.md` per sprint: the durable state of active and past work.
+- `Sprint` — one `sprints/sprint-NNN.md` per sprint: the durable state of active and past work.
 - `Process` — this document.
 
 `index.md` and `log.md` are OKF-reserved (a listing and a change log); they are not concepts.
@@ -34,7 +36,7 @@ Architecture Decision Records live in a separate bundle, [`docs/adr/`](../docs/a
 
 ## Dogfooding rule
 
-readb is the interface to the local OKF bundles. Reading and querying `tasks/` and `docs/adr/`
+readb is the interface to the local OKF bundles. Reading and querying `backlog/` and `docs/adr/`
 goes through `readb query`/`readb schema`/`readb get`; edits go through `readb set`/`unset`. Do not
 fall back to `cat`, grep, or manual file reads for what readb should answer. When readb fails or
 can't express something needed for the workflow: **stop, immediately record a new `Draft` task**
@@ -76,7 +78,7 @@ One sprint moves through:
 Every session begins by checking for unfinished work:
 
 ```sh
-readb query "SELECT __name, status, branch FROM sprint WHERE status NOT IN ('Done','Aborted')" --bundle ./tasks
+readb query "SELECT __name, status, branch FROM sprint WHERE status NOT IN ('Done','Aborted')" --bundle ./backlog
 ```
 
 - **An active sprint exists** → check out its branch (the branch always has the freshest
@@ -94,7 +96,7 @@ The agent reviews the open backlog (`Draft` tasks, unblocked) and proposes a set
 sprint — proposing *all* open tasks is fine when the scope feels right. The maintainer adjusts and
 approves.
 
-**Scope approval is the sprint-start commit on `main`**: create `tasks/sprint-NNN.md`
+**Scope approval is the sprint-start commit on `main`**: create `backlog/sprints/sprint-NNN.md`
 (status `Designing`, the task list, the branch name), commit it to `main`, then create the
 sprint branch `sprint/NNN` from it. All subsequent work happens on the branch.
 
@@ -151,11 +153,12 @@ merge itself.
 ### 6a. Close-out bookkeeping (committed to the branch, before presenting)
 
 1. Flip every delivered task `Designed → Done` via the field editor
-   (`readb set --bundle ./tasks <name> status=Done timestamp=<ISO>`); update the timestamp.
+   (`readb set --bundle ./backlog <name> status=Done timestamp=<ISO>`); update the timestamp.
 2. Flip the sprint `Implementing → Done` (same editor) and update its timestamp.
 3. Write a `## Sprint summary` into the sprint body and a close-out `## Session log` line.
-4. Bring the hand-maintained `tasks/index.md` and `tasks/log.md` current (move Done tasks to a
-   `# Done` section; mark the sprint Done; add a dated log entry).
+4. Move each closed task's file from `tasks/` to `archive/` and bring the hand-maintained
+   `backlog/index.md` and `backlog/log.md` current (list Done tasks under `# Done`; mark the
+   sprint Done; add a dated log entry).
 5. **Every open question / deferred idea must have a home.** If something was left undone —
    deliberately or by omission — it is either done now or captured as a `Draft` task. Never
    say "carried to the backlog" without a concrete task name; create the task if none exists.
@@ -295,11 +298,11 @@ readb query "SELECT __name, status, title FROM adr ORDER BY __name" --bundle ./d
 
 ```sh
 # Anything in flight?
-readb query "SELECT __name, status, branch FROM sprint WHERE status NOT IN ('Done','Aborted')" --bundle ./tasks
+readb query "SELECT __name, status, branch FROM sprint WHERE status NOT IN ('Done','Aborted')" --bundle ./backlog
 
 # The open backlog, highest priority first
 readb query "SELECT __name, priority, title FROM task WHERE status = 'Draft'
-            ORDER BY CASE lower(priority) WHEN 'high' THEN 0 WHEN 'medium' THEN 1 ELSE 2 END, created" --bundle ./tasks
+            ORDER BY CASE lower(priority) WHEN 'high' THEN 0 WHEN 'medium' THEN 1 ELSE 2 END, created" --bundle ./backlog
 
 # Sprint-eligible: Draft and unblocked
 readb query "
@@ -312,8 +315,8 @@ readb query "
     )
   ORDER BY CASE lower(t.priority) WHEN 'high' THEN 0 WHEN 'medium' THEN 1 ELSE 2 END,
            t.created NULLS LAST, t.__name
-" --bundle ./tasks
+" --bundle ./backlog
 
 # Count by state
-readb query "SELECT status, count(*) AS n FROM task GROUP BY status ORDER BY n DESC" --bundle ./tasks
+readb query "SELECT status, count(*) AS n FROM task GROUP BY status ORDER BY n DESC" --bundle ./backlog
 ```

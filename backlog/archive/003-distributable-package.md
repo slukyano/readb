@@ -16,7 +16,7 @@ timestamp: '2026-07-20T00:00:00Z'
 Make okdb installable for end users (not just `uv sync` from a clone) — e.g. `pipx install`,
 `uv tool install`, or `pip install` from a package index.
 
-Blocked by [Choose a package name](/choose-package-name.md): we cannot publish until the
+Blocked by [Choose a package name](001-choose-package-name.md): we cannot publish until the
 distribution name is settled.
 
 ## Context
@@ -37,10 +37,10 @@ keywords/classifiers/URLs/`[project.scripts]`). Decisions:
 - **Version**: bump `0.0.1 → 0.1.0` for the first public release (stays 0.x / Alpha classifier).
 - **Publishing mechanics**: **manual `uv publish` with a PyPI token** held by the maintainer — no CI.
   GitHub Actions + Trusted Publishing recorded as draft
-  [release-automation](release-automation.md) for when releases become routine.
+  [release-automation](../tasks/023-release-automation.md) for when releases become routine.
 - **Split with the publish step** (maintainer call at approval): the actual publishing is **not part
   of this sprint** — it is the special standalone task
-  [publish-readb-0-1-0](publish-readb-0-1-0.md), run after sprint-002's final merge, from
+  [publish-readb-0-1-0](022-publish-readb-0-1-0.md), run after sprint-002's final merge, from
   tagged `main`. Everything upload-shaped (TestPyPI rehearsal included — it needs external
   accounts/tokens) lives there.
 

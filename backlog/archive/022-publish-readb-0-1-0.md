@@ -16,7 +16,7 @@ timestamp: '''2026-07-21T01:30:00Z'''
 
 **Special task — not a normal sprint.** Run as a single standalone task after sprint-002's
 final merge, from `main`. The build/verification legwork happens in-sprint
-([distributable-package](distributable-package.md)); this task is the outward-facing publish.
+([distributable-package](003-distributable-package.md)); this task is the outward-facing publish.
 Every upload is a **stop-and-ask** — the maintainer holds the PyPI/TestPyPI credentials and gives
 the explicit go for each push.
 
