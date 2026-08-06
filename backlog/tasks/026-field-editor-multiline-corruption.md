@@ -44,9 +44,9 @@ The same corruption affects every multi-line value form:
 ## Notes (to refine)
 
 - The fix is about **span detection**, not about YAML round-tripping: find where a key's value
-  ends (the next line at the key's indentation or the closing `---`) and replace or delete that
-  whole span. Everything outside the span must stay byte-identical — the surgical-edit contract
-  in [ADR 0002](../../docs/dev/adr/0002-frontmatter-field-editor.md) does not change.
+  ends (the next top-level key line or the closing `---`) and replace or delete that whole span.
+  Everything outside the span must stay byte-identical — the surgical-edit contract
+  (`AGENTS.md` § Hard constraints; the `src/readb/fields.py` module docstring) does not change.
 - Decide the behavior of `set` on a multi-line key: replace the span with a scalar (a lossy but
   explicit overwrite), or refuse until list-valued assignment exists. Writing list *values* is
   the separate open question in
