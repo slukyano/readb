@@ -102,12 +102,12 @@ type is stored as a `JSON` column — nothing is dropped, and producer intent is
 
 ## Development
 
-```sh
-uv sync              # install deps + dev tools
-uv run pytest        # run tests
-uv run ruff check    # lint
-uv run ruff format   # format
-```
+See [`DEVELOPMENT.md`](DEVELOPMENT.md) for the repository map, commands, and checks.
+Development runs in maintainer-approved sprints; the backlog and the developer documentation
+(including Architecture Decision Records) are
+[OKF](https://github.com/GoogleCloudPlatform/knowledge-catalog/tree/main/okf) bundles in
+[`backlog/`](backlog/index.md) and [`docs/dev/`](docs/dev/index.md). Process:
+[`backlog/workflow.md`](backlog/workflow.md).
 
 ## License
 

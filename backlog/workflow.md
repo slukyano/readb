@@ -133,8 +133,8 @@ subagents where appropriate. Rules of the phase:
 
 ## 5. Gates (must pass before presenting)
 
-- **Validation** — the full suite passes: `uv run pytest` and `uv run ruff check`. New
-  behavior is covered by tests.
+- **Validation** — the repository's declared checks pass
+  ([`DEVELOPMENT.md` § Checks](../DEVELOPMENT.md#checks)). New behavior is covered by tests.
 - **Independent review** — a fresh subagent with no implementation context reviews the full
   sprint diff; findings are fixed (or explicitly presented as known issues).
 - **Publication hygiene** — everything committed must be publishable as-is, since the repo

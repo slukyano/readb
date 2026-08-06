@@ -2,20 +2,21 @@
 
 Read-only SQL query layer over an OKF (Open Knowledge Format) bundle — a directory of markdown
 files with YAML frontmatter. The bundle is loaded into an in-memory DuckDB; DuckDB executes the
-SQL. Full design and acceptance criteria: `docs/dev/design.md`. OKF spec:
+SQL. OKF spec:
 https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md
 
-## Commands
+- **What it is, usage, install:** [`README.md`](README.md).
+- **Development basics — commands, repository map, checks, conventions:**
+  [`DEVELOPMENT.md`](DEVELOPMENT.md).
+- **Binding spec (goals, non-goals, acceptance criteria):**
+  [`docs/dev/design.md`](docs/dev/design.md).
 
-```sh
-uv sync              # install deps + dev tools
-uv run pytest        # run tests
-uv run ruff check    # lint
-uv run ruff format   # format
-uv run readb --help   # exercise the CLI
-```
+This file holds the rules an agent must follow that are not already in those documents.
 
-## Repo structure
+## Architecture
+
+The load is a deliberate two-pass: pass 1 parses every concept and infers unified column types
+via the lattice; pass 2 coerces values and inserts into DuckDB.
 
 - `src/readb/__init__.py` — public API: `readb.open(path)` -> `Database`.
 - `src/readb/database.py` — `Database`: thin read-only wrapper over a DuckDB connection; `.sql()`.
@@ -47,61 +48,40 @@ uv run readb --help   # exercise the CLI
   guess producer intent (don't split comma-strings into lists, don't parse strings to numbers).
 - `index.md` / `log.md` are reserved filenames, NOT concept docs.
 
-## Implementation order
+## Verification
 
-Two-pass load: pass 1 parses every concept and infers unified column types via the lattice;
-pass 2 coerces values and inserts into DuckDB. The brief's acceptance criteria (1-12) should be
-written as tests.
+The declared checks ([`DEVELOPMENT.md` § Checks](DEVELOPMENT.md#checks)) must pass before work
+is presented. New behavior carries tests; the design brief's 12 acceptance criteria stay pinned
+by tests.
 
 ## Development workflow (sessions + sprints, dogfooding)
 
-The project backlog lives in `backlog/`, which is itself an OKF bundle (one `Task` concept per
-file, plus one `Sprint` concept per sprint). Query it with readb:
-`readb query "SELECT status, title FROM task" --bundle ./backlog`. All frontmatter edits go
-through readb's own field editor — `readb set`/`unset --bundle ./backlog <id> ...`.
+**Follow this workflow only when asked to develop the project as the maintainer** — otherwise
+it is context, not a requirement, and external contributions go through standard GitHub issues
+and PRs.
+
+The project backlog lives in `backlog/`, an OKF bundle: one `Task` concept per file, named
+`NNN-slug.md` — active in `tasks/`, closed in `archive/` — plus one `Sprint` concept per sprint
+in `sprints/`. Developer docs and ADRs live in `docs/dev/`. Frontmatter is state: edits are
+surgical — change only the keys being updated, never reformat or round-trip a file. Full
+workflow (sprint lifecycle, gates, chat approval protocol): `backlog/workflow.md`.
 
 **Dogfooding rule:** always prefer readb itself for reading and querying the local OKF bundles
-(`backlog/`, `docs/dev/`) — do not fall back to `cat`/grep/manual file reads for what readb should
-answer. When readb fails or can't express what you need: stop, immediately record a new `Draft`
-task for the gap, and only then work around it. Tasks that block dogfooding readb take priority
-over the rest of the backlog.
+(`backlog/`, `docs/dev/`) — do not fall back to `cat`/grep/manual file reads for what readb
+should answer (e.g. `readb query "SELECT status, title FROM task" --bundle ./backlog`;
+frontmatter edits via `readb set`/`unset --bundle ./backlog <id> ...`). When readb fails or
+can't express what you need: stop, immediately record a new `Draft` task for the gap, and only
+then work around it. Tasks that block dogfooding readb take priority over the rest of the
+backlog.
 
 **Use the global readb on the project's own state:** manipulating this repo's bundles
-(`backlog/`, `docs/dev/`) is done with the globally run readb — `uvx readb` —
-never `uv run readb` from the working copy: code mid-change must not operate on the repo's own
+(`backlog/`, `docs/dev/`) is done with the globally run readb — `uvx readb` — never
+`uv run readb` from the working copy: code mid-change must not operate on the repo's own
 backlog. `uv run readb` is for exercising the code under development.
 
-Development runs in **sprints** (no PRs). At session start, check for an unfinished sprint
+At session start, check for an unfinished sprint
 (`SELECT __name, status, branch FROM sprint WHERE status NOT IN ('Done','Aborted')`; a missing
 `sprint` table means no sprint ever ran) and resume it from its branch; otherwise propose a
-scope from the `Draft` backlog. Scope approval =
-committing `backlog/sprints/sprint-NNN.md` to `main` and cutting branch `sprint/NNN`. Then: an
-interactive design phase (per-task `## Design` sections + `Proposed` ADRs; maintainer approval →
-design merge to `main`), an autonomous implementation phase (commit throughout; **stop and
-ask** on any decision that belongs to the maintainer — never guess), gates (`pytest` + `ruff` +
-an independent subagent review of the diff + a publication-hygiene check: third-person
-project voice, factual/dated/sourced claims about other projects, no personal or environment
-leakage — see `backlog/workflow.md` §5), a sprint summary, and on maintainer approval the final
-merge. Task lifecycle: `Draft → Designed → Done` (+ `Dropped`). ADRs live in `docs/dev/adr/` (in the
-developer-docs bundle); **only the maintainer approves ADRs**. All approvals happen in chat: present a
-separator, a short summary, the complete self-contained decision context (quote what matters;
-don't require reading files; batch approvals list every task with at least a one-line
-description), key-file references for double-clicking, then the explicit question(s). Full
-workflow: `backlog/workflow.md`.
-
-## Stack
-
-- Python >=3.11 (developed on 3.14, pinned in `.python-version`).
-- uv for env/deps; hatchling build backend; src layout.
-- pytest for tests, ruff for lint/format.
-- Key libraries: duckdb (engine), pyyaml (frontmatter), click (CLI).
-
-## Commit convention
-
-Conventional Commits (`feat`, `fix`, `docs`, `design`, `refactor`, `test`, `chore`, `perf`,
-`style`). `design` marks sprint design-phase commits (task `## Design` sections, `Proposed`
-ADRs). Scopes match components (e.g. `loader`, `schema`, `cli`). If a coding agent helped
-write a commit, add a `Co-Authored-By` trailer for the model that helped (e.g.
-`Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>`); otherwise no attribution.
-Never add `Claude-Session:` or other private session-link trailers — the repo and its history
-are public-bound (publication-hygiene gate, `backlog/workflow.md` §5).
+scope from the `Draft` backlog. **Stop and ask** on any decision that belongs to the
+maintainer — never guess. **Only the maintainer approves ADRs.** All approvals happen in chat
+and must be self-contained.
