@@ -7,7 +7,7 @@ priority: low
 tags:
 - docs
 created: 2026-07-17
-timestamp: '2026-07-17T00:00:00Z'
+timestamp: '2026-08-06T00:00:00Z'
 ---
 
 Surfaced by [research-similar-tools](../archive/006-research-similar-tools.md) (sprint-002): the survey found
@@ -47,3 +47,32 @@ not a feature list.
   intent" choice, so readers don't file it as a missing feature.
 - Full comparison lives in `research-similar-tools.md`'s `## Findings`; link it rather than
   duplicating.
+
+## Design
+
+Approved in chat 2026-08-06 (sprint-003).
+
+A single `## Prior art` section in `README.md`, roughly a dozen lines, placed after
+`## Type inference` and before `## Development` — late enough that the reader already knows what
+readb does, early enough to be found before the contributor material.
+
+Structure:
+
+1. **Lead with the differentiator, not a feature list**: the index is transparent and
+   disposable — point at a directory and query; there is no database to create, migrate, or
+   regenerate. Note honestly that the architecture itself is not novel.
+2. **The three neighbours**, one line each, factual and linked: **frontmatter-mcp** (DuckDB SQL
+   over frontmatter, packaged as an MCP server — the closest architectural twin), **MarkdownDB**
+   (JS/TS, same load-into-SQL architecture, but a managed on-disk index the user maintains),
+   **Obsidian Dataview** (the non-SQL alternative, and what most people mean by "query my
+   markdown").
+3. **One sentence on the field editor being deliberately string-literal** — no `key=42` → int
+   inference — so a reader files it as a choice, not a gap.
+4. A link to the full survey in
+   [`docs/dev/research/similar-tools.md`](../../docs/dev/research/similar-tools.md) instead of
+   duplicating it.
+
+Adoption figures are **re-checked and re-dated at implementation** rather than copied from the
+2026-07-17 survey, so the README's dated claim is current when it ships. Tone follows the
+publication-hygiene gate: state facts, cite dates, never disparage — the neighbours are
+described by what they do, not by what they lack.

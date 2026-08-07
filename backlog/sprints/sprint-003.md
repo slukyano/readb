@@ -50,33 +50,41 @@ Scope-time bookkeeping, already committed with this file:
 
 Design phase (a checked box = `## Design` section written and discussed):
 
-- [ ] 026-field-editor-multiline-corruption — span detection for multi-line values; decide `set`'s
-      behavior on a multi-line key (lossy overwrite vs. refuse) and whether a re-parse guard lands
-- [ ] 025-ship-usage-skill — content and distribution shape of the shipped usage skill
-      (repo directory, wheel packaging, or both); usage-only, no process material
-- [ ] 019-readme-prior-art — the prior-art note, led by the transparent-disposable-index framing
-- [ ] 023-release-automation — tag-triggered build + publish via OIDC Trusted Publishing; note
-      that `ci.yml`, `CHANGELOG.md` and `CONTRIBUTING.md` already landed on `main` outside a sprint
+- [x] 026-field-editor-multiline-corruption — span detection; `set` refuses a multi-line key,
+      `unset` deletes the whole span, `get` stops returning `""`; re-parse guard on the write path
+- [x] 025-ship-usage-skill — canonical `src/readb/skill/SKILL.md` shipped in the wheel; read-only
+      `readb skill` prints content (`--path` for the location); examples pinned by tests
+- [x] 019-readme-prior-art — `## Prior art` after Type inference, led by the
+      transparent-disposable-index framing; adoption figures re-checked at implementation
+- [x] 023-release-automation — tag-triggered `release.yml` on `pypa/gh-action-pypi-publish`
+      (it generates PEP 740 attestations; `uv publish` does not); `ci.yml`, `CHANGELOG.md` and
+      `CONTRIBUTING.md` already landed on `main` outside a sprint
 
 ## Implementation checklist (in order)
 
 1. [ ] 026-field-editor-multiline-corruption
 2. [ ] 025-ship-usage-skill
 3. [ ] 019-readme-prior-art
-4. [ ] 023-release-automation
-5. [ ] Gates: `pytest` + `ruff` + independent subagent review of the sprint diff
+4. [ ] Public-surface sweep — README, CLI help, package metadata carry no trace of this
+       project's development process (maintainer instruction, 2026-08-06)
+5. [ ] 023-release-automation
+6. [ ] Gates: `pytest` + `ruff` + independent subagent review of the sprint diff
 
 ## Open questions
 
-- **Scope addition** (raised 2026-08-06, at sprint start): the maintainer approved `025`, `019`,
-  `023`; the agent added `026` on discovering it while executing the approved bookkeeping fix.
-  Confirm or drop before design starts.
-- **`023` hand-off**: configuring the PyPI trusted publisher is a maintainer action the agent
-  cannot perform. Approved at scoping as an in-sprint hand-off — the agent writes and tests the
-  workflow, the maintainer flips the PyPI setting before the first tag.
+- **`023` hand-off** (open, maintainer action): configuring the PyPI trusted publisher — owner
+  `slukyano`, repo `readb`, workflow `release.yml`, environment `pypi`, and the same on TestPyPI
+  for the rehearsal. Approved at scoping; the workflow lands first and is verified once the
+  setting exists.
+
+Resolved:
+
+- **Scope addition** (2026-08-06) — `026` confirmed in scope by the maintainer.
 
 ## Session log
 
 - **2026-08-06** — Scope approved in chat (`ship-usage-skill`, `readme-prior-art`,
   `release-automation`). Sprint created, branch `sprint/003`. Scoping turned up the field-editor
-  multi-line corruption bug; recorded as `026` and added to scope pending confirmation.
+  multi-line corruption bug; recorded as `026`, confirmed into scope. Design phase completed the
+  same day: all four `## Design` sections written; the publishing mechanism decided against
+  `uv publish` on the attestation evidence; a public-surface sweep added to implementation.
