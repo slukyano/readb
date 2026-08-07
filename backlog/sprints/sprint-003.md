@@ -10,7 +10,7 @@ tasks:
 - 019-readme-prior-art
 - 023-release-automation
 created: 2026-08-06
-timestamp: '2026-08-06T00:00:00Z'
+timestamp: '2026-08-07T00:00:00Z'
 ---
 
 Third sprint under the [session/sprint workflow](../workflow.md), and the first after 0.1.0
@@ -27,7 +27,7 @@ the agent: correcting `release-automation`'s stale `blocked_by` — the one book
 approved at scoping — corrupted the file, because the line-based editor orphans the continuation
 lines of any multi-line value. It is data loss in readb's only write path and it blocks
 dogfooded frontmatter edits, so it leads the sprint (workflow: dogfooding-blocking tasks take
-priority). Pending the maintainer's confirmation of the addition.
+priority). Confirmed in scope by the maintainer, 2026-08-06.
 
 Deliberately out of scope: `measure-agent-efficiency` (largest task in the backlog — corpus
 generation, harness, repeat runs; also wants `ship-usage-skill` to exist first, for its third
@@ -52,8 +52,8 @@ Design phase (a checked box = `## Design` section written and discussed):
 
 - [x] 026-field-editor-multiline-corruption — span detection; `set` refuses a multi-line key,
       `unset` deletes the whole span, `get` stops returning `""`; re-parse guard on the write path
-- [x] 025-ship-usage-skill — canonical `src/readb/skill/SKILL.md` shipped in the wheel; read-only
-      `readb skill` prints content (`--path` for the location); examples pinned by tests
+- [x] 025-ship-usage-skill — ⚠️ revised 2026-08-07: the repo becomes its own plugin marketplace
+      (`.claude-plugin/` + `skills/readb/SKILL.md`); no wheel packaging, no `readb skill` command
 - [x] 019-readme-prior-art — `## Prior art` after Type inference, led by the
       transparent-disposable-index framing; adoption figures re-checked at implementation
 - [x] 023-release-automation — tag-triggered `release.yml` on `pypa/gh-action-pypi-publish`
@@ -72,6 +72,12 @@ Design phase (a checked box = `## Design` section written and discussed):
 
 ## Open questions
 
+- **Rust rewrite vs. `023`** (raised by the maintainer 2026-08-07): if readb leaves Python, a PyPI
+  release pipeline is the wrong investment order. Recorded as
+  [028-evaluate-rust-rewrite](../tasks/028-evaluate-rust-rewrite.md) with the measured evidence.
+  The agent's reading: keep `023` — the workflow's skeleton survives any rewrite and a Python 0.x
+  line would keep releasing through a transition — but the maintainer decides whether `023` stays
+  in this sprint.
 - **`023` hand-off** (open, maintainer action): configuring the PyPI trusted publisher — owner
   `slukyano`, repo `readb`, workflow `release.yml`, environment `pypi`, and the same on TestPyPI
   for the rehearsal. Approved at scoping; the workflow lands first and is verified once the
@@ -88,3 +94,10 @@ Resolved:
   multi-line corruption bug; recorded as `026`, confirmed into scope. Design phase completed the
   same day: all four `## Design` sections written; the publishing mechanism decided against
   `uv publish` on the attestation evidence; a public-surface sweep added to implementation.
+- **2026-08-07** — Design review with the maintainer. `025` reworked: the skill leaves `src/` and
+  the repository becomes its own plugin marketplace; the `readb skill` command and wheel packaging
+  are dropped. `019`'s exact README text drafted into the task, with figures re-checked — the
+  survey's "MarkdownDB stalled since March 2024" is stale and the repository has moved to
+  `flowershow/markdowndb`. New drafts:
+  [027-plugin-marketplace-submission](../tasks/027-plugin-marketplace-submission.md),
+  [028-evaluate-rust-rewrite](../tasks/028-evaluate-rust-rewrite.md).
