@@ -19,6 +19,11 @@ All notable changes to readb are documented here, following
 
 ### Added
 
+- An agent skill teaching how to use readb — the data model, the command surface, and worked SQL
+  — shipped from this repository, which now doubles as a plugin marketplace
+  (`/plugin marketplace add slukyano/readb`, then `/plugin install readb@readb`). The skill lives
+  at `skills/readb/SKILL.md` as a portable folder for runtimes that read skill directories
+  directly, and its SQL examples are executed by the test suite so they cannot drift.
 - Frontmatter writes are verified before they land: an edit that would turn valid frontmatter
   into invalid frontmatter is abandoned with an error and the file is left unchanged.
 

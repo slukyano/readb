@@ -114,6 +114,21 @@ type is stored as a `JSON` column — nothing is dropped, and producer intent is
 (strings are never split or parsed). The reserved `tags` field is always a `LIST`. Run
 `readb schema` to see the inferred type of every column.
 
+## Using readb with an agent
+
+This repository doubles as a plugin marketplace, so an agent installs readb's usage guidance the
+same way it installs anything else:
+
+```sh
+/plugin marketplace add slukyano/readb
+/plugin install readb@readb
+```
+
+The skill covers the data model, the command surface, and worked SQL. Its examples are executed
+by readb's own test suite, so they cannot quietly drift from the tool. For runtimes that read
+skill folders directly, [`skills/readb/SKILL.md`](skills/readb/SKILL.md) is a portable folder to
+symlink or copy — nothing in it is specific to one agent.
+
 ## Development
 
 Contributions are welcome — see [`CONTRIBUTING.md`](CONTRIBUTING.md); release history is in
