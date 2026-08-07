@@ -144,8 +144,10 @@ readb unset --bundle ./library dune notes
 
 Two constraints follow from that narrowness:
 
-- **Values are written as strings.** `rating=5` writes `5` with no type conversion; readb does
-  not infer int, bool, or list from command-line syntax, on purpose.
+- **The value is written verbatim, and readb converts nothing.** `rating=5` writes
+  `rating: 5`, which YAML then reads back as the number `5`. There is no syntax for lists or
+  nested values. Values YAML would misread are quoted so they survive as text: `flag=true`
+  writes `flag: 'true'` and stays the string `true`, not a boolean.
 - **Multi-line values are refused by `set`.** A key whose value is a list, block scalar, or
   nested mapping cannot be overwritten with a scalar — `unset` it first if that is the intent.
   `unset` removes such a value in full, and `readb get` returns it as its raw YAML fragment.

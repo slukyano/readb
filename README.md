@@ -152,8 +152,8 @@ Neighbours worth knowing (checked 2026-08-07):
 
 readb differs in packaging and constraints rather than in engine: an OKF bundle in, an in-memory
 DuckDB out, a load and query path that never writes, and exactly one narrow write path — the
-frontmatter field editor, which is deliberately string-literal (`readb set n=42` writes the
-string `42`; producer intent is never guessed).
+frontmatter field editor, which writes the value it is given verbatim and offers no syntax for
+lists or nested values — producer intent is never inferred from the command line.
 
 The full survey, including the tools not listed here, is in
 [`docs/dev/research/similar-tools.md`](docs/dev/research/similar-tools.md).
