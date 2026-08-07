@@ -40,6 +40,11 @@ dev = [
 [tool.hatch.build.targets.wheel]
 packages = ["src/readb"]
 
+[tool.hatch.build.targets.sdist]
+# The sdist is a public artifact. It carries the package, its tests, and the user-facing docs;
+# this project's own development process is not part of readb and stays out of it.
+exclude = ["backlog", "docs", ".readb", "AGENTS.md", "CLAUDE.md"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 # Never collect the cloned upstream fixtures (they ship their own, unrelated test suite).
