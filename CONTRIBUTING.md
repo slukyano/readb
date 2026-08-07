@@ -42,16 +42,28 @@ the contributor path is standard issues and pull requests, as above.
 
 ## Releasing
 
-Releases are cut by the maintainer. The procedure (manual until
-automation lands — backlog task `023-release-automation`):
+Releases are cut by the maintainer. Pushing the tag is the release: everything after it runs in
+[`.github/workflows/release.yml`](.github/workflows/release.yml).
 
-1. **Checks are green** on the commit being released — the declared checks and CI on `main`.
-2. **Bump the version** in `pyproject.toml` (the single version source).
-3. **Close the changelog section**: rename `Unreleased` to `[X.Y.Z] - YYYY-MM-DD`, add a fresh
-   empty `Unreleased`, and update the comparison links at the bottom.
-4. **Commit** as `chore(release): vX.Y.Z`.
-5. **Tag and push**: `git tag vX.Y.Z && git push origin main --tags`.
-6. **Build and publish**: `uv build`, then publish to PyPI (`uv publish`; rehearse against
-   TestPyPI when in doubt), and create the GitHub release with the changelog section as notes.
-7. **Verify** — the release exists with the expected artifacts and notes, `uv tool install
-   readb` works from a clean environment, and the README badges resolve.
+1. **Bump the version** in `pyproject.toml` (the single version source) and in
+   `.claude-plugin/plugin.json`, which a test keeps in step with it.
+2. **Close the changelog section**: rename `Unreleased` to `[X.Y.Z] - YYYY-MM-DD`, add a fresh
+   empty `Unreleased`, and update the comparison links at the bottom. This section becomes the
+   GitHub release notes verbatim, so an empty one fails the release.
+3. **Commit** as `chore(release): vX.Y.Z`, and let CI go green on `main`.
+4. **Tag and push**: `git tag vX.Y.Z && git push origin main --tags`.
+5. **Watch the workflow.** It refuses a tag that disagrees with `pyproject.toml`, re-runs the
+   declared checks against the tagged commit, builds, runs `twine check`, publishes to PyPI, and
+   creates the GitHub release with the changelog section as its notes and the artifacts attached.
+6. **Verify** — `uv tool install readb` works from a clean environment and the README badges
+   resolve.
+
+Publishing uses [PyPI Trusted Publishing](https://docs.pypi.org/trusted-publishers/): the
+workflow authenticates with a short-lived OIDC token, so the repository holds no PyPI
+credentials. Only the publishing job is granted `id-token: write`, and it runs in a GitHub
+environment (`pypi`, or `testpypi` for rehearsals) whose name must match the trusted publisher
+configured on the registry. `pypa/gh-action-pypi-publish` also signs each distribution and
+uploads PEP 740 attestations by default.
+
+To rehearse the whole path without releasing, run the workflow manually
+(**Actions → Release → Run workflow**) with the target `testpypi`.

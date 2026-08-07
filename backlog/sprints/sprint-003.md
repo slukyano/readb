@@ -67,7 +67,7 @@ Design phase (a checked box = `## Design` section written and discussed):
 3. [x] 019-readme-prior-art — `## Prior art` added, figures re-checked 2026-08-07
 4. [x] Public-surface sweep — CLI help/docstrings and package metadata were already clean; the
        README's examples moved from `tasks`/`docs/adr`/`task` to the neutral `library` bundle
-5. [ ] 023-release-automation
+5. [x] 023-release-automation — release.yml (tag guard, checks, build, Trusted Publishing, changelog-sourced GitHub release) + tested extractor; PyPI-side config still with the maintainer
 6. [ ] Gates: `pytest` + `ruff` + independent subagent review of the sprint diff
 
 ## Open questions
