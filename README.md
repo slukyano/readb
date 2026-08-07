@@ -41,22 +41,25 @@ For development from a clone, see [Development](#development).
 
 ## Usage
 
-Library:
+The examples below query `./library`, a bundle of book notes: markdown files whose frontmatter
+carries `type: Book` or `type: Author`.
+
+Python API:
 
 ```python
 import readb
 
-db = readb.open("./path/to/bundle")          # builds an in-memory DuckDB; no files written
-rows = db.sql("SELECT * FROM __DOCUMENTS WHERE type = 'Metric'")
+db = readb.open("./library")                 # builds an in-memory DuckDB; no files written
+rows = db.sql("SELECT title, year FROM book WHERE year < 1980")
 ```
 
 CLI:
 
 ```sh
-readb query "SELECT * FROM __DOCUMENTS" --bundle ./path       # results as a table
-readb query "SELECT * FROM __DOCUMENTS" --bundle ./path --format json   # or csv | tsv | raw
-readb schema --bundle ./path                                  # detected types, tables, columns
-readb show --bundle ./path some-concept                       # a concept's body, by name
+readb query "SELECT * FROM __DOCUMENTS" --bundle ./library     # results as a table
+readb query "SELECT * FROM book" --bundle ./library --format json   # or csv | tsv | raw
+readb schema --bundle ./library                                # detected types, tables, columns
+readb show --bundle ./library dune                             # a concept's body, by name
 ```
 
 Concepts are addressed wiki-style: a simple file name (`some-concept`) when it is unique in
@@ -72,8 +75,8 @@ addressing.
 bundle because you said so once):
 
 ```sh
-readb init tasks docs/adr    # in the project root: writes .readb/config.toml (commit it)
-cd tasks && readb query "SELECT count(*) FROM task"   # bundle resolved by walking up
+readb init library notes    # in the project root: writes .readb/config.toml (commit it)
+cd library && readb query "SELECT count(*) FROM book"   # bundle resolved by walking up
 ```
 
 Commands without `--bundle` walk up from the cwd to the nearest `.readb/` registry, then pick
@@ -87,7 +90,7 @@ it is never read as bundle content.
 readb only addresses files inside the bundle root: a `../` path or a symlink that resolves
 outside the bundle is not supported and is refused with an explicit error (by name and by
 path alike). `--format raw` prints values verbatim, so
-`readb query "SELECT __raw FROM task WHERE __name = 'x'" --format raw` is exactly `cat`.
+`readb query "SELECT __raw FROM book WHERE __name = 'dune'" --format raw` is exactly `cat`.
 
 ## Tables and views
 
@@ -128,6 +131,32 @@ The skill covers the data model, the command surface, and worked SQL. Its exampl
 by readb's own test suite, so they cannot quietly drift from the tool. For runtimes that read
 skill folders directly, [`skills/readb/SKILL.md`](skills/readb/SKILL.md) is a portable folder to
 symlink or copy — nothing in it is specific to one agent.
+
+## Prior art
+
+readb's architecture is not novel: load markdown frontmatter into a SQL engine, then query it
+with SQL. What differs is that **the index is transparent and disposable** — point readb at a
+directory and query it. There is no database to create, migrate, regenerate, or keep in sync;
+the markdown files are the only state.
+
+Neighbours worth knowing (checked 2026-08-07):
+
+- **[frontmatter-mcp](https://github.com/kzmshx/frontmatter-mcp)** — queries markdown frontmatter
+  with DuckDB SQL, packaged as an MCP server. The closest architectural twin (1★, last commit
+  2025-12).
+- **[MarkdownDB](https://github.com/flowershow/markdowndb)** — a JS/TS library that indexes
+  markdown into SQLite, MySQL, or Postgres and runs SQL over that index, which you build and
+  refresh as a managed artifact (499★, last commit 2026-05).
+- **[Obsidian Dataview](https://github.com/blacksmithgu/obsidian-dataview)** — the widely used
+  non-SQL alternative, with its own DQL query language, inside Obsidian (9.3k★).
+
+readb differs in packaging and constraints rather than in engine: an OKF bundle in, an in-memory
+DuckDB out, a load and query path that never writes, and exactly one narrow write path — the
+frontmatter field editor, which is deliberately string-literal (`readb set n=42` writes the
+string `42`; producer intent is never guessed).
+
+The full survey, including the tools not listed here, is in
+[`docs/dev/research/similar-tools.md`](docs/dev/research/similar-tools.md).
 
 ## Development
 

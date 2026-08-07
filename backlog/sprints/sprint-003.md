@@ -64,9 +64,9 @@ Design phase (a checked box = `## Design` section written and discussed):
 
 1. [x] 026-field-editor-multiline-corruption — span-based get/set/unset + write-path guard; 18 new tests (147 total)
 2. [x] 025-ship-usage-skill — plugin + marketplace manifests, portable skills/readb/SKILL.md, neutral library fixture, examples executed by tests
-3. [ ] 019-readme-prior-art
-4. [ ] Public-surface sweep — README, CLI help, package metadata carry no trace of this
-       project's development process (maintainer instruction, 2026-08-06)
+3. [x] 019-readme-prior-art — `## Prior art` added, figures re-checked 2026-08-07
+4. [x] Public-surface sweep — CLI help/docstrings and package metadata were already clean; the
+       README's examples moved from `tasks`/`docs/adr`/`task` to the neutral `library` bundle
 5. [ ] 023-release-automation
 6. [ ] Gates: `pytest` + `ruff` + independent subagent review of the sprint diff
 
