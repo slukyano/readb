@@ -3,14 +3,19 @@
 readb is a read-only SQL layer over a bundle: loading and querying a bundle never mutate it. This
 module is the one deliberate, clearly-separated exception — an explicit frontmatter field editor
 exposed via the ``readb get`` / ``readb set`` / ``readb unset`` commands, never through the
-SQL/query path. Edits are line-based: only the targeted ``key: value`` lines change, so lists,
+SQL/query path. Edits are line-based: only the targeted key's own lines change, so other fields,
 the body, and unrelated formatting stay byte-for-byte intact, which keeps diffs small and
 reviewable. It intentionally does NOT round-trip through a YAML parser (that would reflow,
-reorder, and re-quote the whole block). Scope is single-line scalar fields (e.g. ``status``,
-``claimed_by``, ``claimed_at``, ``timestamp``).
+reorder, and re-quote the whole block).
 
-Stdlib only — deliberately independent of the parser/loader, so it never loads the bundle to
-edit one file.
+A key is addressed by its *span* — the ``key:`` line plus every continuation line of its value
+(block sequences, block scalars, nested mappings) — so that removing or replacing a field cannot
+orphan the rest of its value into invalid YAML. Writing is still scalar-only: ``set`` refuses a
+key whose value spans multiple lines rather than silently discarding it.
+
+PyYAML is used in exactly one place — verifying, never producing: a rewrite that would turn
+valid frontmatter invalid is abandoned before the file is touched. Output always comes from the
+line editor, so the no-round-trip guarantee holds. Nothing here loads the bundle to edit one file.
 """
 
 from __future__ import annotations
@@ -18,6 +23,8 @@ from __future__ import annotations
 import re
 from collections.abc import Callable
 from pathlib import Path
+
+import yaml
 
 _DELIM = "---"
 _KEY_LINE = re.compile(r"^([A-Za-z0-9_-]+)\s*:")
@@ -27,11 +34,19 @@ _RESERVED_WORDS = {"true", "false", "null", "yes", "no", "on", "off", "~"}
 
 
 class FrontmatterError(Exception):
-    """Raised when a file to be edited has no YAML frontmatter block to write into."""
+    """Raised when a frontmatter edit cannot be performed safely."""
+
+
+class MultilineValueError(FrontmatterError):
+    """Raised when ``set`` targets a key whose value spans more than one line."""
 
 
 def get_field(path: Path, key: str) -> str | None:
-    """Return the scalar value of ``key`` in ``path``'s frontmatter, or None if absent.
+    """Return the value of ``key`` in ``path``'s frontmatter, or None if absent.
+
+    Single-line scalars come back unquoted. A value spanning several lines (a block sequence,
+    block scalar, or nested mapping) comes back as the raw YAML fragment, exactly as written —
+    a multi-line field is never reported as an empty string.
 
     Reads are forgiving: a file with no frontmatter block is treated as having no fields
     (returns None), never an error.
@@ -46,6 +61,12 @@ def get_field(path: Path, key: str) -> str | None:
 def set_fields(path: Path, pairs: list[tuple[str, str]]) -> None:
     """Set each ``key=value`` in ``path``'s frontmatter in place, appending keys that are absent.
 
+    Values are written as scalars. A key whose current value spans several lines raises
+    :class:`MultilineValueError` — replacing a list or block scalar with a scalar would discard
+    data the caller never named. Unset the key first if that is genuinely the intent.
+
+    All-or-nothing: if any pair is refused, the file is left untouched.
+
     Raises :class:`FrontmatterError` if the file has no frontmatter block to write into.
     """
     _rewrite(path, lambda frontmatter: _set(frontmatter, pairs))
@@ -54,19 +75,44 @@ def set_fields(path: Path, pairs: list[tuple[str, str]]) -> None:
 def unset_fields(path: Path, keys: list[str]) -> None:
     """Remove each key in ``keys`` from ``path``'s frontmatter in place (absent keys ignored).
 
+    A key's whole value is removed, continuation lines included.
+
     Raises :class:`FrontmatterError` if the file has no frontmatter block.
     """
     _rewrite(path, lambda frontmatter: _unset(frontmatter, keys))
 
 
 def _rewrite(path: Path, transform: Callable[[list[str]], list[str]]) -> None:
-    """Read ``path``, apply ``transform`` to its frontmatter lines, and write it back in place."""
+    """Read ``path``, apply ``transform`` to its frontmatter lines, and write it back in place.
+
+    The write is abandoned if it would turn parseable frontmatter into unparseable frontmatter.
+    A file whose frontmatter is *already* broken is still editable: the guard forbids introducing
+    invalidity, it does not make readb the one tool that refuses to touch a damaged file.
+    """
     parts = _split_frontmatter(path.read_text(encoding="utf-8"))
     if parts is None:
         raise FrontmatterError(f"{path}: no YAML frontmatter block found")
     opening, frontmatter, remainder = parts
-    frontmatter = transform(frontmatter)
-    path.write_text("".join(opening) + "".join(frontmatter) + "".join(remainder), encoding="utf-8")
+    edited = transform(frontmatter)
+    if _yaml_error(frontmatter) is None:
+        broken = _yaml_error(edited)
+        if broken is not None:
+            raise FrontmatterError(
+                f"{path}: edit would produce invalid YAML frontmatter, file left unchanged "
+                f"({broken})"
+            )
+    path.write_text("".join(opening) + "".join(edited) + "".join(remainder), encoding="utf-8")
+
+
+def _yaml_error(frontmatter: list[str]) -> str | None:
+    """Return a one-line reason why ``frontmatter`` is not a usable YAML mapping, else None."""
+    try:
+        parsed = yaml.safe_load("".join(frontmatter))
+    except yaml.YAMLError as exc:
+        return " ".join(str(exc).split())
+    if parsed is not None and not isinstance(parsed, dict):
+        return "frontmatter is not a mapping"
+    return None
 
 
 def _split_frontmatter(text: str) -> tuple[list[str], list[str], list[str]] | None:
@@ -105,36 +151,69 @@ def _unquote(raw: str) -> str:
     return raw
 
 
+def _span(frontmatter: list[str], key: str) -> tuple[int, int] | None:
+    """Return the half-open line range ``key``'s whole entry occupies, or None if absent.
+
+    The span starts at the ``key:`` line and runs to the next top-level key (or the end of the
+    block). Trailing blank lines and column-0 comments are trimmed back out, so a comment
+    introducing the *next* field survives the removal of this one.
+    """
+    key_line = re.compile(rf"^{re.escape(key)}\s*:")
+    start = next((i for i, line in enumerate(frontmatter) if key_line.match(line)), None)
+    if start is None:
+        return None
+    end = start + 1
+    while end < len(frontmatter) and not _KEY_LINE.match(frontmatter[end]):
+        end += 1
+    while end - 1 > start and _is_trailing_filler(frontmatter[end - 1]):
+        end -= 1
+    return start, end
+
+
+def _is_trailing_filler(line: str) -> bool:
+    """True for a blank line or a column-0 comment — never part of the value above it."""
+    return not line.strip() or line.startswith("#")
+
+
 def _get(frontmatter: list[str], key: str) -> str | None:
-    pattern = re.compile(rf"^{re.escape(key)}\s*:\s*(.*?)\s*$")
-    for line in frontmatter:
-        match = pattern.match(line)
-        if match:
-            return _unquote(match.group(1))
-    return None
+    span = _span(frontmatter, key)
+    if span is None:
+        return None
+    start, end = span
+    inline = frontmatter[start].split(":", 1)[1]
+    if end - start == 1:
+        return _unquote(inline)
+    # A multi-line value is returned verbatim: the indicator or fragment left on the key line
+    # (often empty, or "|" for a block scalar) followed by its continuation lines.
+    continuation = "".join(frontmatter[start + 1 : end]).rstrip("\n")
+    inline = inline.strip()
+    return f"{inline}\n{continuation}" if inline else continuation
 
 
 def _set(frontmatter: list[str], pairs: list[tuple[str, str]]) -> list[str]:
     out = list(frontmatter)
     for key, value in pairs:
-        key_pattern = re.compile(rf"^{re.escape(key)}\s*:.*$")
         new_line = f"{key}: {_format(value)}\n"
-        for idx, line in enumerate(out):
-            if key_pattern.match(line):
-                out[idx] = new_line if line.endswith("\n") else new_line.rstrip("\n")
-                break
-        else:
+        span = _span(out, key)
+        if span is None:
             if out and not out[-1].endswith("\n"):
                 out[-1] += "\n"
             out.append(new_line)
+            continue
+        start, end = span
+        if end - start > 1:
+            raise MultilineValueError(
+                f"{key}: multi-line value (list, block scalar, or nested mapping); "
+                f"readb set writes scalar values only — unset the key first"
+            )
+        out[start] = new_line if out[start].endswith("\n") else new_line.rstrip("\n")
     return out
 
 
 def _unset(frontmatter: list[str], keys: list[str]) -> list[str]:
-    drop = set(keys)
-    return [line for line in frontmatter if not _is_key(line, drop)]
-
-
-def _is_key(line: str, keys: set[str]) -> bool:
-    match = _KEY_LINE.match(line)
-    return bool(match and match.group(1) in keys)
+    out = list(frontmatter)
+    for key in keys:
+        # Loop: a duplicated key is removed in full, as it was before spans existed.
+        while (span := _span(out, key)) is not None:
+            del out[span[0] : span[1]]
+    return out

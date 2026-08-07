@@ -5,6 +5,23 @@ All notable changes to readb are documented here, following
 
 ## [Unreleased]
 
+### Fixed
+
+- `readb set` and `readb unset` no longer corrupt a frontmatter key whose value spans several
+  lines (a list, a `|`/`>` block scalar, or a nested mapping). They previously rewrote or removed
+  only the `key:` line and left the rest of the value behind as invalid YAML, after which the
+  permissive loader skipped the concept silently. Each key is now addressed as a whole span:
+  `unset` removes the value entirely, and `set` refuses a multi-line key — with a message saying
+  to unset it first — instead of discarding a value you did not name. A refusal leaves the file
+  untouched even when other assignments in the same command were valid.
+- `readb get` returns a multi-line value as the raw YAML fragment. It previously reported an
+  empty string, indistinguishable from an empty scalar.
+
+### Added
+
+- Frontmatter writes are verified before they land: an edit that would turn valid frontmatter
+  into invalid frontmatter is abandoned with an error and the file is left unchanged.
+
 ## [0.1.0] - 2026-07-21
 
 Initial release.

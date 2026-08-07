@@ -10,6 +10,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+import yaml
 from click.testing import CliRunner, Result
 
 from readb import fields
@@ -105,6 +106,153 @@ def test_set_without_frontmatter_raises(tmp_path: Path) -> None:
     _bundle(tmp_path, text="# body only\n")
     with pytest.raises(fields.FrontmatterError):
         fields.set_fields(tmp_path / "okf-demo.md", [("status", "Refined")])
+
+
+# --------------------------------------------------------------------------------------------
+# Multi-line values.
+#
+# A key's value can span several lines — a block sequence, a block scalar, a nested mapping.
+# Editing only the "key:" line orphans the rest into invalid YAML, and the permissive loader
+# then skips the concept silently, so the damage is invisible. Every edit therefore addresses
+# the key's whole span.
+# --------------------------------------------------------------------------------------------
+
+# Each multi-line form, plus a column-0 sequence (the shape that first exposed the bug) and a
+# comment that documents the key after it.
+MULTILINE = """\
+---
+type: Task
+blocked_by:
+- alpha
+- beta
+note: |
+  line one
+  line two
+owner:
+  name: someone
+  team: infra
+# introduces the next key
+after: tail
+---
+
+body
+"""
+
+
+def _yaml_loads(path: Path) -> dict:
+    """Parse a file's frontmatter the way the loader does, failing the test if it is broken."""
+    block = path.read_text(encoding="utf-8").split("---\n")[1]
+    return yaml.safe_load(block)
+
+
+@pytest.mark.parametrize(
+    ("key", "expected"),
+    [
+        ("blocked_by", "- alpha\n- beta"),
+        ("note", "|\n  line one\n  line two"),
+        ("owner", "  name: someone\n  team: infra"),
+    ],
+)
+def test_get_returns_multiline_value_verbatim(tmp_path: Path, key: str, expected: str) -> None:
+    # Regression: these used to come back as "", indistinguishable from an empty scalar.
+    _bundle(tmp_path, text=MULTILINE)
+    assert fields.get_field(tmp_path / "okf-demo.md", key) == expected
+
+
+@pytest.mark.parametrize("key", ["blocked_by", "note", "owner"])
+def test_set_refuses_multiline_key(tmp_path: Path, key: str) -> None:
+    _bundle(tmp_path, text=MULTILINE)
+    path = tmp_path / "okf-demo.md"
+    with pytest.raises(fields.MultilineValueError, match=key):
+        fields.set_fields(path, [(key, "scalar")])
+    assert path.read_text(encoding="utf-8") == MULTILINE  # untouched
+
+
+def test_set_multiline_refusal_is_all_or_nothing(tmp_path: Path) -> None:
+    _bundle(tmp_path, text=MULTILINE)
+    path = tmp_path / "okf-demo.md"
+    with pytest.raises(fields.MultilineValueError):
+        fields.set_fields(path, [("status", "Draft"), ("note", "scalar")])
+    # The valid pair in the same call must not have landed.
+    assert path.read_text(encoding="utf-8") == MULTILINE
+    assert fields.get_field(path, "status") is None
+
+
+@pytest.mark.parametrize("key", ["blocked_by", "note", "owner"])
+def test_unset_removes_the_whole_span(tmp_path: Path, key: str) -> None:
+    _bundle(tmp_path, text=MULTILINE)
+    path = tmp_path / "okf-demo.md"
+    fields.unset_fields(path, [key])
+    parsed = _yaml_loads(path)  # still valid YAML — the orphaned-continuation bug
+    assert key not in parsed
+    assert parsed["type"] == "Task"
+    assert parsed["after"] == "tail"
+
+
+def test_unset_preserves_a_comment_documenting_the_next_key(tmp_path: Path) -> None:
+    _bundle(tmp_path, text=MULTILINE)
+    path = tmp_path / "okf-demo.md"
+    fields.unset_fields(path, ["owner"])
+    assert "# introduces the next key\nafter: tail\n" in path.read_text(encoding="utf-8")
+
+
+def test_unset_column_zero_sequence_regression(tmp_path: Path) -> None:
+    """The exact shape that broke: `blocked_by:` with its items unindented at column 0."""
+    text = (
+        "---\ntype: Task\nblocked_by:\n- publish-readb-0-1-0\ntimestamp: '2026-07-20'\n---\n\nb\n"
+    )
+    _bundle(tmp_path, text=text)
+    path = tmp_path / "okf-demo.md"
+    fields.unset_fields(path, ["blocked_by"])
+    assert path.read_text(encoding="utf-8") == (
+        "---\ntype: Task\ntimestamp: '2026-07-20'\n---\n\nb\n"
+    )
+    assert _yaml_loads(path) == {"type": "Task", "timestamp": "2026-07-20"}
+
+
+def test_single_line_edits_stay_byte_identical_around_multiline_neighbours(tmp_path: Path) -> None:
+    _bundle(tmp_path, text=MULTILINE)
+    path = tmp_path / "okf-demo.md"
+    fields.set_fields(path, [("type", "Note")])
+    assert path.read_text(encoding="utf-8") == MULTILINE.replace("type: Task", "type: Note")
+
+
+# --------------------------------------------------------------------------------------------
+# The write-path guard: a rewrite may never turn valid frontmatter into invalid frontmatter.
+# --------------------------------------------------------------------------------------------
+
+
+def test_guard_abandons_a_write_that_would_break_the_frontmatter(tmp_path: Path) -> None:
+    _bundle(tmp_path)
+    path = tmp_path / "okf-demo.md"
+    with pytest.raises(fields.FrontmatterError, match="left unchanged"):
+        fields._rewrite(path, lambda lines: [*lines, "  oops: orphaned\n"])
+    assert path.read_text(encoding="utf-8") == TASK
+
+
+BROKEN = "---\ntype: Task\nstatus: Draft\n- orphan\n---\n\nbody\n"
+
+
+def test_guard_still_allows_editing_an_already_broken_file(tmp_path: Path) -> None:
+    # readb must not be the one tool that refuses to touch a damaged file: the guard forbids
+    # *introducing* invalidity, not living with it. Keys away from the damage edit normally.
+    _bundle(tmp_path, text=BROKEN)
+    path = tmp_path / "okf-demo.md"
+    fields.set_fields(path, [("type", "Note")])
+    assert path.read_text(encoding="utf-8") == BROKEN.replace("type: Task", "type: Note")
+
+
+def test_unset_repairs_a_file_broken_by_an_orphaned_continuation(tmp_path: Path) -> None:
+    # `- orphan` reads as part of `status`'s value, so the whole span goes — which is exactly
+    # the repair. (`set status=...` is refused on this file for the same reason: the key looks
+    # multi-line. Unset first, then set, as the error says.)
+    _bundle(tmp_path, text=BROKEN)
+    path = tmp_path / "okf-demo.md"
+    with pytest.raises(fields.MultilineValueError):
+        fields.set_fields(path, [("status", "Done")])
+    fields.unset_fields(path, ["status"])
+    assert path.read_text(encoding="utf-8") == "---\ntype: Task\n---\n\nbody\n"
+    assert _yaml_loads(path) == {"type": "Task"}
 
 
 # --------------------------------------------------------------------------------------------
@@ -206,3 +354,23 @@ def test_cli_name_with_separator_is_rejected(tmp_path: Path) -> None:
     result = _run(["set", "--bundle", str(tmp_path), "sub/x", "status=Refined"])
     assert result.exit_code == 2
     assert ".md" in result.output
+
+
+def test_cli_set_multiline_key_prints_a_clean_error(tmp_path: Path) -> None:
+    # The refusal reaches the user as a one-line message, not a traceback, and names the way out.
+    _bundle(tmp_path, text=MULTILINE)
+    result = _run(["set", "--bundle", str(tmp_path), "okf-demo", "blocked_by=x"])
+    assert result.exit_code == 1
+    assert "Traceback" not in result.output
+    assert "blocked_by" in result.output and "unset the key first" in result.output
+    assert (tmp_path / "okf-demo.md").read_text(encoding="utf-8") == MULTILINE
+
+
+def test_cli_get_and_unset_handle_a_multiline_key(tmp_path: Path) -> None:
+    _bundle(tmp_path, text=MULTILINE)
+    result = _run(["get", "--bundle", str(tmp_path), "okf-demo", "blocked_by"])
+    assert result.exit_code == 0
+    assert result.output.strip() == "- alpha\n- beta"
+    result = _run(["unset", "--bundle", str(tmp_path), "okf-demo", "blocked_by"])
+    assert result.exit_code == 0
+    assert _yaml_loads(tmp_path / "okf-demo.md")["after"] == "tail"
