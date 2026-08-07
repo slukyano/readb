@@ -1,11 +1,29 @@
 # Task Bundle Log
 
 ## 2026-08-07
+* **Sprint 003 closed**: All four tasks `Designed -> Done`
+  ([026](archive/026-field-editor-multiline-corruption.md),
+  [025](archive/025-ship-usage-skill.md), [019](archive/019-readme-prior-art.md),
+  [023](archive/023-release-automation.md)); [sprint-003](sprints/sprint-003.md)
+  `Implementing -> Done` with a written summary. Gates green: 186 tests, `ruff` clean, the built
+  sdist self-contained. Delivered: span-addressed frontmatter edits with a write-path guard; the
+  repository as its own plugin marketplace shipping `skills/readb/SKILL.md`; a README prior-art
+  section; and a tag-triggered release workflow on PyPI Trusted Publishing. No ADRs.
+* **Independent review**: nine findings, all fixed — including a High regression the branch had
+  introduced (the span terminator swallowed dotted, spaced, quoted and non-ASCII keys, so
+  unsetting one field deleted its neighbour) and two release-workflow ordering bugs that would
+  only have surfaced mid-release. Pre-existing edges it surfaced became
+  [029](tasks/029-field-editor-remaining-edges.md).
+* **Public surfaces**: README examples moved off this project's own setup onto a neutral bundle,
+  and the sdist stopped shipping `backlog/`, `docs/` and `AGENTS.md` — `pip download --no-binary`
+  no longer hands the reader the project's sprint records.
+
+## 2026-08-07
 * **Sprint 003 design approved**: All four designs approved in chat — span-based field edits
-  ([026](tasks/026-field-editor-multiline-corruption.md)), the repository as its own plugin
-  marketplace ([025](tasks/025-ship-usage-skill.md)), the drafted prior-art section
-  ([019](tasks/019-readme-prior-art.md)), and a tag-triggered release workflow
-  ([023](tasks/023-release-automation.md)). Tasks flipped `Draft -> Designed`,
+  ([026](archive/026-field-editor-multiline-corruption.md)), the repository as its own plugin
+  marketplace ([025](archive/025-ship-usage-skill.md)), the drafted prior-art section
+  ([019](archive/019-readme-prior-art.md)), and a tag-triggered release workflow
+  ([023](archive/023-release-automation.md)). Tasks flipped `Draft -> Designed`,
   [sprint-003](sprints/sprint-003.md) `Designing -> Implementing`, branch design-merged to `main`.
   No ADRs proposed.
 * **Design corrections from review**: the usage skill left `src/` — distribution now rides the
@@ -19,15 +37,15 @@
   [024](tasks/024-measure-agent-efficiency.md); `023` stays in sprint-003).
 
 ## 2026-08-06
-* **Sprint 003 started**: Scope approved in chat — [ship-usage-skill](tasks/025-ship-usage-skill.md),
-  [readme-prior-art](tasks/019-readme-prior-art.md),
-  [release-automation](tasks/023-release-automation.md); the agent added
-  [field-editor-multiline-corruption](tasks/026-field-editor-multiline-corruption.md) at sprint start
+* **Sprint 003 started**: Scope approved in chat — [ship-usage-skill](archive/025-ship-usage-skill.md),
+  [readme-prior-art](archive/019-readme-prior-art.md),
+  [release-automation](archive/023-release-automation.md); the agent added
+  [field-editor-multiline-corruption](archive/026-field-editor-multiline-corruption.md) at sprint start
   (pending confirmation). Created [sprint-003](sprints/sprint-003.md) (`Designing`, branch `sprint/003`).
 * **Dogfooding gap → new task**: `readb set`/`unset` corrupt any frontmatter key whose value spans
   multiple lines (block list, block scalar, nested mapping) — the continuation lines are orphaned,
   the file stops parsing, and the permissive load then skips the concept silently. Recorded as
-  [026](tasks/026-field-editor-multiline-corruption.md) (high). Hit while fixing
+  [026](archive/026-field-editor-multiline-corruption.md) (high). Hit while fixing
   `release-automation`'s dangling `blocked_by` (`publish-readb-0-1-0` — a name that never existed,
   so the eligibility query hid the task); the blocker was satisfied and removed by hand, since
   readb cannot make that edit today.
@@ -52,7 +70,7 @@
   PyPI publish (readb 0.1.0 live), tag `v0.1.0` + GitHub release, post-publish
   `uv tool install` smoke, README install section now PyPI-first. Task flipped
   `Draft → Done` (execution record in the task body);
-  [release-automation](tasks/023-release-automation.md) is now unblocked.
+  [release-automation](archive/023-release-automation.md) is now unblocked.
 
 ## 2026-07-20
 * **Publication-hygiene sweep** (pre-publication): a new hygiene gate joined the sprint reviews
@@ -81,14 +99,14 @@
   `Proposed → Accepted` (maintainer, in chat). `distributable-package` design: manual `uv publish`,
   version 0.1.0; the outward-facing publishing split into special standalone task
   [publish-readb-0-1-0](archive/022-publish-readb-0-1-0.md) (after the sprint, not a sprint), with
-  [release-automation](tasks/023-release-automation.md) drafted for the eventual CI path. Design merge to
+  [release-automation](archive/023-release-automation.md) drafted for the eventual CI path. Design merge to
   `main`; implementation phase started.
 * **Sprint 002 design phase**: `name-column-unprefix` designed — un-prefix **rejected**; `__name`
   stays immutable/filename-derived, producer `name:` is inert, name-or-path addressing with
   mandatory uniqueness (ADR 0003 affirmed, not amended). `bundle-init-discovery` designed — the
   **registry model**: one `readb init` writes `.readb/config.toml` declaring bundles; discovery
   walks up; `--bundle` stays explicit consent ([ADR 0004](../docs/dev/adr/0004-init-registry-discovery.md),
-  Proposed). New drafts from the discussions: [readme-prior-art](tasks/019-readme-prior-art.md),
+  Proposed). New drafts from the discussions: [readme-prior-art](archive/019-readme-prior-art.md),
   [field-editor-type-inference](tasks/016-field-editor-type-inference.md),
   [frontmatter-schema-checking](tasks/017-frontmatter-schema-checking.md),
   [cross-bundle-querying](tasks/021-cross-bundle-querying.md).

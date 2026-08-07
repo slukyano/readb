@@ -2,7 +2,7 @@
 type: Task
 title: Ship a readb usage skill with the repo
 description: An agent skill in the readb repo documenting how to use readb, installable into agent environments instead of living in personal dotfiles.
-status: Designed
+status: Done
 priority: medium
 tags:
 - docs
@@ -71,7 +71,7 @@ how tools ship agent guidance now, and it keeps readb's CLI surface to the data 
 
 **Not in this task:** submitting the plugin to the `claude-community` marketplace for
 discoverability, which depends on an external review pipeline —
-[plugin-marketplace-submission](027-plugin-marketplace-submission.md).
+[plugin-marketplace-submission](../tasks/027-plugin-marketplace-submission.md).
 
 ### Content (usage only, neutral domains)
 

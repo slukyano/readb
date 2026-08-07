@@ -2,7 +2,7 @@
 type: Task
 title: Fix set/unset corrupting multi-line frontmatter values
 description: The line-based field editor rewrites only the `key:` line, orphaning block-list, block-scalar and nested-mapping continuation lines into invalid YAML.
-status: Designed
+status: Done
 priority: high
 tags:
 - bug
@@ -50,7 +50,7 @@ The same corruption affects every multi-line value form:
 - Decide the behavior of `set` on a multi-line key: replace the span with a scalar (a lossy but
   explicit overwrite), or refuse until list-valued assignment exists. Writing list *values* is
   the separate open question in
-  [field-editor-type-inference](016-field-editor-type-inference.md); this task must at minimum
+  [field-editor-type-inference](../tasks/016-field-editor-type-inference.md); this task must at minimum
   never produce invalid YAML.
 - Consider a guard on the write path: re-parse the edited frontmatter before the file is
   replaced and abort on failure, so no future editor bug can ship a broken file.
@@ -93,7 +93,7 @@ readb set writes scalar values only — unset the key first
 
 Rationale: overwriting a list with a scalar is a type change the caller almost certainly did not
 intend, and the CLI has no syntax for a list value yet — that is the separate open question in
-[field-editor-type-inference](016-field-editor-type-inference.md). Refusing costs nothing today
+[field-editor-type-inference](../tasks/016-field-editor-type-inference.md). Refusing costs nothing today
 and turns into a real write if that task lands list assignment. `unset` then `set` is the
 explicit escape hatch, named in the error message itself.
 

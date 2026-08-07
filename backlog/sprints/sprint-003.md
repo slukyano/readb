@@ -2,7 +2,7 @@
 type: Sprint
 title: Post-0.1.0 adoption — usage skill, prior art, release automation
 description: Ship a readb usage skill, place readb honestly among prior art in the README, automate tag-triggered releases, and fix the field editor's multi-line corruption bug.
-status: Implementing
+status: Done
 branch: sprint/003
 tasks:
 - 026-field-editor-multiline-corruption
@@ -68,14 +68,102 @@ Design phase (a checked box = `## Design` section written and discussed):
 4. [x] Public-surface sweep — CLI help/docstrings and package metadata were already clean; the
        README's examples moved from `tasks`/`docs/adr`/`task` to the neutral `library` bundle
 5. [x] 023-release-automation — release.yml (tag guard, checks, build, Trusted Publishing, changelog-sourced GitHub release) + tested extractor; PyPI-side config still with the maintainer
-6. [ ] Gates: `pytest` + `ruff` + independent subagent review of the sprint diff
+6. [x] Gates: `pytest` (186) + `ruff` clean + independent review of the sprint diff; every
+       finding fixed or given a task
+
+## Sprint summary
+
+Delivered all four tasks. Gates green at close: **186 tests pass** (129 at sprint start, +57),
+`ruff` clean, `claude plugin validate --strict` passes, and the built sdist's own suite passes
+standalone.
+
+**Per task:**
+
+- `026-field-editor-multiline-corruption` — found while executing this sprint's own scope
+  approval. `set`/`unset` assumed a key occupied one line, so any multi-line value had its
+  continuation lines orphaned into invalid YAML, after which the permissive loader skipped the
+  concept **silently**. A key is now addressed by its whole span: `unset` removes it, `set`
+  refuses a multi-line key all-or-nothing, `get` returns the raw fragment instead of `""`, and
+  `_rewrite` abandons any write that would turn valid frontmatter invalid.
+- `025-ship-usage-skill` — ⚠️ **transformed at design review.** The first design packaged the
+  skill in the wheel behind a new `readb skill` command; the maintainer rejected both, and the
+  result uses the mechanism that already exists: the repository carries `.claude-plugin/` and is
+  its own plugin marketplace, with `skills/readb/SKILL.md` as a portable folder. Every SQL
+  example in the skill is executed by the suite against a new neutral `library` fixture.
+- `019-readme-prior-art` — a `## Prior art` section led by the transparent-disposable-index
+  framing. Re-checking the figures was not a formality: MarkdownDB has moved to
+  `flowershow/markdowndb` and is active again, so sprint-002's survey line ("stalled since March
+  2024") would have shipped as a false claim about another project.
+- `023-release-automation` — ⚠️ **shrank before it started**: `ci.yml`, `CHANGELOG.md` and
+  `CONTRIBUTING.md` had already landed on `main` outside a sprint, leaving the release workflow
+  itself. Pushing a `v*` tag now guards tag against version, re-runs the checks, builds,
+  publishes with Trusted Publishing, and creates the GitHub release from a tested changelog
+  extractor. `pypa/gh-action-pypi-publish` beat `uv publish` on evidence: it generates PEP 740
+  attestations by default and uv does not.
+- Public-surface sweep (added at scope approval) — the README's examples no longer borrow this
+  project's own setup, and the sdist no longer ships `backlog/`, `docs/`, `AGENTS.md`.
+
+**Breaking changes:** none to any documented behavior. Two write-path behaviors tighten: `set`
+now refuses a multi-line key and a value containing a line break, where both previously wrote
+something (in the first case, corruption).
+
+**Architectural decisions:** no ADRs. The write-path contract is unchanged; what changed is that
+`fields.py` now uses PyYAML to *verify* a rewrite, which relaxed its "stdlib only" note to the
+invariant that always mattered — it never round-trips YAML.
+
+**Bugs found and fixed.** Beyond `026` itself, self-review caught a false "string-literal `set`"
+claim in two public surfaces (`n=42` reads back as `BIGINT`; `flag=true` is quoted and stays
+text). The independent review then found nine issues, all fixed here:
+
+1. *High, a regression this branch introduced*: the span terminator matched a narrow key
+   charset, so a dotted, spaced, quoted or non-ASCII key read as a continuation and was deleted
+   with its neighbour — and readb writes dotted keys itself. The test now asks whether a line
+   *continues* the value above it.
+2. A flow collection left open on the key line (`tags: {x: 1,`) was half-removed, and the
+   remainder still parsed, so the guard could not catch it. Bracket depth now bounds the span.
+3. The changelog section was validated *after* the irreversible PyPI upload; it moved into the
+   build job, plus a test tying the package version to a non-empty section.
+4. A manual "TestPyPI rehearsal" on a tag ref would have cut a real GitHub release, and the
+   dispatch path could reach real PyPI while skipping the tag guard. Manual runs are now
+   TestPyPI-only and never release.
+5. The extractor truncated at a `##` inside a fenced block and stripped mid-body link
+   definitions — both silently, at exit 0.
+6. Every edit rewrote CRLF files to LF, body included, and a no-op edit rewrote the file at all.
+7. The guard exempted frontmatter that parsed as a non-mapping — precisely the case an edit
+   turns into a parse error.
+8. Test gaps: examples were lower-bounded rather than counted, the Python example was
+   transcribed rather than extracted, and passing required only "does not raise".
+9. Doc claims: `init` takes no `--bundle`, `__LOG` exists only with a `log.md`, and README links
+   into sdist-excluded paths now resolve on PyPI.
+
+**Remaining limitations — read before using the write path:**
+
+- **`set` writes what YAML reads back, not always a string.** `n=42` becomes an integer;
+  `flag=true` is quoted and stays text. Documented in the skill; the asymmetry is recorded on
+  [016](../tasks/016-field-editor-type-inference.md), whose framing it invalidates.
+- **Duplicate keys make `get` and `query` disagree** — `set` edits the first occurrence, YAML
+  resolves to the last ([029](../tasks/029-field-editor-remaining-edges.md)).
+- **A `---` inside a block scalar ends the frontmatter early** for the editor and the parser
+  alike — consistently, but not as a YAML reader would ([029](../tasks/029-field-editor-remaining-edges.md)).
+- **The release workflow has never run.** It cannot until the trusted publisher exists on PyPI
+  and TestPyPI — a maintainer action. The first tag is also the first live test.
+- The skill reaches users through the marketplace, not through `pip install readb`.
+
+**Not done, each with a home:** community-marketplace listing →
+[027](../tasks/027-plugin-marketplace-submission.md); the Rust question →
+[028](../tasks/028-evaluate-rust-rewrite.md); write-path edges →
+[029](../tasks/029-field-editor-remaining-edges.md); typed `set` →
+[016](../tasks/016-field-editor-type-inference.md). Still deferred, untouched:
+[024](../tasks/024-measure-agent-efficiency.md), [009](../tasks/009-bundle-index-log-automation.md),
+[005](../tasks/005-research-body-structured-query.md), [017](../tasks/017-frontmatter-schema-checking.md),
+[021](../tasks/021-cross-bundle-querying.md).
 
 ## Open questions
 
-- **`023` hand-off** (open, maintainer action): configuring the PyPI trusted publisher — owner
-  `slukyano`, repo `readb`, workflow `release.yml`, environment `pypi`, and the same on TestPyPI
-  for the rehearsal. Approved at scoping; the workflow lands first and is verified once the
-  setting exists.
+- **`023` hand-off** (still open at close, maintainer action): configuring the PyPI trusted
+  publisher — owner `slukyano`, repo `readb`, workflow `release.yml`, environment `pypi`, and the
+  same on TestPyPI (environment `testpypi`) for rehearsals. Approved at scoping; the workflow
+  shipped unverified because it cannot run until this exists.
 
 Resolved:
 
@@ -103,3 +191,9 @@ Resolved:
   [028-evaluate-rust-rewrite](../tasks/028-evaluate-rust-rewrite.md). **Design approved** the same
   day, `023` kept in scope: the four tasks flipped `Draft → Designed`, the sprint flipped
   `Designing → Implementing`, and the branch design-merged to `main`. Implementation started.
+- **2026-08-07 (close-out)** — Implementation completed in one run, in checklist order. The
+  independent review returned nine findings, one of them a High regression this branch had
+  introduced into the span logic; all nine were fixed and pinned by tests, and the pre-existing
+  edges it surfaced became [029](../tasks/029-field-editor-remaining-edges.md). Tasks flipped
+  `Designed → Done`, sprint `Implementing → Done`, files archived, index and log brought current.
+  Gates green: 186 tests, `ruff` clean.

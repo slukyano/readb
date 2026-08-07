@@ -8,27 +8,30 @@ okf_version: "0.1"
 
 # Sprints
 
-* [Sprint 003 — Post-0.1.0 adoption: usage skill, prior art, release automation](sprints/sprint-003.md) - Implementing.
+* [Sprint 003 — Post-0.1.0 adoption: usage skill, prior art, release automation](sprints/sprint-003.md) - Done.
 * [Sprint 002 — Bundle init, packaging & correctness follow-ups](sprints/sprint-002.md) - Done.
 * [Sprint 001 — CLI ergonomics, dogfooding gaps, name & license](sprints/sprint-001.md) - Done.
 
 # Tasks
 
-* [Fix set/unset corrupting multi-line frontmatter values](tasks/026-field-editor-multiline-corruption.md) - orphaned continuation lines make the file invalid YAML; the concept then silently disappears. Designed.
 * [Close the field editor's remaining edge cases](tasks/029-field-editor-remaining-edges.md) - duplicate keys; `---` inside a block scalar. From the sprint-003 review.
 * [Research structured-body querying](tasks/005-research-body-structured-query.md) - expose the body as JSON/YAML/DOM by headings.
 * [Keep index.md and log.md current automatically](tasks/009-bundle-index-log-automation.md) - generate the index; sprint-appended log entries.
-* [Add a prior-art note to the README](tasks/019-readme-prior-art.md) - frontmatter-mcp, MarkdownDB, Dataview; the transparent-disposable-index differentiator. Designed.
 * [Research field-editor type inference](tasks/016-field-editor-type-inference.md) - typed `set` (marad-style) vs. the string-literal stance; maybe an opt-in flag.
 * [Research frontmatter schema checking](tasks/017-frontmatter-schema-checking.md) - opt-in declare/check (`readb check`); load stays permissive.
 * [Research cross-bundle querying](tasks/021-cross-bundle-querying.md) - registry bundles as DuckDB schemas; joins across bundles.
-* [Automate releases](tasks/023-release-automation.md) - GitHub Actions + Trusted Publishing on a `v*` tag. Designed.
-* [Ship a readb usage skill with the repo](tasks/025-ship-usage-skill.md) - the repo as its own plugin marketplace; a portable `skills/readb/SKILL.md`. Designed.
 * [Submit the readb plugin to the community marketplace](tasks/027-plugin-marketplace-submission.md) - public discovery, behind an external review pipeline.
 * [Evaluate rewriting readb in Rust](tasks/028-evaluate-rust-rewrite.md) - binary distribution and startup vs. the Python API, YAML semantics, and rebuild cost; sequenced behind the benchmark.
 * [Measure readb's efficiency gains for agents](tasks/024-measure-agent-efficiency.md) - A/B benchmark, unguided vs. readb; wall-clock and token usage on large bundles.
 
 # Done
+
+Sprint 003:
+
+* [Fix set/unset corrupting multi-line frontmatter values](archive/026-field-editor-multiline-corruption.md) - keys are addressed by their whole span; a write that would break the frontmatter is abandoned.
+* [Ship a readb usage skill with the repo](archive/025-ship-usage-skill.md) - the repo is its own plugin marketplace; `skills/readb/SKILL.md`, examples executed by tests.
+* [Add a prior-art note to the README](archive/019-readme-prior-art.md) - frontmatter-mcp, MarkdownDB, Dataview; figures re-checked 2026-08-07.
+* [Automate releases](archive/023-release-automation.md) - a `v*` tag builds, publishes via Trusted Publishing, and cuts the GitHub release.
 
 Standalone:
 

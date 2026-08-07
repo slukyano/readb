@@ -37,7 +37,7 @@ keywords/classifiers/URLs/`[project.scripts]`). Decisions:
 - **Version**: bump `0.0.1 → 0.1.0` for the first public release (stays 0.x / Alpha classifier).
 - **Publishing mechanics**: **manual `uv publish` with a PyPI token** held by the maintainer — no CI.
   GitHub Actions + Trusted Publishing recorded as draft
-  [release-automation](../tasks/023-release-automation.md) for when releases become routine.
+  [release-automation](023-release-automation.md) for when releases become routine.
 - **Split with the publish step** (maintainer call at approval): the actual publishing is **not part
   of this sprint** — it is the special standalone task
   [publish-readb-0-1-0](022-publish-readb-0-1-0.md), run after sprint-002's final merge, from

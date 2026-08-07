@@ -2,7 +2,7 @@
 type: Task
 title: Add a "prior art / how readb differs" note to the README
 description: Cite frontmatter-mcp, MarkdownDB, and Dataview; state readb's niche and the deliberate non-inference of the field editor.
-status: Designed
+status: Done
 priority: low
 tags:
 - docs
@@ -10,7 +10,7 @@ created: 2026-07-17
 timestamp: '2026-08-07T00:00:00Z'
 ---
 
-Surfaced by [research-similar-tools](../archive/006-research-similar-tools.md) (sprint-002): the survey found
+Surfaced by [research-similar-tools](006-research-similar-tools.md) (sprint-002): the survey found
 that readb's core approach is not novel — two maintained tools sit almost exactly on its spot —
 so the README should place readb honestly among them and state what actually differentiates it.
 
@@ -114,5 +114,5 @@ frontmatter field editor, which is deliberately string-literal (`readb set n=42`
 string `42`; producer intent is never guessed).
 
 The full survey, including the tools not listed here, is in
-[`docs/dev/research/similar-tools.md`](docs/dev/research/similar-tools.md).
+[`docs/dev/research/similar-tools.md`](https://github.com/slukyano/readb/blob/main/docs/dev/research/similar-tools.md).
 ```
