@@ -16,6 +16,12 @@ All notable changes to readb are documented here, following
   untouched even when other assignments in the same command were valid.
 - `readb get` returns a multi-line value as the raw YAML fragment. It previously reported an
   empty string, indistinguishable from an empty scalar.
+- Files with CRLF line endings keep them. Any edit previously rewrote the whole file — body
+  included — to LF.
+- An edit that changes nothing now writes nothing, so unsetting an absent key leaves the file
+  untouched rather than rewriting it.
+- `readb set` refuses a value containing a line break instead of writing it across several
+  lines, where YAML would fold it into different data.
 
 ### Added
 

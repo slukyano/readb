@@ -13,22 +13,39 @@ import re
 import sys
 from pathlib import Path
 
+_FENCE = re.compile(r"^\s*(```+|~~~+)")
+_LINK_DEF = re.compile(r"^\[[^\]]+\]:")
+
 
 def extract(changelog: str, version: str) -> str:
     """Return the body of the ``## [<version>]`` section, without its heading.
 
-    The section runs to the next top-level heading. Link-reference definitions at the foot of
-    the file are not part of any section.
+    The section runs to the next top-level heading *outside a fenced code block*, so a shell
+    comment like ``## usage`` inside an example cannot truncate it. Trailing link-reference
+    definitions — the block at the foot of a Keep a Changelog file — belong to no section and
+    are dropped; definitions used mid-body are left alone, since removing them would silently
+    break the links that reference them.
     """
     heading = re.compile(rf"^## \[{re.escape(version)}\][^\n]*$", re.MULTILINE)
     match = heading.search(changelog)
     if match is None:
         raise LookupError(f"no '## [{version}]' section in the changelog")
-    rest = changelog[match.end() :]
-    end = re.search(r"^## ", rest, re.MULTILINE)
-    body = rest[: end.start()] if end else rest
-    body = re.sub(r"^\[[^\]]+\]:.*$", "", body, flags=re.MULTILINE)
-    return body.strip()
+
+    lines = changelog[match.end() :].splitlines()
+    fence: str | None = None
+    body: list[str] = []
+    for line in lines:
+        fence_match = _FENCE.match(line)
+        if fence_match:
+            marker = fence_match.group(1)[0] * 3
+            fence = None if fence and marker in fence else marker
+        elif fence is None and line.startswith("## "):
+            break
+        body.append(line)
+
+    while body and (not body[-1].strip() or _LINK_DEF.match(body[-1])):
+        body.pop()
+    return "\n".join(body).strip()
 
 
 def main(argv: list[str]) -> int:

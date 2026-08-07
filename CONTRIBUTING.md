@@ -66,4 +66,6 @@ configured on the registry. `pypa/gh-action-pypi-publish` also signs each distri
 uploads PEP 740 attestations by default.
 
 To rehearse the whole path without releasing, run the workflow manually
-(**Actions → Release → Run workflow**) with the target `testpypi`.
+(**Actions → Release → Run workflow**). A manual run always targets TestPyPI and never creates a
+GitHub release; real PyPI is reachable only by pushing a tag, so a rehearsal cannot skip the
+tag/version guard.

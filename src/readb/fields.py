@@ -27,7 +27,12 @@ from pathlib import Path
 import yaml
 
 _DELIM = "---"
-_KEY_LINE = re.compile(r"^([A-Za-z0-9_-]+)\s*:")
+# What continues the value above rather than starting a new top-level entry: an indented line, a
+# blank, a sequence item, a comment, or the `?`/`:` of a complex key. Everything else at column 0
+# begins a new entry. The test is deliberately framed this way round — matching *keys* instead
+# would have to enumerate the legal key charset, and any key outside it (dotted, spaced, quoted,
+# non-ASCII) would be mistaken for a continuation and swallowed into its neighbour's value.
+_CONTINUATION = re.compile(r"^[\s\-#?:]")
 # A YAML scalar that is safe to write unquoted (no special chars, not a reserved word).
 _PLAIN = re.compile(r"[A-Za-z0-9_./@+-]+")
 _RESERVED_WORDS = {"true", "false", "null", "yes", "no", "on", "off", "~"}
@@ -51,7 +56,7 @@ def get_field(path: Path, key: str) -> str | None:
     Reads are forgiving: a file with no frontmatter block is treated as having no fields
     (returns None), never an error.
     """
-    parts = _split_frontmatter(path.read_text(encoding="utf-8"))
+    parts = _split_frontmatter(_read(path))
     if parts is None:
         return None
     _, frontmatter, _ = parts
@@ -82,18 +87,27 @@ def unset_fields(path: Path, keys: list[str]) -> None:
     _rewrite(path, lambda frontmatter: _unset(frontmatter, keys))
 
 
+def _read(path: Path) -> str:
+    """Decode ``path`` without translating line endings, so CRLF files survive a round trip."""
+    return path.read_bytes().decode("utf-8")
+
+
 def _rewrite(path: Path, transform: Callable[[list[str]], list[str]]) -> None:
     """Read ``path``, apply ``transform`` to its frontmatter lines, and write it back in place.
 
     The write is abandoned if it would turn parseable frontmatter into unparseable frontmatter.
     A file whose frontmatter is *already* broken is still editable: the guard forbids introducing
     invalidity, it does not make readb the one tool that refuses to touch a damaged file.
+
+    An edit that changes nothing writes nothing — unsetting an absent key must not rewrite a file.
     """
-    parts = _split_frontmatter(path.read_text(encoding="utf-8"))
+    parts = _split_frontmatter(_read(path))
     if parts is None:
         raise FrontmatterError(f"{path}: no YAML frontmatter block found")
     opening, frontmatter, remainder = parts
     edited = transform(frontmatter)
+    if edited == frontmatter:
+        return
     if _yaml_error(frontmatter) is None:
         broken = _yaml_error(edited)
         if broken is not None:
@@ -101,17 +115,21 @@ def _rewrite(path: Path, transform: Callable[[list[str]], list[str]]) -> None:
                 f"{path}: edit would produce invalid YAML frontmatter, file left unchanged "
                 f"({broken})"
             )
-    path.write_text("".join(opening) + "".join(edited) + "".join(remainder), encoding="utf-8")
+    text = "".join(opening) + "".join(edited) + "".join(remainder)
+    path.write_bytes(text.encode("utf-8"))
 
 
 def _yaml_error(frontmatter: list[str]) -> str | None:
-    """Return a one-line reason why ``frontmatter`` is not a usable YAML mapping, else None."""
+    """Return a one-line reason why ``frontmatter`` does not parse as YAML, else None.
+
+    Parseability is the whole test. Frontmatter that parses as something other than a mapping is
+    odd but not readb's to reject — treating it as already-broken would switch the guard off for
+    exactly the edit that turns it into a parse error.
+    """
     try:
-        parsed = yaml.safe_load("".join(frontmatter))
+        yaml.safe_load("".join(frontmatter))
     except yaml.YAMLError as exc:
         return " ".join(str(exc).split())
-    if parsed is not None and not isinstance(parsed, dict):
-        return "frontmatter is not a mapping"
     return None
 
 
@@ -154,7 +172,7 @@ def _unquote(raw: str) -> str:
 def _span(frontmatter: list[str], key: str) -> tuple[int, int] | None:
     """Return the half-open line range ``key``'s whole entry occupies, or None if absent.
 
-    The span starts at the ``key:`` line and runs to the next top-level key (or the end of the
+    The span starts at the ``key:`` line and runs to the next top-level entry (or the end of the
     block). Trailing blank lines and column-0 comments are trimmed back out, so a comment
     introducing the *next* field survives the removal of this one.
     """
@@ -162,17 +180,49 @@ def _span(frontmatter: list[str], key: str) -> tuple[int, int] | None:
     start = next((i for i, line in enumerate(frontmatter) if key_line.match(line)), None)
     if start is None:
         return None
+    # A flow collection left open on the key line (`tags: {x: 1,`) continues on lines that look
+    # like new entries, so bracket depth — not indentation — decides where it ends. Depth only
+    # engages when the key line itself opens one, which a block scalar never does.
     end = start + 1
-    while end < len(frontmatter) and not _KEY_LINE.match(frontmatter[end]):
+    depth = _flow_depth(frontmatter[start])
+    while end < len(frontmatter) and (depth > 0 or _CONTINUATION.match(frontmatter[end])):
+        if depth > 0:
+            depth += _flow_depth(frontmatter[end])
         end += 1
     while end - 1 > start and _is_trailing_filler(frontmatter[end - 1]):
         end -= 1
     return start, end
 
 
+def _flow_depth(line: str) -> int:
+    """Net flow-collection nesting a line opens: `{`/`[` minus `}`/`]`, ignoring quotes/comments."""
+    depth = 0
+    quote = None
+    for char in line:
+        if quote is not None:
+            if char == quote:
+                quote = None
+        elif char in "'\"":
+            quote = char
+        elif char in "[{":
+            depth += 1
+        elif char in "]}":
+            depth -= 1
+        elif char == "#":
+            break
+    return depth
+
+
 def _is_trailing_filler(line: str) -> bool:
     """True for a blank line or a column-0 comment — never part of the value above it."""
     return not line.strip() or line.startswith("#")
+
+
+def _newline_of(line: str) -> str:
+    """The line ending of ``line`` — preserved when rewriting it, so CRLF files stay CRLF."""
+    if line.endswith("\r\n"):
+        return "\r\n"
+    return "\n" if line.endswith("\n") else ""
 
 
 def _get(frontmatter: list[str], key: str) -> str | None:
@@ -193,12 +243,18 @@ def _get(frontmatter: list[str], key: str) -> str | None:
 def _set(frontmatter: list[str], pairs: list[tuple[str, str]]) -> list[str]:
     out = list(frontmatter)
     for key, value in pairs:
-        new_line = f"{key}: {_format(value)}\n"
+        if "\n" in value or "\r" in value:
+            # Writing it would spread one value over several lines, which YAML then folds into
+            # something else entirely — a silent change to data the caller did not ask for.
+            raise FrontmatterError(
+                f"{key}: a frontmatter value written by readb cannot contain a line break"
+            )
         span = _span(out, key)
         if span is None:
-            if out and not out[-1].endswith("\n"):
-                out[-1] += "\n"
-            out.append(new_line)
+            eol = (_newline_of(out[-1]) if out else "") or "\n"
+            if out and not _newline_of(out[-1]):
+                out[-1] += eol
+            out.append(f"{key}: {_format(value)}{eol}")
             continue
         start, end = span
         if end - start > 1:
@@ -206,7 +262,7 @@ def _set(frontmatter: list[str], pairs: list[tuple[str, str]]) -> list[str]:
                 f"{key}: multi-line value (list, block scalar, or nested mapping); "
                 f"readb set writes scalar values only — unset the key first"
             )
-        out[start] = new_line if out[start].endswith("\n") else new_line.rstrip("\n")
+        out[start] = f"{key}: {_format(value)}{_newline_of(out[start])}"
     return out
 
 

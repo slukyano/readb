@@ -23,7 +23,7 @@ modified.
   shell.
 
 > Status: MVP implemented. Bundle loading, type inference, the library API, and the CLI all
-> work; the 12 acceptance criteria in [`docs/dev/design.md`](docs/dev/design.md) are covered
+> work; the 12 acceptance criteria in [`docs/dev/design.md`](https://github.com/slukyano/readb/blob/main/docs/dev/design.md) are covered
 > by tests. Not yet built (left as clean seams): persistent on-disk index, git-aware incremental
 > rebuild, and write-back — all explicit non-goals for this MVP.
 
@@ -90,7 +90,7 @@ it is never read as bundle content.
 readb only addresses files inside the bundle root: a `../` path or a symlink that resolves
 outside the bundle is not supported and is refused with an explicit error (by name and by
 path alike). `--format raw` prints values verbatim, so
-`readb query "SELECT __raw FROM book WHERE __name = 'dune'" --format raw` is exactly `cat`.
+`readb query "SELECT __raw FROM book WHERE __name = 'dune'" --format raw` reproduces the file.
 
 ## Tables and views
 
@@ -152,11 +152,11 @@ Neighbours worth knowing (checked 2026-08-07):
 
 readb differs in packaging and constraints rather than in engine: an OKF bundle in, an in-memory
 DuckDB out, a load and query path that never writes, and exactly one narrow write path — the
-frontmatter field editor, which writes the value it is given verbatim and offers no syntax for
-lists or nested values — producer intent is never inferred from the command line.
+frontmatter field editor, which offers no syntax for lists or nested values and quotes a value
+only where YAML would otherwise misread it — producer intent is never inferred.
 
 The full survey, including the tools not listed here, is in
-[`docs/dev/research/similar-tools.md`](docs/dev/research/similar-tools.md).
+[`docs/dev/research/similar-tools.md`](https://github.com/slukyano/readb/blob/main/docs/dev/research/similar-tools.md).
 
 ## Development
 
@@ -165,8 +165,8 @@ Contributions are welcome — see [`CONTRIBUTING.md`](CONTRIBUTING.md); release 
 commands, and checks. Development runs in maintainer-approved sprints; the backlog and the
 developer documentation (including Architecture Decision Records) are
 [OKF](https://github.com/GoogleCloudPlatform/knowledge-catalog/tree/main/okf) bundles in
-[`backlog/`](backlog/index.md) and [`docs/dev/`](docs/dev/index.md). Process:
-[`backlog/workflow.md`](backlog/workflow.md).
+[`backlog/`](https://github.com/slukyano/readb/blob/main/backlog/index.md) and [`docs/dev/`](https://github.com/slukyano/readb/blob/main/docs/dev/index.md). Process:
+[`backlog/workflow.md`](https://github.com/slukyano/readb/blob/main/backlog/workflow.md).
 
 ## License
 

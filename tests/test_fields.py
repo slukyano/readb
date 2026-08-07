@@ -374,3 +374,129 @@ def test_cli_get_and_unset_handle_a_multiline_key(tmp_path: Path) -> None:
     result = _run(["unset", "--bundle", str(tmp_path), "okf-demo", "blocked_by"])
     assert result.exit_code == 0
     assert _yaml_loads(tmp_path / "okf-demo.md")["after"] == "tail"
+
+
+# --------------------------------------------------------------------------------------------
+# Span boundaries: what ends a key's value.
+#
+# The boundary test asks whether a line *continues* the value above it, never whether it looks
+# like a key readb recognizes. Keys outside a conservative identifier charset — dotted, spaced,
+# quoted, non-ASCII — are ordinary YAML, and readb writes dotted ones itself.
+# --------------------------------------------------------------------------------------------
+
+NEIGHBOURS = """\
+---
+type: Book
+status: read
+tags:
+- a
+- b
+og.title: 'Dune (1965)'
+"my key": v1
+full name: Frank
+título: T
+---
+
+body
+"""
+
+
+# As parsed: the quoted key `"my key"` is the key `my key`.
+@pytest.mark.parametrize("key", ["og.title", "my key", "full name", "título"])
+def test_an_unusual_key_is_not_swallowed_into_its_neighbours_value(
+    tmp_path: Path, key: str
+) -> None:
+    _bundle(tmp_path, text=NEIGHBOURS)
+    path = tmp_path / "okf-demo.md"
+    fields.unset_fields(path, ["tags"])
+    assert key in _yaml_loads(path), f"unsetting a neighbour deleted {key!r}"
+
+
+def test_a_scalar_next_to_an_unusual_key_stays_settable(tmp_path: Path) -> None:
+    # Regression: the scalar `status` was refused as "multi-line" purely because the *next* line
+    # held a dotted key the boundary test did not recognize.
+    _bundle(tmp_path, text=NEIGHBOURS)
+    path = tmp_path / "okf-demo.md"
+    fields.set_fields(path, [("status", "unread")])
+    assert _yaml_loads(path)["status"] == "unread"
+
+
+@pytest.mark.parametrize(
+    "opened",
+    ["tags: {x: 1,\ny: 2}\n", "tags: [a,\nb]\n"],
+    ids=["flow-mapping", "flow-sequence"],
+)
+def test_a_flow_collection_left_open_is_one_span(tmp_path: Path, opened: str) -> None:
+    # These continue on lines that look like new entries, so bracket depth decides the boundary.
+    # Removing only the first line left `y: 2}` behind — which still parses, inventing a column.
+    _bundle(tmp_path, text=f"---\n{opened}status: open\n---\n\nbody\n")
+    path = tmp_path / "okf-demo.md"
+    fields.unset_fields(path, ["tags"])
+    assert _yaml_loads(path) == {"status": "open"}
+
+
+def test_a_brace_inside_a_block_scalar_does_not_extend_the_span(tmp_path: Path) -> None:
+    # Depth tracking must engage only when the *key line* opens a collection.
+    _bundle(tmp_path, text="---\nnote: |\n  a { b\nnext: x\n---\n\nbody\n")
+    path = tmp_path / "okf-demo.md"
+    fields.unset_fields(path, ["note"])
+    assert _yaml_loads(path) == {"next": "x"}
+
+
+def test_a_quoted_brace_is_not_an_open_collection(tmp_path: Path) -> None:
+    _bundle(tmp_path, text="---\ntitle: 'a { b'\nstatus: open\n---\n\nbody\n")
+    path = tmp_path / "okf-demo.md"
+    fields.set_fields(path, [("status", "closed")])
+    assert _yaml_loads(path) == {"title": "a { b", "status": "closed"}
+
+
+# --------------------------------------------------------------------------------------------
+# Byte-exactness of the write path.
+# --------------------------------------------------------------------------------------------
+
+CRLF = "---\r\ntype: Book\r\nstatus: open\r\n---\r\n\r\nbody\r\n"
+
+
+def test_crlf_line_endings_survive_an_edit(tmp_path: Path) -> None:
+    # "byte-for-byte intact" has to hold for the bytes nobody looked at, the body included.
+    _bundle(tmp_path, text=CRLF)
+    path = tmp_path / "okf-demo.md"
+    fields.set_fields(path, [("status", "closed")])
+    assert path.read_bytes() == CRLF.replace("status: open", "status: closed").encode()
+
+
+def test_a_key_appended_to_a_crlf_file_gets_crlf(tmp_path: Path) -> None:
+    _bundle(tmp_path, text=CRLF)
+    path = tmp_path / "okf-demo.md"
+    fields.set_fields(path, [("rating", "5")])
+    assert path.read_bytes().endswith(b"---\r\n\r\nbody\r\n")
+    assert b"rating: 5\r\n" in path.read_bytes()
+
+
+def test_an_edit_that_changes_nothing_writes_nothing(tmp_path: Path) -> None:
+    _bundle(tmp_path, text=CRLF)
+    path = tmp_path / "okf-demo.md"
+    before = path.stat().st_mtime_ns
+    fields.unset_fields(path, ["totally-absent"])
+    assert path.stat().st_mtime_ns == before
+    assert path.read_bytes() == CRLF.encode()
+
+
+def test_a_value_containing_a_line_break_is_refused(tmp_path: Path) -> None:
+    # Written out it would become several lines, which YAML folds into different data entirely.
+    _bundle(tmp_path)
+    path = tmp_path / "okf-demo.md"
+    with pytest.raises(fields.FrontmatterError, match="line break"):
+        fields.set_fields(path, [("note", "a\nb")])
+    assert path.read_text(encoding="utf-8") == TASK
+
+
+def test_the_guard_covers_frontmatter_that_is_not_a_mapping(tmp_path: Path) -> None:
+    # Parseable-but-not-a-mapping must not read as "already broken", which would switch the
+    # guard off for precisely the edit that breaks it.
+    text = "---\n- a\n- b\n---\n\nbody\n"
+    _bundle(tmp_path, text=text)
+    path = tmp_path / "okf-demo.md"
+    with pytest.raises(fields.FrontmatterError, match="left unchanged"):
+        fields.set_fields(path, [("status", "open")])
+    assert path.read_text(encoding="utf-8") == text

@@ -15,6 +15,7 @@ okf_version: "0.1"
 # Tasks
 
 * [Fix set/unset corrupting multi-line frontmatter values](tasks/026-field-editor-multiline-corruption.md) - orphaned continuation lines make the file invalid YAML; the concept then silently disappears. Designed.
+* [Close the field editor's remaining edge cases](tasks/029-field-editor-remaining-edges.md) - duplicate keys; `---` inside a block scalar. From the sprint-003 review.
 * [Research structured-body querying](tasks/005-research-body-structured-query.md) - expose the body as JSON/YAML/DOM by headings.
 * [Keep index.md and log.md current automatically](tasks/009-bundle-index-log-automation.md) - generate the index; sprint-appended log entries.
 * [Add a prior-art note to the README](tasks/019-readme-prior-art.md) - frontmatter-mcp, MarkdownDB, Dataview; the transparent-disposable-index differentiator. Designed.

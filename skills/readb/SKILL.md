@@ -34,7 +34,7 @@ prints every table, its original type, and every column with its inferred type.
 | Table | Rows |
 | --- | --- |
 | `__DOCUMENTS` | every concept in the bundle |
-| `__INDEXES` / `__LOG` | the reserved `index.md` / `log.md` files, which are *not* concepts |
+| `__INDEXES` / `__LOG` | the reserved `index.md` / `log.md` files, which are *not* concepts. `__LOG` exists only if the bundle has a `log.md` |
 | `__UNKNOWNTYPE` | concepts with a missing or unusable `type` |
 | `__TAGS` | a `(concept_path, tag)` view, for tag filtering by join |
 
@@ -76,7 +76,7 @@ stderr for a `skipping ...` line.
 | `readb unset <name> KEY ...` | remove frontmatter fields |
 | `readb init [DIRS...]` | declare bundles so `--bundle` can be omitted |
 
-Every command takes `--bundle <dir>`. Concepts are addressed by bare `<name>` when unique in the
+Every command except `init` takes `--bundle <dir>`. Concepts are addressed by bare `<name>` when unique in the
 bundle, or by full `sub/dir/name.md` path; an ambiguous name is a hard error listing the clashes,
 never a silent first match.
 
@@ -161,6 +161,7 @@ An edit that would leave the frontmatter unparseable is abandoned and the file l
 - Query the specific type table when you know the type, `__DOCUMENTS` when you do not.
 - Prefer one SQL query over several narrower ones; the bundle is loaded once per invocation, so
   the load, not the query, is the cost.
-- `index.md` and `log.md` are reserved names, not concepts — look for them in `__INDEXES` and
-  `__LOG`.
+- `index.md` and `log.md` are reserved names, not concepts — look for them in `__INDEXES`, and
+  in `__LOG` where a `log.md` exists (querying `__LOG` in a bundle without one is a
+  "table does not exist" error).
 - readb never modifies files while reading. Any change comes from an explicit `set`/`unset`.

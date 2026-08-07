@@ -43,26 +43,36 @@ def test_skill_exists_with_portable_frontmatter() -> None:
     assert re.search(r"^description: \S", frontmatter, re.MULTILINE)
 
 
-def test_skill_has_executable_examples() -> None:
-    # Guards the guard: if the extraction regex ever stops matching, the suite must not go quiet.
-    assert len(_skill_queries()) >= 5
+def test_every_query_example_is_extracted() -> None:
+    # Guards the guard. A loose lower bound would let examples silently stop being executed as
+    # the skill grows, so this counts every invocation in the file and demands they all match.
+    text = SKILL.read_text(encoding="utf-8")
+    written = text.count('readb query "')
+    assert written == len(_QUERY_EXAMPLE.findall(text)), (
+        "an example is written in a form the extractor does not match"
+    )
+    assert len(_skill_queries()) == written - 1  # minus the `<SQL>` placeholder in the table
 
 
 @pytest.mark.parametrize("sql", _skill_queries(), ids=lambda s: s[:48])
 def test_skill_query_examples_run(sql: str) -> None:
     db = readb.open(str(LIBRARY))
     try:
-        db.sql(sql)
+        # Rows, not merely the absence of an exception: an example returning nothing teaches
+        # nothing, and would go on passing after the fixture or the data model moved under it.
+        assert db.sql(sql), "the example runs but returns no rows"
     finally:
         db.close()
 
 
 def test_skill_python_example_runs() -> None:
-    db = readb.open(str(LIBRARY))
-    try:
-        assert db.sql("SELECT title FROM book WHERE 'classic' IN tags")
-    finally:
-        db.close()
+    # Extracted, not transcribed: a hardcoded copy would keep passing after the skill changed.
+    block = re.search(r"```python\n(.*?)```", SKILL.read_text(encoding="utf-8"), re.DOTALL)
+    assert block, "the skill's Python example is missing"
+    source = block.group(1).replace('readb.open("./library")', f"readb.open({str(LIBRARY)!r})")
+    namespace: dict[str, object] = {}
+    exec(compile(source, "SKILL.md", "exec"), namespace)  # noqa: S102 - our own documentation
+    assert namespace["rows"]
 
 
 def test_skill_carries_no_project_process_material() -> None:
