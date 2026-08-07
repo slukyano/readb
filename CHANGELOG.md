@@ -5,6 +5,35 @@ All notable changes to readb are documented here, following
 
 ## [Unreleased]
 
+### Fixed
+
+- `readb set` and `readb unset` no longer corrupt a frontmatter key whose value spans several
+  lines (a list, a `|`/`>` block scalar, or a nested mapping). They previously rewrote or removed
+  only the `key:` line and left the rest of the value behind as invalid YAML, after which the
+  permissive loader skipped the concept — the edit itself reported nothing, so the loss only
+  showed up as a document missing from later results. Each key is now addressed as a whole span:
+  `unset` removes the value entirely, and `set` refuses a multi-line key — with a message saying
+  to unset it first — instead of discarding a value you did not name. A refusal leaves the file
+  untouched even when other assignments in the same command were valid.
+- `readb get` returns a multi-line value as the raw YAML fragment. It previously reported an
+  empty string, indistinguishable from an empty scalar.
+- Files with CRLF line endings keep them. Any edit previously rewrote the whole file — body
+  included — to LF.
+- An edit that changes nothing now writes nothing, so unsetting an absent key leaves the file
+  untouched rather than rewriting it.
+- `readb set` refuses a value containing a line break instead of writing it across several
+  lines, where YAML would fold it into different data.
+
+### Added
+
+- An agent skill teaching how to use readb — the data model, the command surface, and worked SQL
+  — shipped from this repository, which now doubles as a plugin marketplace
+  (`/plugin marketplace add slukyano/readb`, then `/plugin install readb@readb`). The skill lives
+  at `skills/readb/SKILL.md` as a portable folder for runtimes that read skill directories
+  directly, and its SQL examples are executed by the test suite so they cannot drift.
+- Frontmatter writes are verified before they land: an edit that would turn valid frontmatter
+  into invalid frontmatter is abandoned with an error and the file is left unchanged.
+
 ## [0.1.0] - 2026-07-21
 
 Initial release.

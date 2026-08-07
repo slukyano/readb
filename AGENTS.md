@@ -25,8 +25,11 @@ via the lattice; pass 2 coerces values and inserts into DuckDB.
 - `src/readb/parser.py` — parse one file -> `Concept(path, frontmatter, body)`. Permissive.
 - `src/readb/schema.py` — type-name normalization + the column-type unification lattice.
 - `src/readb/fields.py` — the ONE write path: a surgical, line-based frontmatter field editor
-  (`get_field`/`set_fields`/`unset_fields`). Stdlib only; does NOT load the bundle or round-trip
-  YAML — only the targeted `key: value` lines change.
+  (`get_field`/`set_fields`/`unset_fields`). Does NOT load the bundle or round-trip YAML — only
+  the targeted key's own lines change. A key is addressed by its *span* (the `key:` line plus
+  its continuation lines), so an edit can never orphan half a value into invalid YAML; `set`
+  refuses a multi-line key rather than discarding it. PyYAML appears here for exactly one
+  purpose: verifying that a rewrite does not break frontmatter that parsed before.
 - `src/readb/cli.py` — click CLI: `readb query`/`readb schema` (read-only) and `readb get`/`set`/
   `unset` (the frontmatter editor, addressed by `--bundle <dir> <concept-id>`).
 - `src/readb/registry.py` — `readb init` + upward bundle discovery (ADR 0004): `.readb/config.toml`

@@ -1,0 +1,16 @@
+{
+  "name": "readb",
+  "description": "The readb plugin: agent guidance for querying OKF bundles with SQL.",
+  "owner": {
+    "name": "Stanislav Lukyanov",
+    "url": "https://github.com/slukyano"
+  },
+  "plugins": [
+    {
+      "name": "readb",
+      "source": "./",
+      "description": "Query markdown files with YAML frontmatter using real SQL, and make surgical frontmatter edits.",
+      "license": "Apache-2.0"
+    }
+  ]
+}

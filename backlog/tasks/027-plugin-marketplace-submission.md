@@ -12,7 +12,7 @@ created: 2026-08-07
 timestamp: '2026-08-07T00:00:00Z'
 ---
 
-Deferred from [ship-usage-skill](025-ship-usage-skill.md) (sprint-003): that task makes this
+Deferred from [ship-usage-skill](../archive/025-ship-usage-skill.md) (sprint-003): that task makes this
 repository its own plugin marketplace, so installing the skill requires knowing the repository
 and adding it first (`/plugin marketplace add slukyano/readb`). Listing the plugin in the public
 community marketplace removes that step and makes it discoverable by search.

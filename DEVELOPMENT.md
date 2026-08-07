@@ -23,6 +23,9 @@ uv run readb --help  # exercise the CLI from the working copy
 - `docs/dev/` — developer documentation, an OKF bundle: the binding design brief
   (`design.md`), ADRs (`adr/`), research artifacts (`research/`).
 - `.readb/` — the committed readb bundle registry for this repo (`readb init`; ADR 0004).
+- `skills/readb/` — the usage skill shipped to agents; `.claude-plugin/` makes this repository
+  its own plugin marketplace. The skill's SQL examples are executed by the test suite.
+- `scripts/` — small release-support scripts (tested like the package).
 
 ## Stack
 
@@ -73,5 +76,6 @@ Which document takes which kind of change:
 
 ## Releasing
 
-The release procedure lives in [`CONTRIBUTING.md`](CONTRIBUTING.md#releasing). Automation is
-planned (backlog task `023-release-automation`).
+The release procedure lives in [`CONTRIBUTING.md`](CONTRIBUTING.md#releasing). Pushing a `v*`
+tag runs [`.github/workflows/release.yml`](.github/workflows/release.yml), which checks, builds,
+publishes to PyPI via Trusted Publishing, and creates the GitHub release.
