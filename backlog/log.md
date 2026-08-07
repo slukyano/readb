@@ -19,6 +19,16 @@
   fix had left the superseded MarkdownDB reading in
   [the survey](../docs/dev/research/similar-tools.md) it links to, which now carries a dated
   correction (the repository moved to `flowershow/markdowndb` and is active again).
+* **Workflow adopted from birch**: the sibling project's workflow had evolved past this one, and
+  the differences were merged back (maintainer decision, in chat). New: a mandatory closing TLDR
+  block with fixed sections and a fixed heading; lettered message sections, one per ask, with the
+  ask stated as a question rather than a topic; scope- and design-presentation requirements; a
+  **public-surface delta** in every `## Design` and in close-out; a **hands-on verification** gate
+  (behavior is run and observed, and what cannot be driven is named, not skipped); publication
+  hygiene split into hygiene and an agentless **voice** rule. The close-out ledger drops the ⚠️
+  transformation marker for a one-sentence description covering what changed, what the plan was,
+  and how it changed. readb-specific rules — dogfooding through `uvx readb`, the timestamp
+  fields — are unchanged.
 * **Public surfaces**: README examples moved off this project's own setup onto a neutral bundle,
   and the sdist stopped shipping `backlog/`, `docs/` and `AGENTS.md` — `pip download --no-binary`
   no longer hands the reader the project's sprint records.

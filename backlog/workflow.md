@@ -13,9 +13,9 @@ timestamp: '2026-07-17T00:00:00Z'
 This `backlog/` directory is the project backlog **and** an OKF bundle — one markdown file per
 concept. Active tasks live in `tasks/` (named `NNN-slug.md`, numbered sequentially), closed
 tasks move to `archive/` at close-out, and sprint records live in `sprints/`; `workflow.md`,
-`index.md`, and `log.md` stay at the bundle root. We dogfood readb here: the backlog is queried
+`index.md`, and `log.md` stay at the bundle root. readb is dogfooded here: the backlog is queried
 with readb itself (see [Querying with readb](#querying-with-readb)) and all frontmatter edits
-are made with readb's own field editor (`readb set`/`unset --bundle ./backlog <id> ...`).
+go through readb's own field editor (`readb set`/`unset --bundle ./backlog <id> ...`).
 
 Development happens in **sprints**, driven interactively in **sessions**:
 
@@ -97,6 +97,16 @@ The agent reviews the open backlog (`Draft` tasks, unblocked) and proposes a set
 sprint — proposing *all* open tasks is fine when the scope feels right. The maintainer adjusts and
 approves.
 
+The scope is **presented for approval** in the chat protocol (below), with:
+
+- the sprint id, theme, and branch;
+- an **in-scope task ledger** — every task as slug, priority, one-line description, and a
+  design-weight flag (trivial vs. design-heavy);
+- **ordering / dependencies** among the in-scope tasks;
+- **considered but out of scope** — tasks weighed and deferred, each with a one-line why;
+- the **scope rationale** — what ties the set together and what is deliberately held back;
+- the **sprint-start action** requested (commit `backlog/sprints/sprint-NNN.md`, cut `sprint/NNN`).
+
 **Scope approval is the sprint-start commit on `main`**: create `backlog/sprints/sprint-NNN.md`
 (status `Designing`, the task list, the branch name), commit it to `main`, then create the
 sprint branch `sprint/NNN` from it. All subsequent work happens on the branch.
@@ -111,8 +121,20 @@ asks questions, records decisions. Per task, the outcome is:
 - zero or more **ADRs** in `docs/dev/adr/` (status `Proposed`) for decisions of architectural
   weight. See [ADRs](#adrs).
 
-Commit throughout the phase. When all tasks in scope are designed, the maintainer reviews the
-batch. **Design approval** triggers, in order:
+Every `## Design` must enumerate the task's **complete public-surface delta** — every new or
+changed CLI command, flag, and output format; every public Python API name; every on-disk path,
+config key, and packaged artifact. Public surface means the **user-facing contract**, not internal
+module or function structure — those belong in the design prose, not the surface list. A task with
+no public-surface change states that explicitly. Carry the same enumeration into the
+design-approval and close-out presentations.
+
+Commit throughout the phase. When all tasks in scope are designed, present the batch for approval
+via the chat protocol below. The presentation **always includes, for each task**: a **design
+summary** (what it builds and how the task transformed from its original framing), the **key
+decisions** (with the alternatives weighed), the **ADRs** it introduces — each **stated as the
+decision it makes, in plain terms, not just its title** — and its **public-surface delta**; then
+the explicit open decisions the maintainer must make. Prefer **structured markdown — tables and
+lists — over prose** throughout the presentation. **Design approval** triggers, in order:
 
 1. ADRs from this phase flip `Proposed → Accepted` (only the maintainer approves ADRs).
 2. Tasks flip `Draft → Designed`; the sprint flips `Designing → Implementing`.
@@ -134,16 +156,30 @@ subagents where appropriate. Rules of the phase:
 ## 5. Gates (must pass before presenting)
 
 - **Validation** — the repository's declared checks pass
-  ([`DEVELOPMENT.md` § Checks](../DEVELOPMENT.md#checks)). New behavior is covered by tests.
+  ([`DEVELOPMENT.md` § Checks](../DEVELOPMENT.md#checks)). **Every new code path carries a test**:
+  a branch no test exercises is not delivered.
+- **Hands-on verification** — every new, changed, or fixed behavior is **run and observed**, not
+  merely unit-tested. Automated tests prove the logic; this gate proves the thing works when used.
+  Drive the CLI and read its output — commands, flags, output formats, error messages, exit codes
+  — and exercise the Python API directly. For a change to the write path, inspect the resulting
+  file bytes, not just the parsed result. Where behavior differs between the working copy and an
+  installed build, verify the built artifact too. Scenarios that cannot be driven — anything
+  needing a credential, a live registry, or a third-party service — are **named as such in the
+  presentation, never quietly skipped**.
 - **Independent review** — a fresh subagent with no implementation context reviews the full
   sprint diff; findings are fixed (or explicitly presented as known issues).
 - **Publication hygiene** — everything committed must be publishable as-is, since the repo
-  (history included) is public-bound. The review checks the sprint diff for: conversational or
-  second-person prose ("you asked…", chat-transcript style — write in third-person project
-  voice; role terms like "the maintainer"/"the agent" and project "we" are fine); references to
-  people beyond the intended author/copyright identity; claims about other projects that are
-  not factual, dated, and sourced (state facts, never disparage); and local paths, credentials,
-  private links, or other environment leakage.
+  (history included) is public-bound. Two checks:
+  - **Hygiene** — no identifiable individuals except the author/copyright identity in an
+    authorship or license capacity; no environment leakage (local paths, credentials, private
+    links, internal hostnames, machine-specific artifacts); claims about other projects factual,
+    dated, and sourced (state facts, never disparage); and nothing in a user-facing surface that
+    presents this project's own development process as part of readb (see `AGENTS.md`).
+  - **Voice** — impersonal and agentless: name the thing, not the actor (nominal or passive
+    constructions), no second-person or chat-transcript prose, no project "we". The sole
+    exception is this document's governance statements, where a role *is* the meaning ("only the
+    maintainer approves ADRs"); records, product docs, ADR decisions, and summaries carry no
+    roles.
 
 ## 6. Close-out, presentation & final merge
 
@@ -180,8 +216,16 @@ Present in the chat protocol below. The summary MUST include:
 - **A task ledger listing *every* task involved** — Done, Dropped, created-this-sprint, and
   planned-but-descoped. For each: its **relative weight** (`major` / `mid` / `minor` — size AND
   importance AND future impact; e.g. a package rename is a small diff but major impact), and a
-  **⚠️ mark if it transformed significantly** during design or implementation.
-- **Per change: what changed and why, and how the task transformed** from its original framing.
+  **brief description — one sentence, shorter where possible**, covering three things:
+  1. **what the change is**;
+  2. **what the plan was**;
+  3. **how the plan changed**.
+
+  Points 2 and 3 are omitted when the delivered change *is* the approved design with no
+  transformation — most tasks. Saying so in the sentence is the whole signal: no warning glyph, no
+  separate "transformed" marker, since a mark beside a description that already states the change
+  is redundant, and a mark on nearly every row means nothing at all.
+- **The public-surface delta** for the sprint as a whole, in the terms §3 defines.
 - **Explicitly what was NOT done** — deliberately or by omission — each item paired with its
   disposition (done, or the **named** `Draft` task that now holds it).
 - **Breaking changes.**
@@ -220,10 +264,123 @@ agent finishes an iteration or needs a decision, it formats the ask as:
 4. **references to the key files** touched or decided on (paths, with line numbers where it
    helps), so the maintainer can double-click into any detail,
 5. the **explicit list of questions** to answer (or the single question), each answerable
-   with a short reply.
+   with a short reply,
+6. a closing **TLDR block** — always last, and mandatory (format below).
 
 This applies to scope approval, design approval, implementation approval, ADR acceptance,
 and stop-and-ask questions raised mid-implementation.
+
+## The closing TLDR
+
+Every approval gate and every question set ends with:
+
+```
+# TLDR - <topic> - <phase> <Approval | Questions>
+```
+
+`Questions` means the phase continues after the answers; `Approval` means the next phase begins
+on approval. Example headings: `# TLDR - Sprint 004 - Field editor typing - Design Approval`,
+`# TLDR - Sprint 004 - Design Questions`.
+
+Under the heading:
+
+- a **bullet summary** of what is being looked at;
+- the **list of questions or items to approve explicitly**, with the recommendation in **bold**.
+
+Each question must be understandable **on its own** — no reliance on the prose above it, on an
+earlier message, or on a file. The TLDR repeats what a decision needs rather than referring to it.
+
+**Nothing else belongs in it.** The TLDR is read first and often alone, bottom-up; the prose above
+exists to be double-clicked into, not summarised a second time. The bar is *just enough to make
+scrolling up unnecessary* — and no more. Measurements, narrative, file lists, what was tried and
+rejected, per-item detail that does not change an answer: all of that goes above the separator.
+
+- **Gates are one line**: green or not, and the names of the checks that ran — e.g. *gates green
+  (ruff format, ruff check, pytest, hands-on, independent review)*. Test counts, timings, and
+  per-check output stay above.
+- **A fact earns its place only by changing a decision.** If the answer is the same whether or not
+  the maintainer knows it, it is not TLDR material.
+
+### Standard sections
+
+In this order, **omitting any that is empty**:
+
+1. **Done** — **applied changes only**: what was written somewhere durable — commits (pushed or
+   not), files created or edited, anything published to another repository or service. One line
+   per item: slug plus a few words, not a sentence. Includes scope creep and any extra work beyond
+   the approved set, marked as such, and work with no task behind it. Analysis, answers, findings,
+   and proposals that exist only in the chat are **not** Done — a draft is not a change, and
+   neither is a scratch file. If nothing was written, the section is omitted.
+2. **Scope rejected** — what the sprint took on and did *not* deliver, dropped after the scope was
+   approved. Never lists what was never in the started scope.
+3. **ADRs** — what each decides, summarised.
+4. **Surfaces** — what changed in the public surface, summarised.
+5. **Backlog changes** — changes to the *backlog itself*: tasks created, removed, retitled, or
+   re-scoped outside the sprint scope, and anything filed rather than fixed. Work that was simply
+   carried out is **Done**, not a backlog change. Informational: **no approval is asked for
+   these.**
+6. **Gates** — one line, per above.
+7. **The asks**, numbered. An ask exists for every decision not already approved explicitly — a
+   new or changed ADR, a decision taken during implementation the approved design did not cover.
+   **The ask to merge is always last.**
+
+### Message layout
+
+A message is plain prose, then **sections separated by `---`** — including before the TLDR. Each
+section covers one topic or one workflow operation: an acknowledgement, the context behind one
+ask, the TLDR. Sections are **lettered `A.`, `B.`, `C.`…** in order. Only one may be a TLDR, and
+it is always last.
+
+The TLDR's heading **names every topic it covers**, joined with `+`, so it is clear which sections
+it draws on.
+
+```
+plain chat text — the answer, the finding, whatever is being said
+---
+A. <topic> - Confirmation
+  an approved action that has now been carried out
+---
+B. <topic> - Approval
+  the context behind its ask
+---
+C. <other topic> - Approval
+  the context behind its ask
+---
+D. TLDR - <topic> + <other topic> - Approval
+  the TLDR
+```
+
+An action that was already approved and has now been carried out is **confirmed, never
+re-approved**: it appears in a Confirmation section and never in the TLDR, whose `Done` covers
+only changes belonging to the decision still open.
+
+There is no notes section, and no section for commentary. If an item is not one of the above, the
+threshold for mentioning it at all is that a decision changes without it.
+
+**Every ask has a matching section above the TLDR**, one per ask, carrying the context the ask
+itself is too short to hold: what the decision is, what the alternatives were, and the references
+worth opening — task slugs, ADRs, key files with line numbers. The ask stays one or two lines; the
+section above it is where the reasoning lives.
+
+**An ask to publish something carries the thing itself.** Filing an issue, opening a PR, sending a
+comment, posting a release note — the exact proposed text is part of the ask, not a summary of it,
+because the text *is* what is being approved. Short texts go inline; anything long enough to bury
+the decision goes in a file under the scratchpad with its path given in the ask.
+
+Each section **names its ask in its heading** — `## Ask 1 — <the question>` — so the pairing is
+obvious from either direction and survives renumbering. Sections appear in ask order.
+
+**An ask is a question or a choice, never a topic.** "Ask 1 — the write path and the guard" is a
+subject line; "Ask 1 — should `set` refuse a multi-line key?" is an ask. For an approval, state
+the **lasting effect being approved** — how the thing behaves from now on — rather than the edit
+that produced it, because the edit is not what is being agreed to. The same sentence opens the
+section, so the decision is legible without reading the reasoning under it.
+
+Every presentation is **self-contained**: full context and the explicit question(s) spelled out
+each time, never "as before" or a bare pointer. **Final approvals** (scope, design,
+implementation) are always presented on the **complete** artifact as a whole; partial or
+incremental presentations are legitimate only to gather intermediate feedback, never as the basis
+for a final sign-off — unless the maintainer explicitly opts into a partial.
 
 # Sprint frontmatter schema
 
