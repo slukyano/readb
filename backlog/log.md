@@ -1,5 +1,23 @@
 # Task Bundle Log
 
+## 2026-08-07
+* **Sprint 003 design approved**: All four designs approved in chat — span-based field edits
+  ([026](tasks/026-field-editor-multiline-corruption.md)), the repository as its own plugin
+  marketplace ([025](tasks/025-ship-usage-skill.md)), the drafted prior-art section
+  ([019](tasks/019-readme-prior-art.md)), and a tag-triggered release workflow
+  ([023](tasks/023-release-automation.md)). Tasks flipped `Draft -> Designed`,
+  [sprint-003](sprints/sprint-003.md) `Designing -> Implementing`, branch design-merged to `main`.
+  No ADRs proposed.
+* **Design corrections from review**: the usage skill left `src/` — distribution now rides the
+  plugin/marketplace mechanism rather than a bespoke `readb skill` command. Re-checking the
+  prior-art figures caught a claim that would have shipped false: MarkdownDB has moved to
+  `flowershow/markdowndb` and is active again, not "stalled since March 2024".
+* **New drafts**: [027-plugin-marketplace-submission](tasks/027-plugin-marketplace-submission.md)
+  (public listing, behind an external review pipeline) and
+  [028-evaluate-rust-rewrite](tasks/028-evaluate-rust-rewrite.md) (raised by the maintainer;
+  measured evidence recorded, sequenced behind
+  [024](tasks/024-measure-agent-efficiency.md); `023` stays in sprint-003).
+
 ## 2026-08-06
 * **Sprint 003 started**: Scope approved in chat — [ship-usage-skill](tasks/025-ship-usage-skill.md),
   [readme-prior-art](tasks/019-readme-prior-art.md),

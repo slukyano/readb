@@ -2,14 +2,14 @@
 type: Task
 title: Fix set/unset corrupting multi-line frontmatter values
 description: The line-based field editor rewrites only the `key:` line, orphaning block-list, block-scalar and nested-mapping continuation lines into invalid YAML.
-status: Draft
+status: Designed
 priority: high
 tags:
 - bug
 - fields
 - dogfooding
 created: 2026-08-06
-timestamp: '2026-08-06T00:00:00Z'
+timestamp: '2026-08-07T00:00:00Z'
 ---
 
 `readb set` and `readb unset` treat a frontmatter key as exactly one line. When the value spans

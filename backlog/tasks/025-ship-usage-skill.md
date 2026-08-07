@@ -2,7 +2,7 @@
 type: Task
 title: Ship a readb usage skill with the repo
 description: An agent skill in the readb repo documenting how to use readb, installable into agent environments instead of living in personal dotfiles.
-status: Draft
+status: Designed
 priority: medium
 tags:
 - docs

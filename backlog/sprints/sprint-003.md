@@ -2,7 +2,7 @@
 type: Sprint
 title: Post-0.1.0 adoption — usage skill, prior art, release automation
 description: Ship a readb usage skill, place readb honestly among prior art in the README, automate tag-triggered releases, and fix the field editor's multi-line corruption bug.
-status: Designing
+status: Implementing
 branch: sprint/003
 tasks:
 - 026-field-editor-multiline-corruption
@@ -72,12 +72,6 @@ Design phase (a checked box = `## Design` section written and discussed):
 
 ## Open questions
 
-- **Rust rewrite vs. `023`** (raised by the maintainer 2026-08-07): if readb leaves Python, a PyPI
-  release pipeline is the wrong investment order. Recorded as
-  [028-evaluate-rust-rewrite](../tasks/028-evaluate-rust-rewrite.md) with the measured evidence.
-  The agent's reading: keep `023` — the workflow's skeleton survives any rewrite and a Python 0.x
-  line would keep releasing through a transition — but the maintainer decides whether `023` stays
-  in this sprint.
 - **`023` hand-off** (open, maintainer action): configuring the PyPI trusted publisher — owner
   `slukyano`, repo `readb`, workflow `release.yml`, environment `pypi`, and the same on TestPyPI
   for the rehearsal. Approved at scoping; the workflow lands first and is verified once the
@@ -86,6 +80,12 @@ Design phase (a checked box = `## Design` section written and discussed):
 Resolved:
 
 - **Scope addition** (2026-08-06) — `026` confirmed in scope by the maintainer.
+- **Rust rewrite vs. `023`** (2026-08-07) — the maintainer raised that automating a PyPI release
+  pipeline is the wrong investment order if readb is leaving Python. Recorded with its measured
+  evidence as [028-evaluate-rust-rewrite](../tasks/028-evaluate-rust-rewrite.md) and sequenced
+  behind [024](../tasks/024-measure-agent-efficiency.md); `023` **stays in this sprint** — the
+  workflow's skeleton (tag guard, changelog extraction, GitHub release) survives any rewrite, and
+  a Python 0.x line would keep releasing through a transition.
 
 ## Session log
 
@@ -100,4 +100,6 @@ Resolved:
   survey's "MarkdownDB stalled since March 2024" is stale and the repository has moved to
   `flowershow/markdowndb`. New drafts:
   [027-plugin-marketplace-submission](../tasks/027-plugin-marketplace-submission.md),
-  [028-evaluate-rust-rewrite](../tasks/028-evaluate-rust-rewrite.md).
+  [028-evaluate-rust-rewrite](../tasks/028-evaluate-rust-rewrite.md). **Design approved** the same
+  day, `023` kept in scope: the four tasks flipped `Draft → Designed`, the sprint flipped
+  `Designing → Implementing`, and the branch design-merged to `main`. Implementation started.

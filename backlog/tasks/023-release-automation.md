@@ -2,14 +2,14 @@
 type: Task
 title: Automate releases (GitHub Actions + PyPI Trusted Publishing)
 description: Replace manual uv publish with a tag-triggered workflow using OIDC trusted publishing; consider a CHANGELOG.
-status: Draft
+status: Designed
 priority: low
 tags:
 - packaging
 - release
 - ci
 created: 2026-07-20
-timestamp: '2026-08-06T00:00:00Z'
+timestamp: '2026-08-07T00:00:00Z'
 ---
 
 Deferred from the [distributable-package](../archive/003-distributable-package.md) design (sprint-002): 0.1.0

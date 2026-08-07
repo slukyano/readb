@@ -2,7 +2,7 @@
 type: Task
 title: Add a "prior art / how readb differs" note to the README
 description: Cite frontmatter-mcp, MarkdownDB, and Dataview; state readb's niche and the deliberate non-inference of the field editor.
-status: Draft
+status: Designed
 priority: low
 tags:
 - docs
