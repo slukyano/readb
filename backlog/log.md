@@ -14,6 +14,11 @@
   unsetting one field deleted its neighbour) and two release-workflow ordering bugs that would
   only have surfaced mid-release. Pre-existing edges it surfaced became
   [029](tasks/029-field-editor-remaining-edges.md).
+* **Summary accuracy check**: a second fresh reviewer verified the close-out summary against the
+  diff and live gate output. Six inaccuracies corrected, one substantive: the README's prior-art
+  fix had left the superseded MarkdownDB reading in
+  [the survey](../docs/dev/research/similar-tools.md) it links to, which now carries a dated
+  correction (the repository moved to `flowershow/markdowndb` and is active again).
 * **Public surfaces**: README examples moved off this project's own setup onto a neutral bundle,
   and the sdist stopped shipping `backlog/`, `docs/` and `AGENTS.md` — `pip download --no-binary`
   no longer hands the reader the project's sprint records.

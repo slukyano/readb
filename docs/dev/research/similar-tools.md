@@ -7,12 +7,20 @@ tags:
 - survey
 surveyed: 2026-07-17
 created: 2026-07-20
-timestamp: '2026-07-20T00:00:00Z'
+timestamp: '2026-08-07T00:00:00Z'
 ---
 
 Produced by the backlog task `research-similar-tools` (sprint-002) via a
 fan-out web survey verified against each tool's own repo/docs. Point-in-time data (star counts,
 maintenance status) is dated inline — true as of the date given, worth keeping *with* the date.
+
+**Correction, re-checked 2026-08-07 (sprint-003).** The MarkdownDB entries below are
+superseded: the repository has **moved** from `datopian/markdowndb` to
+[`flowershow/markdowndb`](https://github.com/flowershow/markdowndb) (the old path redirects), and
+it is **no longer stalled** — 499 stars, last commit 2026-05-21. The "stalled since March 2024"
+reading was true when surveyed and is not true now; the marked entries carry this correction
+inline. Everything else re-checked on the same date still holds: frontmatter-mcp 1 star, last
+commit 2025-12-31; Obsidian Dataview 9,256 stars.
 
 Confidence: the Backlog.md and taskmd claims were adversarially verified (2–3 independent
 votes each); the Dataview / Foam / Dendron / MarkdownDB / frontmatter-mcp / mdbasequery / yq /
@@ -26,7 +34,8 @@ Two tools sit almost exactly on readb's spot and are the most important finds:
   frontmatter with **DuckDB SQL**." Same engine, same data model as readb; packaged as an MCP
   server rather than a CLI/library. Proof the exact approach is viable — and that readb's
   differentiation is *packaging*, not the core idea.
-- **MarkdownDB** (`datopian/markdowndb`) — a JS/TS library that indexes a markdown folder into a
+- **MarkdownDB** (`flowershow/markdowndb`; surveyed as `datopian/markdowndb`, which now
+  redirects) — a JS/TS library that indexes a markdown folder into a
   real SQL database (SQLite by default; MySQL/Postgres via Knex) and lets you run raw SQL over
   the index tables (e.g. join `files` with `file_tags`). Same "load markdown into an embedded
   SQL engine" architecture — but a managed on-disk index + JS API vs. readb's transparent
@@ -109,8 +118,11 @@ language. readb's real-SQL-via-DuckDB buys joins/aggregates/window functions non
   [Hacker News launch thread](https://news.ycombinator.com/item?id=44483530) (top asks:
   dependency management, Jira/OpenRouter integration). The most mature/adopted tool in the
   survey by a wide margin.
-- **MarkdownDB** — **~495 stars, 25 forks**, TypeScript, npm `mddb`. **Stalled**: latest
-  release v0.9.5 March 2024, pre-1.0, 9 open issues / 0 PRs at check time.
+- **MarkdownDB** — **~495 stars, 25 forks**, TypeScript, npm `mddb`. Read as **stalled** at
+  survey time: latest release v0.9.5 March 2024, pre-1.0, 9 open issues / 0 PRs at check time.
+  **Superseded 2026-08-07**: 499 stars and a last commit of 2026-05-21 under the repository's
+  new home, `flowershow/markdowndb` — the project is active, and any claim that it is dormant
+  should not be repeated.
 - **frontmatter-mcp** — **1 star, 2 forks** (Python, DuckDB, v0.5.3 Dec 2025). Effectively
   zero adoption; architecturally the closest twin to readb. The niche is validated yet
   unclaimed in practice.
@@ -148,6 +160,6 @@ Primary repos/docs: `github.com/MrLesk/Backlog.md` (+ `CLI-INSTRUCTIONS.md`),
 `github.com/driangle/taskmd` (+ `driangle.github.io/taskmd`), `github.com/mtoohey31/taskmatter`,
 `github.com/marad/frontmatter`, `blacksmithgu.github.io/obsidian-dataview`,
 `github.com/blacksmithgu/obsidian-dataview`, `foambubble.github.io/foam`, `wiki.dendron.so`,
-`github.com/datopian/markdowndb` (+ `markdowndb.com`), `github.com/kzmshx/frontmatter-mcp`,
+`github.com/datopian/markdowndb` → `github.com/flowershow/markdowndb` (+ `markdowndb.com`), `github.com/kzmshx/frontmatter-mcp`,
 `github.com/intellectronica/mdbasequery`, `mikefarah.gitbook.io/yq`, plus the Obsidian forum
 (filename-clash behavior) and Hacker News (Backlog.md launch).

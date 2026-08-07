@@ -73,16 +73,18 @@ Design phase (a checked box = `## Design` section written and discussed):
 
 ## Sprint summary
 
-Delivered all four tasks. Gates green at close: **186 tests pass** (129 at sprint start, +57),
-`ruff` clean, `claude plugin validate --strict` passes, and the built sdist's own suite passes
-standalone.
+Delivered all four tasks. Gates green at close: **186 tests** (129 at sprint start, +57), all
+passing where the optional upstream `ga4` fixture is cloned and 182 passing / 4 skipping where it
+is not; `ruff` clean; `claude plugin validate --strict` passes; the built sdist's own suite runs
+standalone (182 passed, 4 skipped — the sdist does not vendor that fixture).
 
 **Per task:**
 
 - `026-field-editor-multiline-corruption` — found while executing this sprint's own scope
   approval. `set`/`unset` assumed a key occupied one line, so any multi-line value had its
   continuation lines orphaned into invalid YAML, after which the permissive loader skipped the
-  concept **silently**. A key is now addressed by its whole span: `unset` removes it, `set`
+  concept. The *edit* was the silent part — exit 0, no warning — while the skip logged to stderr;
+  either way the concept vanished from every query. A key is now addressed by its whole span: `unset` removes it, `set`
   refuses a multi-line key all-or-nothing, `get` returns the raw fragment instead of `""`, and
   `_rewrite` abandons any write that would turn valid frontmatter invalid.
 - `025-ship-usage-skill` — ⚠️ **transformed at design review.** The first design packaged the
@@ -92,8 +94,11 @@ standalone.
   example in the skill is executed by the suite against a new neutral `library` fixture.
 - `019-readme-prior-art` — a `## Prior art` section led by the transparent-disposable-index
   framing. Re-checking the figures was not a formality: MarkdownDB has moved to
-  `flowershow/markdowndb` and is active again, so sprint-002's survey line ("stalled since March
-  2024") would have shipped as a false claim about another project.
+  `flowershow/markdowndb` and is active again, so sprint-002's survey reading of it as *stalled*
+  (`**Stalled**: latest release v0.9.5 March 2024`) was about to be repeated as a live claim
+  about another project. The accuracy check then caught that fixing the README alone was not
+  enough — the survey it links to still carried the superseded reading, and now carries a dated
+  correction instead.
 - `023-release-automation` — ⚠️ **shrank before it started**: `ci.yml`, `CHANGELOG.md` and
   `CONTRIBUTING.md` had already landed on `main` outside a sprint, leaving the release workflow
   itself. Pushing a `v*` tag now guards tag against version, re-runs the checks, builds,
@@ -153,10 +158,11 @@ text). The independent review then found nine issues, all fixed here:
 [027](../tasks/027-plugin-marketplace-submission.md); the Rust question →
 [028](../tasks/028-evaluate-rust-rewrite.md); write-path edges →
 [029](../tasks/029-field-editor-remaining-edges.md); typed `set` →
-[016](../tasks/016-field-editor-type-inference.md). Still deferred, untouched:
-[024](../tasks/024-measure-agent-efficiency.md), [009](../tasks/009-bundle-index-log-automation.md),
+[016](../tasks/016-field-editor-type-inference.md). Still deferred:
+[024](../tasks/024-measure-agent-efficiency.md) (untouched but for a re-pointed link),
+[009](../tasks/009-bundle-index-log-automation.md),
 [005](../tasks/005-research-body-structured-query.md), [017](../tasks/017-frontmatter-schema-checking.md),
-[021](../tasks/021-cross-bundle-querying.md).
+[021](../tasks/021-cross-bundle-querying.md) — these four wholly untouched.
 
 ## Open questions
 
@@ -196,4 +202,7 @@ Resolved:
   introduced into the span logic; all nine were fixed and pinned by tests, and the pre-existing
   edges it surfaced became [029](../tasks/029-field-editor-remaining-edges.md). Tasks flipped
   `Designed → Done`, sprint `Implementing → Done`, files archived, index and log brought current.
-  Gates green: 186 tests, `ruff` clean.
+  Gates green: 186 tests, `ruff` clean. A second fresh reviewer fact-checked this summary against
+  the diff and live gate output; six inaccuracies in it were corrected, one of which was
+  substantive — the superseded MarkdownDB reading still shipped in the survey the new README
+  section links to, and now carries a dated correction.

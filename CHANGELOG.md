@@ -10,7 +10,8 @@ All notable changes to readb are documented here, following
 - `readb set` and `readb unset` no longer corrupt a frontmatter key whose value spans several
   lines (a list, a `|`/`>` block scalar, or a nested mapping). They previously rewrote or removed
   only the `key:` line and left the rest of the value behind as invalid YAML, after which the
-  permissive loader skipped the concept silently. Each key is now addressed as a whole span:
+  permissive loader skipped the concept — the edit itself reported nothing, so the loss only
+  showed up as a document missing from later results. Each key is now addressed as a whole span:
   `unset` removes the value entirely, and `set` refuses a multi-line key — with a message saying
   to unset it first — instead of discarding a value you did not name. A refusal leaves the file
   untouched even when other assignments in the same command were valid.
