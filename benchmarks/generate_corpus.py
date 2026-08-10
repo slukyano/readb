@@ -276,6 +276,36 @@ def generate(concepts: int, seed: int) -> tuple[list[Concept], dict]:
             )
         )
 
+    # --- Fuzzy-retrieval plants -----------------------------------------------
+    # Four runbooks get a Failover section. All four mention a standby and a datastore,
+    # so neither grep nor a SQL LIKE can separate them: only one actually describes
+    # promoting the datastore's standby, and finding it means reading the candidates.
+    fuzzy_targets = [runbooks[i] for i in (7, 41, 88, 150) if i < len(runbooks)]
+    fuzzy_bodies = [
+        (
+            "The standby datastore is promoted to accept writes once the primary is fenced, "
+            "and the connection string is repointed before traffic is readmitted."
+        ),
+        (
+            "Traffic is drained from the affected region while the datastore and its standby "
+            "stay in place; nothing is promoted and no write path moves."
+        ),
+        (
+            "Credentials for the datastore and its standby are rotated in place; the write "
+            "path is untouched and no promotion occurs."
+        ),
+        (
+            "A snapshot is restored into a fresh datastore while the standby continues to "
+            "replicate; the restored copy is verified before anything is promoted."
+        ),
+    ]
+    fuzzy_by_name = {
+        rb["name"]: body for rb, body in zip(fuzzy_targets, fuzzy_bodies, strict=False)
+    }
+    for concept in out:
+        if concept.name in fuzzy_by_name:
+            concept.body += "\n# Failover\n\n" + fuzzy_by_name[concept.name] + "\n"
+
     # --- Decisions ------------------------------------------------------------
     decisions: list[dict] = []
     for i in range(n_decisions):
@@ -305,7 +335,59 @@ def generate(concepts: int, seed: int) -> tuple[list[Concept], dict]:
         )
 
     truth = ground_truth(services, runbooks, incidents, decisions)
+    truth["q9"] = {"runbook": runbooks[3]["name"], "answer": runbooks[3]["service"]}
+    truth["q11"] = {
+        "answer": fuzzy_targets[0]["name"],
+        "distractors": [r["name"] for r in fuzzy_targets[1:]],
+    }
+    truth["q12"] = {
+        "a": sum(1 for s in services if s["tier"] == 1),
+        "b": sum(1 for r in runbooks if r["status"] == "current"),
+        "c": sum(1 for i in incidents if i["severity"] == "sev1"),
+        "d": sum(1 for d in decisions if d["status"] == "accepted"),
+        "e": sum(1 for s in services if s["team"] == "identity"),
+    }
     return out, truth
+
+
+MALFORMED_TEMPLATE = """---
+type: Service
+title: {title}
+team: {team}
+tier: {tier}
+tags: [{tag}, broken
+status: {status}
+language: {language}
+---
+
+# Summary
+
+{sentence}
+"""
+
+
+def malformed_services(count: int, seed: int) -> list[tuple[str, str]]:
+    """Service files whose frontmatter declares its type but does not parse as YAML.
+
+    The unclosed flow sequence is the fault. readb's permissive load skips such a file
+    with a logged warning — so a count taken through readb alone silently omits them.
+    That is a documented behaviour of the tool and the point of the question.
+    """
+    rng = random.Random(seed + 977)
+    files = []
+    for i in range(count):
+        name = f"svc-9{i + 1:03d}-{rng.choice(SERVICE_QUALIFIERS)}-{rng.choice(SERVICE_NOUNS)}"
+        text = MALFORMED_TEMPLATE.format(
+            title=name.split("-", 2)[2].replace("-", " ").title(),
+            team=rng.choice(TEAMS),
+            tier=rng.choice(TIERS),
+            tag=rng.choice(TAG_POOL),
+            status=rng.choice(SERVICE_STATUSES),
+            language=rng.choice(LANGUAGES),
+            sentence=rng.choice(BODY_SENTENCES),
+        )
+        files.append((name, text))
+    return files
 
 
 def ground_truth(
@@ -329,7 +411,9 @@ def ground_truth(
     # Q3 targets the team owning the most services, so the answer set is never empty.
     q3_team = top_team[0]
     q3 = sorted(
-        s["name"] for s in services if s["team"] == q3_team and s["tier"] == 1 and s["status"] != "ga"
+        s["name"]
+        for s in services
+        if s["team"] == q3_team and s["tier"] == 1 and s["status"] != "ga"
     )
 
     q4 = sorted(
@@ -351,7 +435,9 @@ def ground_truth(
     # Q8 is deliberately narrowed by three predicates: the un-narrowed "runbooks covering
     # any sev1-affected service" answer runs to ~90 names, which measures an agent's
     # willingness to type a long list more than its ability to find the answer.
-    sev1_services = sorted({n for inc in incidents if inc["severity"] == "sev1" for n in inc["services"]})
+    sev1_services = sorted(
+        {n for inc in incidents if inc["severity"] == "sev1" for n in inc["services"]}
+    )
     q8 = sorted(
         r["name"]
         for r in runbooks
@@ -384,8 +470,10 @@ def ground_truth(
     }
 
 
+# The index deliberately carries no `type:` key. With one, an arm reading files directly
+# reports it as a fifth type while readb — which treats `index.md` as OKF-reserved — does
+# not, and the question silently tests knowledge of that convention instead of efficiency.
 INDEX = """---
-type: Index
 title: Platform knowledge base
 ---
 
@@ -400,7 +488,14 @@ Services, their runbooks, the incidents that hit them, and the decisions behind 
 """
 
 
-def write(out_dir: Path, truth_path: Path, concepts: list[Concept], truth: dict) -> None:
+def write(
+    out_dir: Path,
+    truth_path: Path,
+    concepts: list[Concept],
+    truth: dict,
+    malformed: int = 0,
+    seed: int = 24,
+) -> None:
     """Write the bundle to `out_dir` and the answers to `truth_path`.
 
     The ground truth is written OUTSIDE the bundle on purpose: an agent under test can
@@ -420,28 +515,130 @@ def write(out_dir: Path, truth_path: Path, concepts: list[Concept], truth: dict)
             needle_holders.append(concept.name)
 
     if len(needle_holders) != 1:
-        raise AssertionError(f"needle phrase must occur in exactly one concept, got {needle_holders}")
+        raise AssertionError(
+            f"needle phrase must occur in exactly one concept, got {needle_holders}"
+        )
     truth["q7"]["answer"] = needle_holders[0]
 
     names = [c.name for c in concepts]
     if len(set(names)) != len(names):
         raise AssertionError("concept names must be unique across the bundle")
 
+    if malformed:
+        services_dir = out_dir / "services"
+        for name, text in malformed_services(malformed, seed):
+            (services_dir / f"{name}.md").write_text(text)
+        truth["q10"] = {"answer": truth["counts"]["Service"] + malformed, "malformed": malformed}
+
+    _assert_no_leak_in_index(out_dir, truth)
+    _cross_check(out_dir, truth, malformed)
+
     truth_path.parent.mkdir(parents=True, exist_ok=True)
     truth_path.write_text(json.dumps(truth, indent=2, sort_keys=True) + "\n")
+
+
+def _flatten_answers(truth: dict) -> list[str]:
+    values: list[str] = []
+    for value in truth.values():
+        if isinstance(value, dict):
+            values.extend(str(v) for v in value.values() if not isinstance(v, list))
+            for v in value.values():
+                if isinstance(v, list):
+                    values.extend(str(x) for x in v)
+        elif isinstance(value, list):
+            values.extend(str(v) for v in value)
+        else:
+            values.append(str(value))
+    return values
+
+
+def _assert_no_leak_in_index(out_dir: Path, truth: dict) -> None:
+    """`index.md` must not hand any answer over: it is prose, never a rollup."""
+    index = (out_dir / "index.md").read_text()
+    for answer in _flatten_answers(truth):
+        if len(answer) > 3 and answer in index:
+            raise AssertionError(f"index.md leaks a ground-truth value: {answer!r}")
+
+
+def _cross_check(out_dir: Path, truth: dict, malformed: int) -> None:
+    """Recompute the headline answers by a second, independent path.
+
+    Ground truth above comes from the generation parameters. This reads the files back
+    off disk with PyYAML and must agree — a generator bug would otherwise be scored as
+    an agent's error, penalising whichever arm was right.
+    """
+    try:
+        import yaml
+    except ImportError:  # the cross-check is a safety net, not a hard dependency
+        print("warning: PyYAML unavailable, skipping the independent cross-check")
+        return
+
+    parsed: list[dict] = []
+    unparseable = 0
+    declared_service = 0
+    for path in sorted(out_dir.rglob("*.md")):
+        if path.name == "index.md":
+            continue
+        text = path.read_text()
+        _, _, rest = text.partition("---\n")
+        block, _, _ = rest.partition("\n---")
+        if any(line.strip() == "type: Service" for line in block.splitlines()):
+            declared_service += 1
+        try:
+            data = yaml.safe_load(block)
+        except yaml.YAMLError:
+            unparseable += 1
+            continue
+        if isinstance(data, dict):
+            data["__name"] = path.stem
+            parsed.append(data)
+
+    counts: dict[str, int] = {}
+    for record in parsed:
+        counts[record.get("type", "?")] = counts.get(record.get("type", "?"), 0) + 1
+    if counts != truth["counts"]:
+        raise AssertionError(f"cross-check disagrees on type counts: {counts} != {truth['counts']}")
+    if unparseable != malformed:
+        raise AssertionError(
+            f"cross-check found {unparseable} unparseable files, expected {malformed}"
+        )
+    if malformed and declared_service != truth["q10"]["answer"]:
+        raise AssertionError(
+            f"cross-check counts {declared_service} files declaring type Service, "
+            f"expected {truth['q10']['answer']}"
+        )
+
+    q3 = sorted(
+        r["__name"]
+        for r in parsed
+        if r.get("type") == "Service"
+        and r.get("team") == truth["q3"]["team"]
+        and r.get("tier") == 1
+        and r.get("status") != "ga"
+    )
+    if q3 != truth["q3"]["answer"]:
+        raise AssertionError("cross-check disagrees on q3")
 
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--out", required=True, type=Path)
-    ap.add_argument("--truth", type=Path, help="default: <out>_ground_truth.json, beside the bundle")
+    ap.add_argument(
+        "--truth", type=Path, help="default: <out>_ground_truth.json, beside the bundle"
+    )
     ap.add_argument("--concepts", type=int, default=600)
     ap.add_argument("--seed", type=int, default=24)
+    ap.add_argument(
+        "--malformed",
+        type=int,
+        default=0,
+        help="extra service files whose frontmatter declares its type but does not parse",
+    )
     args = ap.parse_args()
 
     truth_path = args.truth or args.out.parent / f"{args.out.name}_ground_truth.json"
     concepts, truth = generate(args.concepts, args.seed)
-    write(args.out, truth_path, concepts, truth)
+    write(args.out, truth_path, concepts, truth, malformed=args.malformed, seed=args.seed)
     print(f"{len(concepts)} concepts -> {args.out}")
     print(json.dumps(truth["counts"], sort_keys=True))
 

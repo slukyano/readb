@@ -43,7 +43,7 @@ packages = ["src/readb"]
 [tool.hatch.build.targets.sdist]
 # The sdist is a public artifact. It carries the package, its tests, and the user-facing docs;
 # this project's own development process is not part of readb and stays out of it.
-exclude = ["backlog", "docs", ".readb", "AGENTS.md", "CLAUDE.md"]
+exclude = ["backlog", "docs", "benchmarks", ".readb", "AGENTS.md", "CLAUDE.md"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
