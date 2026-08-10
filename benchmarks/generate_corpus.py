@@ -280,7 +280,15 @@ def generate(concepts: int, seed: int) -> tuple[list[Concept], dict]:
     # Four runbooks get a Failover section. All four mention a standby and a datastore,
     # so neither grep nor a SQL LIKE can separate them: only one actually describes
     # promoting the datastore's standby, and finding it means reading the candidates.
-    fuzzy_targets = [runbooks[i] for i in (7, 41, 88, 150) if i < len(runbooks)]
+    # Spread across the runbooks rather than at fixed indices: at 150 concepts there are only
+    # 50 runbooks, and fixed indices silently planted two candidates while Q11's prompt promised
+    # four.
+    if len(runbooks) < 4:
+        raise ValueError(
+            f"need at least 4 runbooks to plant the fuzzy candidates, got {len(runbooks)}"
+        )
+    step = len(runbooks) // 4
+    fuzzy_targets = [runbooks[i * step] for i in range(4)]
     fuzzy_bodies = [
         (
             "The standby datastore is promoted to accept writes once the primary is fenced, "
@@ -299,9 +307,7 @@ def generate(concepts: int, seed: int) -> tuple[list[Concept], dict]:
             "replicate; the restored copy is verified before anything is promoted."
         ),
     ]
-    fuzzy_by_name = {
-        rb["name"]: body for rb, body in zip(fuzzy_targets, fuzzy_bodies, strict=False)
-    }
+    fuzzy_by_name = {rb["name"]: body for rb, body in zip(fuzzy_targets, fuzzy_bodies, strict=True)}
     for concept in out:
         if concept.name in fuzzy_by_name:
             concept.body += "\n# Failover\n\n" + fuzzy_by_name[concept.name] + "\n"

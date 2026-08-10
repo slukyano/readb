@@ -103,8 +103,11 @@ def test_cost_model_reproduces_a_known_billing():
 
 
 def test_cost_model_falls_back_to_the_flat_cache_creation_field():
+    """An untyped cache-creation count is priced at the cheaper TTL, never the dearer one."""
     out = costs({"input_tokens": 10, "output_tokens": 0, "cache_creation_input_tokens": 100})
     assert out["new_tokens_ingested"] == 110
+    expected = (10 * 3.00 + 100 * 3.75) / 1e6
+    assert out["cost_billed_usd"] == pytest.approx(expected)
 
 
 # --- integrity checks ---------------------------------------------------------
@@ -172,3 +175,84 @@ def test_the_index_leaks_no_answer(tmp_path):
     index = (tmp_path / "kb" / "index.md").read_text()
     assert "type:" not in index, "a typed index makes the rollup question test OKF trivia"
     assert "180" not in index
+
+
+# --- the analyzer -------------------------------------------------------------
+# This is the code that turns records into published numbers. The exclusion predicate in
+# particular decides whether a retracted batch reaches a table.
+
+import analyze  # noqa: E402
+
+
+def _rec(arm, question, cost, **extra):
+    rec = {
+        "arm": arm,
+        "question": question,
+        "repeat": 1,
+        "shape": "s",
+        "favours": "sql",
+        "correct": True,
+        "partial_credit": 1.0,
+        "cost_billed_usd": cost,
+        "cost_cache_neutral_usd": cost * 3,
+        "new_tokens_ingested": 1000,
+        "wall_s": 1.0,
+        "output_tokens": 100,
+        "num_turns": 2,
+        "cumulative_prompt_tokens": 10_000,
+    }
+    rec.update(extra)
+    return rec
+
+
+def test_retracted_records_are_excluded():
+    assert analyze.invalid(_rec("a", "q1", 1.0, retracted="environment defect")) == (
+        "environment defect"
+    )
+    assert analyze.invalid(_rec("a", "q1", 1.0)) is None
+
+
+def test_other_exclusion_reasons():
+    assert analyze.invalid(_rec("a", "q1", 1.0, harness_error="timeout")) == "timeout"
+    assert "leaked" in analyze.invalid(_rec("a", "q1", 1.0, leak_baseline_readb=True))
+    assert "permission" in analyze.invalid(_rec("a", "q1", 1.0, permission_denials=["Bash"]))
+    assert analyze.invalid(_rec("a", "q1", 1.0, is_error=True)) is not None
+
+
+def test_paired_ratio_is_a_median_over_questions_not_over_runs():
+    """One question dominated by an outlier must not carry the arm-level ratio."""
+    rows = [
+        _rec("baseline", "q1", 1.0),
+        _rec("arm", "q1", 0.5),
+        _rec("baseline", "q2", 1.0),
+        _rec("arm", "q2", 0.5),
+        _rec("baseline", "q3", 1.0),
+        _rec("arm", "q3", 100.0),
+    ]
+    ratios = []
+    for q in ("q1", "q2", "q3"):
+        b = analyze.med(
+            [r["cost_billed_usd"] for r in rows if r["arm"] == "baseline" and r["question"] == q]
+        )
+        v = analyze.med(
+            [r["cost_billed_usd"] for r in rows if r["arm"] == "arm" and r["question"] == q]
+        )
+        ratios.append(v / b)
+    assert analyze.med(ratios) == 0.5
+
+
+def test_bootstrap_interval_brackets_the_median_and_is_seed_stable():
+    ratios = [0.5, 0.6, 0.7, 0.8, 0.9]
+    lo, hi = analyze.bootstrap_ci(ratios)
+    assert lo <= 0.7 <= hi
+    assert analyze.bootstrap_ci(ratios) == (lo, hi)
+
+
+def test_bootstrap_declines_to_invent_an_interval_from_two_points():
+    lo, hi = analyze.bootstrap_ci([0.5, 0.6])
+    assert lo != lo and hi != hi  # NaN
+
+
+def test_median_of_nothing_is_nan_not_a_crash():
+    assert analyze.med([]) != analyze.med([])
+    assert analyze.fmt(float("nan"), 2) == "—"

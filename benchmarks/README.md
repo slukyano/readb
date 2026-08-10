@@ -10,49 +10,88 @@ Development material — excluded from the sdist, not part of the readb package.
 | File | What it is |
 | --- | --- |
 | `generate_corpus.py` | Deterministic synthetic OKF bundle (services, runbooks, incidents, decisions) plus its ground truth, computed in plain Python and written **outside** the bundle. |
-| `battery.py` | The eight questions, their answer protocol, and the scorer. |
+| `battery.py` | The twelve questions, their answer protocol, and the scorer. |
 | `run_benchmark.py` | Runs the matrix of arm × question × repeat and appends one JSON line per run. |
 | `analyze.py` | Aggregates a results file into the published tables. |
-| `test_harness.py` | Tests for the scorer, the cost model, the integrity checks and the corpus invariants. |
-| `results/` | Raw per-run records, full transcripts, and a `manifest.json` per batch. |
+| `test_harness.py` | Tests for the scorer, the cost model, the integrity checks, the exclusion rule and the corpus invariants. |
+| `results/` | Raw per-run records, full transcripts per batch, a `manifest-<batch>.json` per batch, and the generated analyses. |
 
-The harness has its own suite — the scorer decides what gets published, and the cost model
-turns token counts into a number a reader will quote:
+Run the harness suite by name — it is outside the package's `testpaths`:
 
 ```sh
 uv run pytest benchmarks
 ```
 
-The package's own suite does not collect this directory, and the sdist does not ship it.
-
-## Reproducing
-
-```sh
-python benchmarks/generate_corpus.py --out /tmp/corpus600 --concepts 600 --seed 24
-
-uv venv /tmp/benchvenv
-VIRTUAL_ENV=/tmp/benchvenv uv pip install "readb==0.2.0"
-
-python benchmarks/run_benchmark.py \
-    --corpus /tmp/corpus600 --truth /tmp/corpus600_ground_truth.json \
-    --readb-bin /tmp/benchvenv/bin/readb \
-    --results benchmarks/results/run.jsonl --repeats 3
-
-python benchmarks/analyze.py --results benchmarks/results/run.jsonl
-```
-
-Runs cost money — a full 3-repeat matrix is 72 headless agent invocations. `run_benchmark.py`
-is resumable: a cell already present in the results file is skipped.
-
-## The three arms
+## The four arms
 
 | Arm | Prompt | Environment |
 | --- | --- | --- |
-| `baseline` | No mention of readb | readb kept off `PATH` |
-| `readb-bare` | Two sentences naming `readb query` and `readb schema` | readb on `PATH` |
-| `readb-skill` | Identical to `baseline` | readb on `PATH`, the repository's plugin loaded so the shipped skill is discoverable |
+| `baseline` | Orientation only | readb kept off `PATH` |
+| `shell-coached` | Orientation plus a worked `grep`/`awk` recipe | readb kept off `PATH` |
+| `readb-bare` | Orientation plus `readb query` / `readb schema` syntax | readb and `uv` on `PATH` |
+| `readb-skill` | Identical to `baseline` | readb and `uv` on `PATH`, the repository's plugin loaded so the shipped skill is discoverable |
+
+`shell-coached` exists because readb's honest competitor is a shell pipeline, not an uncoached
+agent. `uv` is on the readb arms' `PATH` because the shipped skill's leading example is
+`uvx readb` — an arm without it measures that failure instead of the skill, which is exactly what
+happened to the first `readb-skill` batch (retracted; see the research concept's finding 6).
 
 Every arm runs with `--setting-sources ""`, so no personal configuration, skill, hook or MCP
 server reaches any of them; arm C differs from arm A by exactly one loaded skill. `--safe-mode`
 is deliberately *not* used — it suppresses `--plugin-dir`, which would collapse arm C onto arm A
 without any visible sign.
+
+## Reproducing
+
+Two corpora are needed: a clean one, and one seeded with malformed frontmatter for Q10.
+
+```sh
+python benchmarks/generate_corpus.py --out /tmp/kb_clean \
+    --truth /tmp/truth_clean.json --concepts 600 --seed 24
+python benchmarks/generate_corpus.py --out /tmp/kb_malformed \
+    --truth /tmp/truth_malformed.json --concepts 600 --seed 24 --malformed 12
+
+uv venv /tmp/benchvenv
+VIRTUAL_ENV=/tmp/benchvenv uv pip install "readb==0.2.0"
+
+python benchmarks/run_benchmark.py \
+    --corpus-clean /tmp/kb_clean --corpus-malformed /tmp/kb_malformed \
+    --truth-clean /tmp/truth_clean.json --truth-malformed /tmp/truth_malformed.json \
+    --readb-bin /tmp/benchvenv/bin/readb \
+    --results benchmarks/results/run.jsonl --repeats 3
+```
+
+A preflight runs first and refuses to start unless each arm loaded the skills it should have and
+can execute the binaries it needs on its own `PATH`.
+
+Analysis, including the floor-subtracted ratios and a comparison against an arm other than the
+baseline:
+
+```sh
+python benchmarks/analyze.py --results benchmarks/results/run.jsonl \
+    --floor benchmarks/results/floor.jsonl
+python benchmarks/analyze.py --results benchmarks/results/run.jsonl \
+    --baseline-arm shell-coached
+```
+
+A batch that re-measures a single arm has no baseline of its own to pair against; give it one:
+
+```sh
+python benchmarks/analyze.py --results benchmarks/results/skill_uv.jsonl \
+    --baseline-from benchmarks/results/run.jsonl --floor benchmarks/results/floor.jsonl
+```
+
+## Costs and caution
+
+A full 3-repeat matrix is **144 headless agent invocations**; the batches behind the published
+result came to about $25 in total. `run_benchmark.py` is resumable — a cell already present in
+the results file is skipped — and `--budget` / `--total-budget` are runaway guards, not live
+constraints.
+
+Two rules learned the hard way, both now enforced in code:
+
+- **Give every batch its own `--results` stem.** Transcripts and manifests are named after it. A
+  shared name means a later batch overwrites an earlier batch's evidence — which is how 68
+  transcripts behind published runs were lost.
+- **Never hand-compute a figure the analyzer could emit.** Four wrong cells reached a published
+  table that way.

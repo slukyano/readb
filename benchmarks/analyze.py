@@ -18,7 +18,7 @@ import statistics
 from collections import defaultdict
 from pathlib import Path
 
-BASELINE = "baseline"
+DEFAULT_BASELINE = "baseline"
 METRICS = [
     ("cost_billed_usd", "cost, as billed (USD)", 4),
     ("cost_cache_neutral_usd", "cost, cache-neutral (USD)", 4),
@@ -28,6 +28,7 @@ METRICS = [
     ("num_turns", "turns", 1),
     ("cumulative_prompt_tokens", "cumulative prompt tokens", 0),
 ]
+BASELINE = DEFAULT_BASELINE
 BOOTSTRAP = 10_000
 
 
@@ -85,7 +86,15 @@ def main() -> None:
         ),
     )
     ap.add_argument("--floor", type=Path, help="floor runs, to report floor-subtracted ratios")
+    ap.add_argument(
+        "--baseline-arm",
+        default=DEFAULT_BASELINE,
+        help="the arm every ratio is taken against (default: baseline). Comparing against the "
+        "coached arm is a published table, so it must come from a command, not a calculator.",
+    )
     args = ap.parse_args()
+    global BASELINE
+    BASELINE = args.baseline_arm
 
     records = load(args.results)
     if args.baseline_from:
@@ -185,6 +194,8 @@ def main() -> None:
         # It is a choice, not a correction: a ratio below 1 always moves further from 1 when a
         # constant is removed from both sides. Published beside the raw figure, never instead.
         floors = {r["arm"]: r for r in load(args.floor)}
+        if BASELINE not in floors:
+            raise SystemExit(f"--floor has no run for the baseline arm {BASELINE!r}")
         print("\n## Overhead-subtracted cost ratios — two rules, neither authoritative\n")
         print(
             "A ratio below 1.00 always moves further from 1.00 when the same constant is removed\n"
@@ -201,10 +212,10 @@ def main() -> None:
                 for q in questions:
                     b = base.get((key, q))
                     v = med([r[key] for r in clean if r["arm"] == arm and r["question"] == q])
-                    if b and v == v:
+                    if b == b and b and v == v:
                         lo_b = b - floors[BASELINE][key]
                         lo_v = v - floors[arm][key]
-                        if lo_b > 0:
+                        if lo_b > 0 and lo_v > 0:
                             ratios.append(lo_v / lo_b)
                 cells.append(f"{med(ratios):.2f}×" if ratios else "—")
 
@@ -221,7 +232,7 @@ def main() -> None:
                     return cum - turns * floors[a]["cumulative_prompt_tokens"]
 
                 b, v = adjusted(BASELINE), adjusted(arm)
-                if b > 0 and v == v:
+                if b == b and b > 0 and v == v and v > 0:
                     per_turn.append(v / b)
             cells.append(f"{med(per_turn):.2f}×" if per_turn else "—")
             print(f"| {arm} | " + " | ".join(cells) + " |")
@@ -247,7 +258,7 @@ def main() -> None:
                     continue
                 v = [r["cost_billed_usd"] for r in clean if r["arm"] == arm and r["question"] == q]
                 b = base.get(("cost_billed_usd", q))
-                if v and b:
+                if v and b and b == b:
                     ratios.append(med(v) / b)
             cells.append(f"{med(ratios):.2f}×" if ratios else "—")
         print(f"| {arm} | " + " | ".join(cells) + " |")

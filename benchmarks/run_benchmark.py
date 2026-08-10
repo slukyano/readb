@@ -140,6 +140,7 @@ FLOOR_PROMPT = "Reply with exactly this line and nothing else:\nANSWER: ok"
 # repository is public-bound, so those are redacted on the way out rather than left for a
 # later sweep to catch.
 REDACTIONS = [
+    (os.environ.get("TMPDIR", "").rstrip("/") or "\0", "<TMP>"),
     (str(Path.home()), "<HOME>"),
     (os.environ.get("USER") or "\0", "<USER>"),
 ]
@@ -220,7 +221,9 @@ def costs(usage: dict) -> dict:
     w1h = creation.get("ephemeral_1h_input_tokens") or 0
     w5m = creation.get("ephemeral_5m_input_tokens") or 0
     if not (w1h or w5m):
-        w1h = usage.get("cache_creation_input_tokens") or 0
+        # The flat field carries no TTL. Price it at the cheaper rate: guessing the dearer one
+        # would inflate a published cost on any runtime that omits the breakdown.
+        w5m = usage.get("cache_creation_input_tokens") or 0
 
     billed = (
         inp * PRICES["input"]
@@ -319,6 +322,14 @@ def run_one(arm: Arm, question, repeat: int, cfg, truth: dict, corpus: Path) -> 
         cfg.transcripts / cfg.results.stem / f"{arm.name}-{question.id}-r{repeat}.jsonl"
     )
     transcript_path.parent.mkdir(parents=True, exist_ok=True)
+    # Never overwrite: a transcript is the only evidence its run happened, and a batch that
+    # reused a cell once silently destroyed 68 of them.
+    suffix = 1
+    while transcript_path.exists():
+        suffix += 1
+        transcript_path = transcript_path.with_name(
+            f"{arm.name}-{question.id}-r{repeat}.{suffix}.jsonl"
+        )
     transcript_path.write_text(scrub(stdout))
 
     result_text = result.get("result", "")
@@ -405,6 +416,31 @@ def preflight(cfg) -> dict:
         raise SystemExit("preflight failed: the baseline arm can see a readb skill")
     if not seen.get("readb-skill"):
         raise SystemExit("preflight failed: arm readb-skill did not load the readb skill")
+
+    # Skill visibility was never the thing that broke. What broke was an arm that could not
+    # run the command its own documentation leads with, so probe each arm's constructed PATH
+    # for every binary that arm is supposed to reach.
+    for name, arm in ARMS.items():
+        if name not in cfg.arms.split(","):
+            continue
+        path = ":".join(
+            ([str(cfg.readb_bin.parent)] if arm.readb_on_path else [])
+            + ([UV_DIR] if arm.uv_on_path else [])
+            + [BASE_PATH]
+        )
+        wanted = ([("readb", ["readb", "--version"])] if arm.readb_on_path else []) + (
+            [("uv", ["uvx", "--version"])] if arm.uv_on_path else []
+        )
+        for binary, argv in wanted:
+            probe = subprocess.run(
+                argv, env={"PATH": path, "HOME": os.environ["HOME"]}, capture_output=True
+            )
+            if probe.returncode != 0:
+                raise SystemExit(
+                    f"preflight failed: arm {name} cannot execute {binary} on its PATH "
+                    f"({path}) — this is the defect that retracted 36 runs once already"
+                )
+        seen[f"{name}:binaries"] = [b for b, _ in wanted] or ["none required"]
     return seen
 
 
@@ -430,6 +466,7 @@ def done_cells(results: Path) -> set[tuple[str, str, int]]:
     return {
         (rec["arm"], rec["question"], rec["repeat"])
         for rec in (json.loads(line) for line in results.read_text().splitlines() if line.strip())
+        if not rec.get("retracted")
     }
 
 

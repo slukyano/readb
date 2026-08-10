@@ -48,9 +48,15 @@ These must pass before any change is presented or merged:
 uv run ruff format --check .
 uv run ruff check .
 uv run pytest
+uv run pytest benchmarks
 ```
 
 New behavior carries tests.
+
+`benchmarks/` holds the agent-efficiency harness behind
+[`docs/dev/research/agent-efficiency.md`](docs/dev/research/agent-efficiency.md) — development
+material, excluded from the sdist and from the package's own `testpaths`, so its suite is run by
+name.
 
 ## Conventions
 

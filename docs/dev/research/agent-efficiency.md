@@ -90,7 +90,9 @@ count taken through readb alone omits the 12 broken records — readb reports 18
   prompt).
 - Runs are interleaved by arm and the question order rotates per repeat.
 - Full stream transcripts are kept, which is what makes the integrity checks above possible at
-  all (except the first skill-arm batch, whose transcripts were later overwritten — limitation 11).
+  all. 68 of them were later overwritten by subsequent batches and are gone — see limitation 11;
+  the integrity checks ran against every transcript at the time each run was recorded, and their
+  verdicts are stored per record.
 
 ## Metrics
 
@@ -375,18 +377,25 @@ should have been a shape the model could not mistake for an answer.
 8. Arms measuring the skill's *content* separately from its *discovery*, and a cross-check
    against the runtime's own plugin-evaluation harness, were designed but not run.
 9. **No arm had `Grep` or `Glob`.** In this runtime build they are deferred tools reached through
-   a search step, and no run reached for them: across 144 runs the tools used were `Bash` (491),
-   `Read` (5) and `Skill` (28). Every arm was therefore an agent with a shell, not an agent with
-   native structured search. This is identical across arms, but structured search returns
+   a search step, and no run reached for them. Across the 144 published runs (108 main matrix
+   plus the 36 re-measured skill runs) the records count **453 tool calls**, and the 128 of those
+   runs whose transcripts survive break down as `Bash` 357, `Skill` 28, `Read` 5 — nothing else.
+   Every arm was therefore an agent with a shell, not an agent with native structured search. This is identical across arms, but structured search returns
    truncated, pre-formatted results rather than piping raw text into the context, so its absence
    plausibly *inflates* the file-reading arms' cost. The measured gap is an upper bound on
    readb's advantage over a fully-equipped agent.
 10. **Half of every measured run is fixed overhead** — $0.053 of a $0.088–0.101 median. Absolute
     figures here are not "the cost of answering a question with readb"; they are that cost plus a
     constant, and the constant dilutes every ratio toward 1.00.
-11. **The first skill-arm batch lost its transcripts.** The re-measurement overwrote them, before
-    transcripts were namespaced per batch. Its numeric records survive in `run.jsonl`, flagged
-    `transcript_lost`; the tool-level evidence for the `uvx` failures does not. The
+11. **68 of the published runs have no surviving transcript.** The transcript directory was flat
+    until batches were namespaced, so every batch that reused an (arm, question, repeat) cell
+    overwrote the earlier batch's evidence: the skill re-measurement took the 36 retracted
+    skill runs, and the two size sweeps took 16 main-matrix cells (Q3, Q4, Q8, Q12 at r1/r2 in
+    the two file-reading arms) and then 16 of `sweep_150`'s own. Every affected record is
+    flagged `transcript_lost` and its numeric fields are intact — the 128 surviving transcripts
+    are re-filed under the batch that actually produced them, matched by session id. What is
+    gone is tool-level evidence, which is why the tool counts in limitation 9 are given over the
+    surviving subset. The harness now refuses to overwrite a transcript. The
     re-measurement also carries one asymmetry worth naming: reaching `uv` meant putting
     `/opt/homebrew/bin` on that arm's `PATH`, so the skill arm could see binaries the
     readb-free arms could not. Across all 36 runs the only one it invoked from there was `uvx`,
@@ -399,7 +408,7 @@ should have been a shape the model could not mistake for an answer.
 # Reproducing
 
 Harness, corpus generator, battery, scorer, raw per-run records and full transcripts are in
-[`benchmarks/`](../../../benchmarks/README.md). Each of the five batches has a `manifest-<batch>.json`
+[`benchmarks/`](../../../benchmarks/README.md). Each of the five committed batches has a `manifest-<batch>.json`
 recording the runtime version, readb version, model, effort, price table, corpus checksums,
 generation seed and machine. The four written during a run carry the per-arm `PATH` as a
 structured field; the reconstructed `manifest-run.json` carries it as a note.

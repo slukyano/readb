@@ -50,3 +50,4 @@ study. Dated point-in-time observations (adoption numbers, version checks) are k
 their dates.
 
 * [Similar markdown+frontmatter tools](research/similar-tools.md) - 11 tools surveyed 2026-07-17; conventions, adoption, adopt/reject calls (sprint-002).
+* [Does readb make an agent cheaper or faster than plain file access?](research/agent-efficiency.md) - four-arm benchmark measured 2026-08-10; 13% cheaper in money, no accuracy or wall-clock effect, concentrated in join-shaped questions (sprint-004).

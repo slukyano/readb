@@ -2,12 +2,13 @@
 type: Task
 title: Measure readb's efficiency gains for agents over unguided bundle access
 description: A/B-benchmark an agent on OKF-style bundles — no guidance vs. using readb — measuring wall-clock speedup and token-usage reduction on large enough repos.
-status: Draft
+status: Designed
 priority: medium
 tags:
 - research
 - benchmarks
 created: 2026-07-21
+timestamp: '2026-08-10T00:00:00Z'
 ---
 
 readb's pitch to agents is efficiency: one SQL query instead of many file reads. That claim

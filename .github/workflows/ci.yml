@@ -22,3 +22,6 @@ jobs:
       - run: uv run ruff format --check .
       - run: uv run ruff check .
       - run: uv run pytest
+      # The benchmark harness is excluded from the package's own testpaths (and from the
+      # sdist), so its suite needs asking for by name or it rots unnoticed.
+      - run: uv run pytest benchmarks

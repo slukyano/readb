@@ -59,7 +59,7 @@ readb, have the reviewer check the results, and iterate until the reviewer is sa
        parse
 4. [x] Harness — stream-json transcripts, per-run integrity assertions, cache-invariant cost
 5. [x] Pilot runs — three harness faults found and fixed before any measured run
-6. [x] Full run — 144 runs (4 arms × 12 questions × 3 repeats), 0 excluded
+6. [x] Full run — 144 runs (4 arms × 12 questions × 3 repeats); 36 later retracted, see step 9
 7. [x] Size sweep at 150 and 2000 concepts (32 runs) — the finding that matters most
 8. [x] Reviewer round 2 on the results — every primary table reproduced exactly, but three
        blockers: the skill arm measured a broken environment, the manifest recorded the wrong
@@ -91,4 +91,4 @@ assumption; the unrun conditions are stated as limitations 1, 8 and 9 in the res
 - 2026-08-10 — sprint opened on the branch (scope merge waived), design phase started.
 - 2026-08-10 — design reviewed (verdict: not fit to run), rebuilt; corpus, harness and battery
   built; 144-run matrix and 32-run size sweep executed; results audited; skill arm re-measured
-  after the audit found its environment broken; write-up corrected. Spend across all batches ~$23.
+  after the audit found its environment broken; write-up corrected. Spend across all batches $25.05.

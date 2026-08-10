@@ -246,15 +246,21 @@ def _parse_set(raw: str) -> set[str]:
     return {t for t in (_norm_token(p) for p in re.split(r"[,\n;]+", raw)) if t}
 
 
+def _as_int(text: str) -> int | None:
+    """Digits out of a free-text value, or None. A lone `-` is not a number."""
+    match = re.search(r"-?\d+", text)
+    return int(match.group()) if match else None
+
+
 def _parse_mapping(raw: str) -> dict[str, int]:
     out: dict[str, int] = {}
     for pair in re.split(r"[,\n;]+", raw):
         if "=" not in pair:
             continue
         key, _, value = pair.partition("=")
-        digits = re.sub(r"[^0-9-]", "", value)
-        if digits:
-            out[_norm_token(key)] = int(digits)
+        number = _as_int(value)
+        if number is not None:
+            out[_norm_token(key)] = number
     return out
 
 
@@ -289,8 +295,7 @@ def score(question: Question, raw_answer: str | None, truth: dict) -> tuple[bool
         exact = got == str(expected).lower()
         return exact, 1.0 if exact else 0.0, got
     if question.kind == "number":
-        digits = re.sub(r"[^0-9-]", "", raw_answer)
-        got = int(digits) if digits else None
+        got = _as_int(raw_answer)
         exact = got == expected
         return exact, 1.0 if exact else 0.0, got
     raise ValueError(f"unknown kind {question.kind}")
