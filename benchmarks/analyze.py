@@ -109,6 +109,12 @@ def main() -> None:
     for arm in arms:
         rows = by_arm[arm]
         if not rows:
+            # Dashes alone read as missing data; this arm's runs were excluded on purpose.
+            print(
+                f"| {arm} | 0 | — | — |"
+                + " — |" * len(METRICS)
+                + " *(all runs excluded — see below)*"
+            )
             continue
         exact = sum(1 for r in rows if r["correct"]) / len(rows)
         partial = statistics.mean(r.get("partial_credit") or 0 for r in rows)
@@ -179,9 +185,13 @@ def main() -> None:
         # It is a choice, not a correction: a ratio below 1 always moves further from 1 when a
         # constant is removed from both sides. Published beside the raw figure, never instead.
         floors = {r["arm"]: r for r in load(args.floor)}
-        print("\n## Floor-subtracted cost ratios (one floor per run; see the caveat)\n")
-        print("| arm | billed | cache-neutral |")
-        print("|---|---|---|")
+        print("\n## Overhead-subtracted cost ratios — two rules, neither authoritative\n")
+        print(
+            "A ratio below 1.00 always moves further from 1.00 when the same constant is removed\n"
+            "from both sides, so which constant is removed is a choice. Both rules are shown.\n"
+        )
+        print("| arm | one floor per run: billed | cache-neutral | one prompt prefix per turn |")
+        print("|---|---|---|---|")
         for arm in arms:
             if arm == BASELINE or arm not in floors:
                 continue
@@ -197,6 +207,23 @@ def main() -> None:
                         if lo_b > 0:
                             ratios.append(lo_v / lo_b)
                 cells.append(f"{med(ratios):.2f}×" if ratios else "—")
+
+            # The per-turn rule: each turn re-sends the whole prompt prefix, so remove one
+            # floor-sized prefix per turn from the cumulative token count. Extra turns are
+            # caused by the approach, which is the argument for charging them to it.
+            per_turn = []
+            for q in questions:
+
+                def adjusted(a: str, question: str = q) -> float:
+                    rows = [r for r in clean if r["arm"] == a and r["question"] == question]
+                    cum = med([r["cumulative_prompt_tokens"] for r in rows])
+                    turns = med([r["num_turns"] for r in rows if r.get("num_turns")])
+                    return cum - turns * floors[a]["cumulative_prompt_tokens"]
+
+                b, v = adjusted(BASELINE), adjusted(arm)
+                if b > 0 and v == v:
+                    per_turn.append(v / b)
+            cells.append(f"{med(per_turn):.2f}×" if per_turn else "—")
             print(f"| {arm} | " + " | ".join(cells) + " |")
 
     # The headline ratio is a median over questions, so it tracks the battery's shape mix.

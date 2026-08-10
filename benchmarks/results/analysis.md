@@ -8,6 +8,7 @@
 |---|---|---|---|---|---|---|---|---|---|---|
 | baseline | 36 | 97% | 0.97 | 0.1011 | 0.3698 | 9,739 | 11.4 | 453 | 4.0 | 120,302 |
 | readb-bare | 36 | 94% | 0.94 | 0.0877 | 0.2780 | 9,542 | 10.6 | 338 | 3.0 | 90,790 |
+| readb-skill | 0 | — | — | — | — | — | — | — | — | — | *(all runs excluded — see below)*
 | shell-coached | 36 | 100% | 1.00 | 0.0983 | 0.3678 | 9,051 | 11.8 | 512 | 4.0 | 119,574 |
 
 ## Ratio to baseline, paired by question (below 1.00 favours the arm)
@@ -59,13 +60,16 @@
 | q9 | single-file lookup | files | readb-bare | 3 | 100% | 9,276 | 0.3584 | 8.1 | 4.0 | 0.0 |
 | q9 | single-file lookup | files | shell-coached | 3 | 100% | 8,617 | 0.3584 | 9.9 | 4.0 | 0.0 |
 
-## Floor-subtracted cost ratios (one floor per run; see the caveat)
+## Overhead-subtracted cost ratios — two rules, neither authoritative
 
-| arm | billed | cache-neutral |
-|---|---|---|
-| readb-bare | 0.76× | 0.69× |
-| readb-skill | — | — |
-| shell-coached | 0.93× | 0.99× |
+A ratio below 1.00 always moves further from 1.00 when the same constant is removed
+from both sides, so which constant is removed is a choice. Both rules are shown.
+
+| arm | one floor per run: billed | cache-neutral | one prompt prefix per turn |
+|---|---|---|---|
+| readb-bare | 0.76× | 0.69× | 0.89× |
+| readb-skill | — | — | — |
+| shell-coached | 0.93× | 0.99× | 0.84× |
 
 ## Cost ratio to baseline, by the shape a question was declared to favour
 

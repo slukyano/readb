@@ -131,7 +131,7 @@ that has nothing to do with readb. Floor-subtracted ratios are given alongside t
 
 144 runs (4 arms × 12 questions × 3 repeats) on 2026-08-10, plus a 36-run re-measurement of the
 skill arm, a 32-run size sweep and 4 floor runs. Total spend across every batch, including the
-retracted one, $23.
+retracted one, $25.05.
 
 **36 of the 144 are excluded** — the whole first `readb-skill` arm, retracted for the environment
 defect in finding 6. Its records stay in `run.jsonl` flagged `retracted`, and the analyzer drops
@@ -185,7 +185,8 @@ below 1.00 always moves further from 1.00 when the same constant is removed from
 rule used is **one floor per run**, which treats the fixed overhead as belonging to neither arm.
 A different defensible rule — subtracting one prompt prefix per *turn*, since extra turns are
 caused by the approach and their re-sends arguably belong to it — puts the figure back at
-**0.89×**, indistinguishable from the raw 0.87×. So the honest short statement is: **13% less in
+**0.89×**, indistinguishable from the raw 0.87×. Both rules are emitted by
+`analyze.py --floor`, neither as the authoritative one. So the honest short statement is: **13% less in
 money; up to 24% less if the fixed harness overhead is treated as attributable to neither arm — a
 choice, not a measurement.**
 
@@ -385,7 +386,11 @@ should have been a shape the model could not mistake for an answer.
     constant, and the constant dilutes every ratio toward 1.00.
 11. **The first skill-arm batch lost its transcripts.** The re-measurement overwrote them, before
     transcripts were namespaced per batch. Its numeric records survive in `run.jsonl`, flagged
-    `transcript_lost`; the tool-level evidence for the `uvx` failures does not.
+    `transcript_lost`; the tool-level evidence for the `uvx` failures does not. The
+    re-measurement also carries one asymmetry worth naming: reaching `uv` meant putting
+    `/opt/homebrew/bin` on that arm's `PATH`, so the skill arm could see binaries the
+    readb-free arms could not. Across all 36 runs the only one it invoked from there was `uvx`,
+    35 times.
 12. **`manifest-run.json` was reconstructed after the fact.** The harness of the time wrote one
     `manifest.json` that later batches overwrote. The corpora it records are the same directories
     the batch read, hashed afterwards and unmodified since, but it is a reconstruction and says
@@ -396,4 +401,5 @@ should have been a shape the model could not mistake for an answer.
 Harness, corpus generator, battery, scorer, raw per-run records and full transcripts are in
 [`benchmarks/`](../../../benchmarks/README.md). Each of the five batches has a `manifest-<batch>.json`
 recording the runtime version, readb version, model, effort, price table, corpus checksums,
-generation seed, per-arm `PATH` and machine.
+generation seed and machine. The four written during a run carry the per-arm `PATH` as a
+structured field; the reconstructed `manifest-run.json` carries it as a note.

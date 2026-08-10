@@ -44,11 +44,14 @@
 | q9 | single-file lookup | files | baseline | 3 | 100% | 9,052 | 0.3587 | 7.5 | 4.0 | 0.0 |
 | q9 | single-file lookup | files | readb-skill | 3 | 100% | 8,552 | 0.2680 | 8.9 | 3.0 | 0.0 |
 
-## Floor-subtracted cost ratios (one floor per run; see the caveat)
+## Overhead-subtracted cost ratios — two rules, neither authoritative
 
-| arm | billed | cache-neutral |
-|---|---|---|
-| readb-skill | 1.00× | 1.00× |
+A ratio below 1.00 always moves further from 1.00 when the same constant is removed
+from both sides, so which constant is removed is a choice. Both rules are shown.
+
+| arm | one floor per run: billed | cache-neutral | one prompt prefix per turn |
+|---|---|---|---|
+| readb-skill | 1.00× | 1.00× | -1.25× |
 
 ## Cost ratio to baseline, by the shape a question was declared to favour
 
