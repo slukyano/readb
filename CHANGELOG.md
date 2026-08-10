@@ -5,6 +5,8 @@ All notable changes to readb are documented here, following
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-08-09
+
 ### Fixed
 
 - `readb set` and `readb unset` no longer corrupt a frontmatter key whose value spans several
@@ -55,5 +57,6 @@ Initial release.
 - `readb init` and upward bundle discovery: a committed `.readb/config.toml` registry lets
   commands omit `--bundle`.
 
-[Unreleased]: https://github.com/slukyano/readb/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/slukyano/readb/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/slukyano/readb/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/slukyano/readb/releases/tag/v0.1.0

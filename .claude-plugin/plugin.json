@@ -1,7 +1,7 @@
 {
   "name": "readb",
   "description": "Query markdown files with YAML frontmatter using real SQL, and make surgical frontmatter edits.",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "author": {
     "name": "Stanislav Lukyanov"
   },
