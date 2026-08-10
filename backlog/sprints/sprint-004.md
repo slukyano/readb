@@ -51,15 +51,29 @@ readb, have the reviewer check the results, and iterate until the reviewer is sa
 
 ## Implementation checklist
 
-1. [ ] Experiment design written into the task body
-2. [ ] Reviewer round 1 — expert review of the design; findings folded in
-3. [ ] Corpus generator + ground truth
-4. [ ] Harness (per-run token, cost, duration, accuracy capture)
-5. [ ] Pilot run — calibrate cost and detect harness faults
+1. [x] Experiment design written into the task body
+2. [x] Reviewer round 1 — verdict *not fit to run as written*; five blockers and eleven majors
+       folded in as "Design revision 1" (arms, controls, metrics, battery, analysis all changed)
+3. [x] Corpus generator + ground truth — 600 concepts, cross-checked by an independent PyYAML
+       pass; a second corpus carries 12 files whose frontmatter declares its type but does not
+       parse
+4. [x] Harness — stream-json transcripts, per-run integrity assertions, cache-invariant cost
+5. [x] Pilot runs — three harness faults found and fixed before any measured run
 6. [ ] Full run
 7. [ ] Analysis + reviewer round 2 on the results; iterate until satisfied
 8. [ ] `docs/dev/research/agent-efficiency.md` written
 9. [ ] Gates
+
+## Faults the pilots caught (before any measured run)
+
+- **A rigged question.** The baseline counted all four concept types *and* `index.md`'s own
+  `type: Index`, and binary scoring called that wrong — the question was silently testing
+  knowledge of OKF's reserved-filename rule, which readb encodes and a grep does not. The index
+  now carries no `type` key and every arm is told it is a listing, not a concept.
+- **A working directory named after the tool.** The new baseline-leak assertion fired on its
+  first use: the scratch root sat under a path containing `readb`, which the runtime echoes into
+  the agent's system prompt.
+- **`--safe-mode` suppresses `--plugin-dir`.** Arm C would have run as arm A under arm C's label.
 
 ## Open questions
 

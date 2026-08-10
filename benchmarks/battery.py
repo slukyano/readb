@@ -14,8 +14,8 @@ must not be adjusted after seeing results.
 from __future__ import annotations
 
 import re
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable
 
 ANSWER_RE = re.compile(r"^\s*ANSWER:\s*(.*)$", re.MULTILINE | re.IGNORECASE)
 

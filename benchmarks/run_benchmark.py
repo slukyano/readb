@@ -31,7 +31,7 @@ import sys
 import time
 import uuid
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
@@ -303,7 +303,7 @@ def run_one(arm: Arm, question, repeat: int, cfg, truth: dict, corpus: Path) -> 
             default=(None, None),
         )[0],
         "effort": cfg.effort,
-        "started_utc": datetime.fromtimestamp(started, timezone.utc).isoformat(),
+        "started_utc": datetime.fromtimestamp(started, UTC).isoformat(),
         "correct": correct,
         "partial_credit": round(partial, 4),
         "parsed_answer": parsed,
@@ -432,7 +432,7 @@ def main() -> None:
         print(f"preflight ok: {preflight(cfg)}", flush=True)
 
     manifest = {
-        "started_utc": datetime.now(timezone.utc).isoformat(),
+        "started_utc": datetime.now(UTC).isoformat(),
         "git_sha": git_sha(),
         "claude_version": subprocess.run(
             [CLAUDE_BIN, "--version"], capture_output=True, text=True

@@ -138,7 +138,8 @@ def main() -> None:
 
     print("\n## By question shape\n")
     print(
-        "| question | shape | favours | arm | n | exact | ingested | cost (neutral) | wall (s) | turns | readb calls |"
+        "| question | shape | favours | arm | n | exact | ingested | cost (neutral) "
+        "| wall (s) | turns | readb calls |"
     )
     print("|" + "---|" * 11)
     for q in questions:

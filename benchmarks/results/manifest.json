@@ -1,0 +1,30 @@
+{
+  "started_utc": "2026-08-10T08:06:44.393012+00:00",
+  "git_sha": "022c049e8ab968a88c9ad1b3266d94e3aabbd6bd",
+  "claude_version": "2.1.226 (Claude Code)",
+  "readb_version": "readb, version 0.2.0",
+  "readb_bin": "/private/tmp/claude-501/-Users-<USER>-workspaces-personal-readb/80fb7b4d-0629-4235-99cf-6b1fb850d167/scratchpad/benchvenv/bin/readb",
+  "python": "3.14.2 (main, Dec 17 2025, 20:54:49) [Clang 21.1.4 ]",
+  "platform": "macOS-26.5.2-arm64-arm-64bit-Mach-O",
+  "machine": "arm64",
+  "model": "claude-sonnet-5",
+  "effort": "medium",
+  "autocompact": 1000000,
+  "per_run_budget_usd": 3.0,
+  "prices_usd_per_mtok": {
+    "input": 3.0,
+    "output": 15.0,
+    "cache_read": 0.3,
+    "cache_write_5m": 3.75,
+    "cache_write_1h": 6.0
+  },
+  "repeats": 1,
+  "corpus_sha256": {
+    "clean": "db46507d3eae833dd7fb3207d8a88a99a0bfbfd9fb6e49b8f8ecf2b7de70dd0a",
+    "malformed": "312c3e4cfbd8ce6b805921b4221cb0f67d83dc468ae4ff29e7e1dc828b55b61e"
+  },
+  "corpus_concepts": {
+    "clean": 600,
+    "malformed": 612
+  }
+}
