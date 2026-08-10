@@ -59,10 +59,16 @@ readb, have the reviewer check the results, and iterate until the reviewer is sa
        parse
 4. [x] Harness — stream-json transcripts, per-run integrity assertions, cache-invariant cost
 5. [x] Pilot runs — three harness faults found and fixed before any measured run
-6. [ ] Full run
-7. [ ] Analysis + reviewer round 2 on the results; iterate until satisfied
-8. [ ] `docs/dev/research/agent-efficiency.md` written
-9. [ ] Gates
+6. [x] Full run — 144 runs (4 arms × 12 questions × 3 repeats), 0 excluded
+7. [x] Size sweep at 150 and 2000 concepts (32 runs) — the finding that matters most
+8. [x] Reviewer round 2 on the results — every primary table reproduced exactly, but three
+       blockers: the skill arm measured a broken environment, the manifest recorded the wrong
+       batch, and the published cost basis was the flattering one
+9. [x] Corrective runs — skill arm re-measured with `uv` present (36 runs), harness floor
+       measured (4 runs)
+10. [ ] Reviewer round 3 — verification of the corrections
+11. [x] `docs/dev/research/agent-efficiency.md` written and corrected
+12. [x] Gates — ruff clean, 188 package tests, 21 harness tests
 
 ## Faults the pilots caught (before any measured run)
 
@@ -77,8 +83,12 @@ readb, have the reviewer check the results, and iterate until the reviewer is sa
 
 ## Open questions
 
-_(none yet)_
+_(none — every deferral has a named home: `030-skill-uvx-assumption` holds the skill's `uv`
+assumption; the unrun conditions are stated as limitations 1, 8 and 9 in the research concept.)_
 
 ## Session log
 
 - 2026-08-10 — sprint opened on the branch (scope merge waived), design phase started.
+- 2026-08-10 — design reviewed (verdict: not fit to run), rebuilt; corpus, harness and battery
+  built; 144-run matrix and 32-run size sweep executed; results audited; skill arm re-measured
+  after the audit found its environment broken; write-up corrected. Spend across all batches ~$23.
