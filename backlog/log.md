@@ -1,5 +1,21 @@
 # Task Bundle Log
 
+## 2026-08-10
+* **readb 0.2.0 released**: Published to PyPI via the new tag-triggered workflow (Trusted
+  Publishing, PEP 740 attestations) with the GitHub release cut from the changelog section. The
+  TestPyPI rehearsal caught `__version__` reporting 0.1.0 from a 0.2.0 build — a third version
+  source the release procedure did not cover, now derived from distribution metadata. The real
+  release then caught `gh release create` failing without a checkout, after the PyPI upload had
+  already landed; the release was created by hand from the run's artifacts and the workflow
+  fixed with `--repo`.
+* **Skill distribution surveyed**: `gh skill` (GitHub CLI, preview since 2026-04-16) installs
+  skills from any repository with no registry and no submission — readb is already installable
+  through it, verified. The `--skill` flag convention has effectively no adoption and is closed;
+  the Claude Code hint protocol, which real vendor CLIs do emit, needs an official-marketplace
+  listing. Recorded on [027](tasks/027-plugin-marketplace-submission.md), which is now a
+  discoverability task rather than a distribution one. The shipped skill gained the `license`
+  field its spec validation recommends.
+
 ## 2026-08-07
 * **Sprint 003 closed**: All four tasks `Designed -> Done`
   ([026](archive/026-field-editor-multiline-corruption.md),

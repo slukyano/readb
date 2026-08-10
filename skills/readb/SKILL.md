@@ -1,6 +1,7 @@
 ---
 name: readb
 description: Query a directory of markdown files with YAML frontmatter using real SQL, and make surgical single-field frontmatter edits. Use when asked to search, filter, count, group, or cross-reference markdown documents by their frontmatter, when answering a question would otherwise mean opening many files, or when one frontmatter field needs changing.
+license: Apache-2.0
 ---
 
 # readb
