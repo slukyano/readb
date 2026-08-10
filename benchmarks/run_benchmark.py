@@ -296,7 +296,12 @@ def run_one(arm: Arm, question, repeat: int, cfg, truth: dict, corpus: Path) -> 
     lines = stdout.splitlines()
     result, tools = parse_stream(lines)
 
-    transcript_path = cfg.transcripts / f"{arm.name}-{question.id}-r{repeat}.jsonl"
+    # Namespaced by batch: a re-measurement of one arm must not overwrite the evidence for
+    # the batch it replaces. The first arm-C batch lost its transcripts this way.
+    transcript_path = (
+        cfg.transcripts / cfg.results.stem / f"{arm.name}-{question.id}-r{repeat}.jsonl"
+    )
+    transcript_path.parent.mkdir(parents=True, exist_ok=True)
     transcript_path.write_text(stdout)
 
     result_text = result.get("result", "")
@@ -342,7 +347,7 @@ def run_one(arm: Arm, question, repeat: int, cfg, truth: dict, corpus: Path) -> 
         "stop_reason": result.get("stop_reason"),
         "harness_error": harness_error,
         "session_id": result.get("session_id"),
-        "transcript": str(transcript_path.name),
+        "transcript": str(transcript_path.relative_to(cfg.transcripts)),
         "result_text": result_text[-3000:],
         **checks,
     }

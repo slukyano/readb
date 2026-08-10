@@ -4,20 +4,20 @@
 
 ## Per arm, all questions pooled
 
-| arm | n | exact | partial credit | new tokens ingested | cost, cache-neutral (USD) | wall clock (s) | output tokens | turns | cumulative prompt tokens |
-|---|---|---|---|---|---|---|---|---|---|
-| baseline | 36 | 97% | 0.97 | 9,739 | 0.3698 | 11.4 | 453 | 4.0 | 120,302 |
-| readb-bare | 36 | 94% | 0.94 | 9,542 | 0.2780 | 10.6 | 338 | 3.0 | 90,790 |
-| readb-skill | 36 | 100% | 1.00 | 12,260 | 0.4925 | 14.4 | 604 | 6.0 | 161,637 |
-| shell-coached | 36 | 100% | 1.00 | 9,051 | 0.3678 | 11.8 | 512 | 4.0 | 119,574 |
+| arm | n | exact | partial credit | cost, as billed (USD) | cost, cache-neutral (USD) | new tokens ingested | wall clock (s) | output tokens | turns | cumulative prompt tokens |
+|---|---|---|---|---|---|---|---|---|---|---|
+| baseline | 36 | 97% | 0.97 | 0.1011 | 0.3698 | 9,739 | 11.4 | 453 | 4.0 | 120,302 |
+| readb-bare | 36 | 94% | 0.94 | 0.0877 | 0.2780 | 9,542 | 10.6 | 338 | 3.0 | 90,790 |
+| readb-skill | 36 | 100% | 1.00 | 0.1276 | 0.4925 | 12,260 | 14.4 | 604 | 6.0 | 161,637 |
+| shell-coached | 36 | 100% | 1.00 | 0.0983 | 0.3678 | 9,051 | 11.8 | 512 | 4.0 | 119,574 |
 
 ## Ratio to baseline, paired by question (below 1.00 favours the arm)
 
-| arm | new tokens ingested [95% CI] | cost, cache-neutral (USD) [95% CI] | wall clock (s) [95% CI] | output tokens [95% CI] | turns [95% CI] | cumulative prompt tokens [95% CI] |
-|---|---|---|---|---|---|---|
-| readb-bare | 0.97× [0.85–1.02] | 0.76× [0.62–1.00] | 1.03× [0.70–1.20] | 0.65× [0.43–0.96] | 0.75× [0.62–1.00] | 0.76× [0.62–1.00] |
-| readb-skill | 1.21× [1.00–1.35] | 1.21× [0.90–1.55] | 1.28× [0.89–1.38] | 0.99× [0.79–1.16] | 1.33× [1.00–1.75] | 1.22× [0.90–1.56] |
-| shell-coached | 0.95× [0.91–0.97] | 0.99× [0.79–1.02] | 0.95× [0.79–1.16] | 0.98× [0.70–1.04] | 1.00× [0.79–1.00] | 1.00× [0.79–1.02] |
+| arm | cost, as billed (USD) [95% CI] | cost, cache-neutral (USD) [95% CI] | new tokens ingested [95% CI] | wall clock (s) [95% CI] | output tokens [95% CI] | turns [95% CI] | cumulative prompt tokens [95% CI] |
+|---|---|---|---|---|---|---|---|
+| readb-bare | 0.87× [0.75–0.97] | 0.76× [0.62–1.00] | 0.97× [0.85–1.02] | 1.03× [0.70–1.20] | 0.65× [0.43–0.96] | 0.75× [0.62–1.00] | 0.76× [0.62–1.00] |
+| readb-skill | 1.21× [0.89–1.38] | 1.21× [0.90–1.55] | 1.21× [1.00–1.35] | 1.28× [0.89–1.38] | 0.99× [0.79–1.16] | 1.33× [1.00–1.75] | 1.22× [0.90–1.56] |
+| shell-coached | 0.96× [0.87–1.00] | 0.99× [0.79–1.02] | 0.95× [0.91–0.97] | 0.95× [0.79–1.16] | 0.98× [0.70–1.04] | 1.00× [0.79–1.00] | 1.00× [0.79–1.02] |
 
 ## By question shape
 
@@ -71,6 +71,14 @@
 | q9 | single-file lookup | files | readb-bare | 3 | 100% | 9,276 | 0.3584 | 8.1 | 4.0 | 0.0 |
 | q9 | single-file lookup | files | readb-skill | 3 | 100% | 9,398 | 0.2868 | 7.1 | 4.0 | 0.0 |
 | q9 | single-file lookup | files | shell-coached | 3 | 100% | 8,617 | 0.3584 | 9.9 | 4.0 | 0.0 |
+
+## Cost ratio to baseline, by the shape a question was declared to favour
+
+| arm | files (n=4) | neutral (n=1) | sql (n=7) |
+|---|---|---|---|
+| readb-bare | 0.93× | 0.85× | 0.83× |
+| readb-skill | 1.02× | 1.53× | 1.25× |
+| shell-coached | 0.96× | 0.97× | 0.95× |
 
 ## Integrity
 
