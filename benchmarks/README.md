@@ -13,7 +13,17 @@ Development material — excluded from the sdist, not part of the readb package.
 | `battery.py` | The eight questions, their answer protocol, and the scorer. |
 | `run_benchmark.py` | Runs the matrix of arm × question × repeat and appends one JSON line per run. |
 | `analyze.py` | Aggregates a results file into the published tables. |
-| `results/` | Raw per-run records. |
+| `test_harness.py` | Tests for the scorer, the cost model, the integrity checks and the corpus invariants. |
+| `results/` | Raw per-run records, full transcripts, and a `manifest.json` per batch. |
+
+The harness has its own suite — the scorer decides what gets published, and the cost model
+turns token counts into a number a reader will quote:
+
+```sh
+uv run pytest benchmarks
+```
+
+The package's own suite does not collect this directory, and the sdist does not ship it.
 
 ## Reproducing
 
