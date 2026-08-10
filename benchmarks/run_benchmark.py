@@ -107,20 +107,32 @@ class Arm:
     readb_on_path: bool
     extra_args: tuple[str, ...]
     expects_skill: bool
+    uv_on_path: bool = False
 
+
+# The shipped skill's first runnable example is `uvx readb …`. An arm that has readb but
+# not `uv` cannot execute the thing the skill documents, and measures the failure instead
+# of the skill — which is exactly what the first batch did.
+UV_DIR = str(Path(shutil.which("uv") or "/opt/homebrew/bin/uv").parent)
 
 ARMS = {
     "baseline": Arm("baseline", PREAMBLE_BASELINE, False, ISOLATION, False),
     "shell-coached": Arm("shell-coached", PREAMBLE_SHELL, False, ISOLATION, False),
-    "readb-bare": Arm("readb-bare", PREAMBLE_READB, True, ISOLATION, False),
+    "readb-bare": Arm("readb-bare", PREAMBLE_READB, True, ISOLATION, False, uv_on_path=True),
     "readb-skill": Arm(
         "readb-skill",
         PREAMBLE_BASELINE,
         True,
         (*ISOLATION, "--plugin-dir", str(REPO_ROOT)),
         True,
+        uv_on_path=True,
     ),
 }
+
+# A trivial prompt run through the identical harness, to measure the fixed overhead that
+# both arms pay before any work happens. Without it, every ratio is diluted toward 1 by an
+# unknown constant.
+FLOOR_PROMPT = "Reply with exactly this line and nothing else:\nANSWER: ok"
 
 
 # --- transcript analysis ------------------------------------------------------
@@ -226,13 +238,17 @@ def run_one(arm: Arm, question, repeat: int, cfg, truth: dict, corpus: Path) -> 
         "USER": os.environ.get("USER", ""),
         "TERM": "dumb",
         "LANG": os.environ.get("LANG", "en_US.UTF-8"),
-        "PATH": f"{cfg.readb_bin.parent}:{BASE_PATH}" if arm.readb_on_path else BASE_PATH,
+        "PATH": ":".join(
+            ([str(cfg.readb_bin.parent)] if arm.readb_on_path else [])
+            + ([UV_DIR] if arm.uv_on_path else [])
+            + [BASE_PATH]
+        ),
     }
     for key in ("ANTHROPIC_API_KEY", "CLAUDE_CODE_OAUTH_TOKEN", "SHELL"):
         if key in os.environ:
             env[key] = os.environ[key]
 
-    prompt = arm.preamble + TASK_INTRO + render(question, truth)
+    prompt = FLOOR_PROMPT if cfg.floor else arm.preamble + TASK_INTRO + render(question, truth)
     cmd = [
         CLAUDE_BIN,
         "-p",
@@ -420,6 +436,11 @@ def main() -> None:
     ap.add_argument("--arms", default=",".join(ARMS))
     ap.add_argument("--questions", default=",".join(q.id for q in QUESTIONS))
     ap.add_argument("--skip-preflight", action="store_true")
+    ap.add_argument(
+        "--floor",
+        action="store_true",
+        help="replace every question with a trivial prompt, to measure fixed harness overhead",
+    )
     cfg = ap.parse_args()
 
     cfg.transcripts = cfg.transcripts or cfg.results.parent / "transcripts"
@@ -456,10 +477,30 @@ def main() -> None:
         "per_run_budget_usd": cfg.budget,
         "prices_usd_per_mtok": PRICES,
         "repeats": cfg.repeats,
+        "arms": cfg.arms,
+        "questions": cfg.questions,
+        "corpus_dirs": {k: str(v) for k, v in corpora.items()},
+        "corpus_generation": {k: truths[k].get("_meta") for k in truths},
         "corpus_sha256": {k: sha256_tree(v) for k, v in corpora.items()},
         "corpus_concepts": {k: sum(1 for _ in v.rglob("*.md")) - 1 for k, v in corpora.items()},
+        # The variable that invalidated the first arm-C batch: the shipped skill's leading
+        # example is `uvx readb`, and the arm had no uv.
+        "arm_paths": {
+            name: ":".join(
+                ([str(cfg.readb_bin.parent)] if arm.readb_on_path else [])
+                + ([UV_DIR] if arm.uv_on_path else [])
+                + [BASE_PATH]
+            )
+            for name, arm in ARMS.items()
+            if name in cfg.arms.split(",")
+        },
+        "floor_mode": cfg.floor,
     }
-    (cfg.results.parent / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
+    # One manifest per batch, named after its results file: a shared filename means the
+    # last batch silently overwrites the record of every earlier one.
+    (cfg.results.parent / f"manifest-{cfg.results.stem}.json").write_text(
+        json.dumps(manifest, indent=2) + "\n"
+    )
     print(json.dumps(manifest, indent=2), flush=True)
 
     arms = [ARMS[a] for a in cfg.arms.split(",")]

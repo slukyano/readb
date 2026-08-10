@@ -20,8 +20,9 @@ from pathlib import Path
 
 BASELINE = "baseline"
 METRICS = [
-    ("new_tokens_ingested", "new tokens ingested", 0),
+    ("cost_billed_usd", "cost, as billed (USD)", 4),
     ("cost_cache_neutral_usd", "cost, cache-neutral (USD)", 4),
+    ("new_tokens_ingested", "new tokens ingested", 0),
     ("wall_s", "wall clock (s)", 1),
     ("output_tokens", "output tokens", 0),
     ("num_turns", "turns", 1),
@@ -157,6 +158,32 @@ def main() -> None:
                 f"{fmt(med([r['num_turns'] for r in rows if r.get('num_turns')]), 1)} | "
                 f"{fmt(med([r['readb_invocations'] for r in rows]), 1)} |"
             )
+
+    # The headline ratio is a median over questions, so it tracks the battery's shape mix.
+    # Publishing it by declared shape is the honest sensitivity analysis.
+    print("\n## Cost ratio to baseline, by the shape a question was declared to favour\n")
+    favours = sorted({shape_of[q][1] for q in questions})
+    print(
+        "| arm | "
+        + " | ".join(f"{f} (n={sum(1 for q in questions if shape_of[q][1] == f)})" for f in favours)
+        + " |"
+    )
+    print("|" + "---|" * (len(favours) + 1))
+    for arm in arms:
+        if arm == BASELINE:
+            continue
+        cells = []
+        for fav in favours:
+            ratios = []
+            for q in questions:
+                if shape_of[q][1] != fav:
+                    continue
+                v = [r["cost_billed_usd"] for r in clean if r["arm"] == arm and r["question"] == q]
+                b = base.get(("cost_billed_usd", q))
+                if v and b:
+                    ratios.append(med(v) / b)
+            cells.append(f"{med(ratios):.2f}×" if ratios else "—")
+        print(f"| {arm} | " + " | ".join(cells) + " |")
 
     print("\n## Integrity\n")
     print("| arm | runs | unsupported | skill fired | compacted | denials | readb never used |")

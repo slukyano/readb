@@ -534,6 +534,15 @@ def write(
     _cross_check(out_dir, truth, malformed)
 
     truth_path.parent.mkdir(parents=True, exist_ok=True)
+    # Recorded after the leak assertion so generation parameters are never mistaken for
+    # answers. The harness copies this into its manifest: without the seed, a corpus
+    # checksum proves a batch used *a* corpus but not which one, or how to rebuild it.
+    truth["_meta"] = {
+        "seed": seed,
+        "concepts": len(concepts),
+        "malformed": malformed,
+        "needle_phrase": NEEDLE_PHRASE,
+    }
     truth_path.write_text(json.dumps(truth, indent=2, sort_keys=True) + "\n")
 
 
