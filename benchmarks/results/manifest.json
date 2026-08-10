@@ -1,6 +1,6 @@
 {
-  "started_utc": "2026-08-10T08:34:19.511858+00:00",
-  "git_sha": "0cc1f32219d0afc6621659585695fe4fe520bcb3",
+  "started_utc": "2026-08-10T08:50:29.252151+00:00",
+  "git_sha": "f453af878c6b7804a788b431485f33be7f7d9681",
   "claude_version": "2.1.226 (Claude Code)",
   "readb_version": "readb, version 0.2.0",
   "readb_bin": "/private/tmp/claude-501/-Users-<USER>-workspaces-personal-readb/80fb7b4d-0629-4235-99cf-6b1fb850d167/scratchpad/benchvenv/bin/readb",
@@ -18,13 +18,13 @@
     "cache_write_5m": 3.75,
     "cache_write_1h": 6.0
   },
-  "repeats": 3,
+  "repeats": 2,
   "corpus_sha256": {
-    "clean": "db46507d3eae833dd7fb3207d8a88a99a0bfbfd9fb6e49b8f8ecf2b7de70dd0a",
-    "malformed": "312c3e4cfbd8ce6b805921b4221cb0f67d83dc468ae4ff29e7e1dc828b55b61e"
+    "clean": "fbdb25c236b0799949d5db8bde59a3e899f356e0fdd2a8f8e5070441f4591aa5",
+    "malformed": "fbdb25c236b0799949d5db8bde59a3e899f356e0fdd2a8f8e5070441f4591aa5"
   },
   "corpus_concepts": {
-    "clean": 600,
-    "malformed": 612
+    "clean": 2000,
+    "malformed": 2000
   }
 }
