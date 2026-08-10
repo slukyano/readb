@@ -135,6 +135,23 @@ ARMS = {
 FLOOR_PROMPT = "Reply with exactly this line and nothing else:\nANSWER: ok"
 
 
+# Transcripts and manifests are committed verbatim, and a run's own paths travel inside
+# them — home directory, scratch directory, and the account name embedded in both. The
+# repository is public-bound, so those are redacted on the way out rather than left for a
+# later sweep to catch.
+REDACTIONS = [
+    (str(Path.home()), "<HOME>"),
+    (os.environ.get("USER") or "\0", "<USER>"),
+]
+
+
+def scrub(text: str) -> str:
+    for needle, placeholder in REDACTIONS:
+        if needle and needle != "\0":
+            text = text.replace(needle, placeholder)
+    return text
+
+
 # --- transcript analysis ------------------------------------------------------
 
 
@@ -302,7 +319,7 @@ def run_one(arm: Arm, question, repeat: int, cfg, truth: dict, corpus: Path) -> 
         cfg.transcripts / cfg.results.stem / f"{arm.name}-{question.id}-r{repeat}.jsonl"
     )
     transcript_path.parent.mkdir(parents=True, exist_ok=True)
-    transcript_path.write_text(stdout)
+    transcript_path.write_text(scrub(stdout))
 
     result_text = result.get("result", "")
     raw_answer = extract_answer(result_text)
@@ -504,7 +521,7 @@ def main() -> None:
     # One manifest per batch, named after its results file: a shared filename means the
     # last batch silently overwrites the record of every earlier one.
     (cfg.results.parent / f"manifest-{cfg.results.stem}.json").write_text(
-        json.dumps(manifest, indent=2) + "\n"
+        scrub(json.dumps(manifest, indent=2)) + "\n"
     )
     print(json.dumps(manifest, indent=2), flush=True)
 
