@@ -41,6 +41,8 @@ def faulted(rec: dict) -> bool:
 
 def invalid(rec: dict) -> str | None:
     """Runs whose numbers must not be used, and why."""
+    if rec.get("retracted"):
+        return rec["retracted"]
     if faulted(rec):
         return rec.get("harness_error") or f"api error {rec.get('api_error_status')}"
     if rec.get("leak_baseline_readb"):
@@ -72,9 +74,22 @@ def bootstrap_ci(ratios: list[float], seed: int = 24) -> tuple[float, float]:
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--results", required=True, type=Path)
+    ap.add_argument(
+        "--baseline-from",
+        type=Path,
+        help=(
+            "pull the baseline arm from another results file, for a batch that re-measures one "
+            "arm alone. Without it such a batch has nothing to pair against and every ratio "
+            "prints as '—', which invites hand-computation — how four wrong cells reached a "
+            "published table once already."
+        ),
+    )
+    ap.add_argument("--floor", type=Path, help="floor runs, to report floor-subtracted ratios")
     args = ap.parse_args()
 
     records = load(args.results)
+    if args.baseline_from:
+        records += [r for r in load(args.baseline_from) if r["arm"] == BASELINE]
     dropped = [(r, why) for r in records if (why := invalid(r))]
     clean = [r for r in records if not invalid(r)]
     arms = sorted({r["arm"] for r in records}, key=lambda a: (a != BASELINE, a))
@@ -158,6 +173,31 @@ def main() -> None:
                 f"{fmt(med([r['num_turns'] for r in rows if r.get('num_turns')]), 1)} | "
                 f"{fmt(med([r['readb_invocations'] for r in rows]), 1)} |"
             )
+
+    if args.floor:
+        # Subtracting one floor per run treats the fixed overhead as belonging to neither arm.
+        # It is a choice, not a correction: a ratio below 1 always moves further from 1 when a
+        # constant is removed from both sides. Published beside the raw figure, never instead.
+        floors = {r["arm"]: r for r in load(args.floor)}
+        print("\n## Floor-subtracted cost ratios (one floor per run; see the caveat)\n")
+        print("| arm | billed | cache-neutral |")
+        print("|---|---|---|")
+        for arm in arms:
+            if arm == BASELINE or arm not in floors:
+                continue
+            cells = []
+            for key in ("cost_billed_usd", "cost_cache_neutral_usd"):
+                ratios = []
+                for q in questions:
+                    b = base.get((key, q))
+                    v = med([r[key] for r in clean if r["arm"] == arm and r["question"] == q])
+                    if b and v == v:
+                        lo_b = b - floors[BASELINE][key]
+                        lo_v = v - floors[arm][key]
+                        if lo_b > 0:
+                            ratios.append(lo_v / lo_b)
+                cells.append(f"{med(ratios):.2f}×" if ratios else "—")
+            print(f"| {arm} | " + " | ".join(cells) + " |")
 
     # The headline ratio is a median over questions, so it tracks the battery's shape mix.
     # Publishing it by declared shape is the honest sensitivity analysis.

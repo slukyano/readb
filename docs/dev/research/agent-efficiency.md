@@ -90,7 +90,7 @@ count taken through readb alone omits the 12 broken records — readb reports 18
   prompt).
 - Runs are interleaved by arm and the question order rotates per repeat.
 - Full stream transcripts are kept, which is what makes the integrity checks above possible at
-  all.
+  all (except the first skill-arm batch, whose transcripts were later overwritten — limitation 11).
 
 ## Metrics
 
@@ -130,9 +130,14 @@ that has nothing to do with readb. Floor-subtracted ratios are given alongside t
 # Results
 
 144 runs (4 arms × 12 questions × 3 repeats) on 2026-08-10, plus a 36-run re-measurement of the
-skill arm and 4 floor runs. No run was excluded: no leak into a readb-free arm, no permission
-denial, no context compaction, no harness fault. Total spend across every batch, including the
-discarded one, $23.
+skill arm, a 32-run size sweep and 4 floor runs. Total spend across every batch, including the
+retracted one, $23.
+
+**36 of the 144 are excluded** — the whole first `readb-skill` arm, retracted for the environment
+defect in finding 6. Its records stay in `run.jsonl` flagged `retracted`, and the analyzer drops
+them; the arm's published numbers come from the re-measurement. Of the 108 that remain, **none**
+was excluded for any other reason: no leak into a readb-free arm, no permission denial, no
+context compaction, no harness fault.
 
 Two caveats about that clean sheet, since a control that cannot fail is not evidence: the
 "unsupported answer" check is `at least one tool call`, which nothing in this battery could
@@ -157,10 +162,10 @@ questions:
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `shell-coached` | 0.96× [0.87–1.00] | 0.93× | 0.99× [0.79–1.02] | 0.95× [0.91–0.97] | 0.95× [0.79–1.16] | 0.98× [0.70–1.04] | 1.00× [0.79–1.00] |
 | `readb-bare` | **0.87×** [0.75–0.97] | **0.76×** | 0.76× [0.62–1.00] | 0.97× [0.85–1.02] | 1.03× [0.70–1.20] | 0.65× [0.43–0.96] | 0.75× [0.62–1.00] |
-| `readb-skill` | 1.01× | 1.00× | 1.00× | 1.02× | 1.06× | 1.00× | 1.10× |
+| `readb-skill` | 1.01× [0.89–1.18] | 1.00× | 1.00× [0.81–1.06] | 1.04× [0.97–1.28] | 1.03× [0.82–1.16] | **0.70×** [0.58–0.94] | 1.00× [0.88–1.29] |
 
-`readb-skill`'s row comes from the re-measurement described below and has no interval: it is a
-single 36-run batch compared against the main matrix's baseline.
+`readb-skill`'s row comes from the re-measurement described in finding 6, paired against the main
+matrix's baseline question by question exactly as the other rows are.
 
 ## What the numbers say
 
@@ -172,9 +177,17 @@ and battery, readb does not make an agent more right — the file-reading arms w
 **2. The cost saving is real but modest, and how large depends on the basis.** In money,
 `readb-bare` costs **13% less** than the baseline (0.87×, interval [0.75–0.97], which does not
 cross 1.00). On a cache-neutral basis it is 0.76×, with an interval [0.62–1.001] that does cross
-1.00. Subtracting the harness floor — the half of every run that is fixed overhead — the money
-figure becomes 0.76×. All three are the same measurement seen through different denominators;
-the honest short statement is **"between 13% and 24% cheaper, depending on how you count."**
+1.00. Subtracting one harness floor per run — the half of every run that is fixed overhead —
+the money figure becomes 0.76×.
+
+That last figure needs its rule stated, because it is a choice rather than a correction: a ratio
+below 1.00 always moves further from 1.00 when the same constant is removed from both sides. The
+rule used is **one floor per run**, which treats the fixed overhead as belonging to neither arm.
+A different defensible rule — subtracting one prompt prefix per *turn*, since extra turns are
+caused by the approach and their re-sends arguably belong to it — puts the figure back at
+**0.89×**, indistinguishable from the raw 0.87×. So the honest short statement is: **13% less in
+money; up to 24% less if the fixed harness overhead is treated as attributable to neither arm — a
+choice, not a measurement.**
 
 **3. The saving comes from fewer turns, not from reading less.** New tokens ingested is 0.97× —
 nothing. What changes is turn count (0.75×), and since each turn re-sends the whole prompt
@@ -217,7 +230,17 @@ turns recovering; the arm came out at 1.21× the baseline's cost, and that numbe
 written up as "the shipped skill costs more than it saves". It was an artefact of the
 environment. Re-run with `uv` present, the skill arm sits at **1.01× billed, 1.00× cache-neutral
 — parity with doing nothing.** The skill fired in 28 of 36 runs in both batches, and sensibly:
-never on the exact-phrase needle, once on the single-file lookup.
+in the re-measured batch, never on the exact-phrase needle or the single-file lookup, and once on
+fuzzy retrieval.
+
+Parity in cost is not parity in behaviour, though. The skill arm's **output drops to 0.70×** the
+baseline's — close to `readb-bare`'s 0.65× — so the skill does change what the agent writes even
+where it does not change what the run costs. It buys `readb-bare`'s terseness and spends the
+saving on discovering and reading itself.
+
+(The "17 of 36" figure above was measured during the adversarial audit of the first batch, before
+that batch's transcripts were overwritten by the re-run — see limitation 11. The numeric records
+survive in `run.jsonl`, flagged `retracted`, and are excluded from every table here.)
 
 The artefact is worth keeping as a finding in its own right, because it is not confined to a
 benchmark: **the skill's leading example fails on any machine where readb is installed but `uv`
@@ -225,8 +248,8 @@ is not.** That is now backlog task `030-skill-uvx-assumption`.
 
 **7. Coaching alone changes little.** `shell-coached` sits at 0.96× the baseline's billed cost
 (0.93× floor-subtracted). A worked `grep`/`awk` recipe buys a few percent; readb's advantage is
-not an artefact of being told what to do, and holds at the same 0.76× median against the coached
-arm as against the uncoached one.
+not an artefact of being told what to do, and holds against the coached arm too — **0.90× billed,
+0.76× cache-neutral**.
 
 **8. An agent given readb often declines to use it — correctly.** In 12 of 36 `readb-bare` runs
 no readb command was issued, and those 12 are exactly the four file-favouring questions (Q7, Q9,
@@ -262,7 +285,7 @@ sweep as a direction, not a measurement.
 **readb's cost barely moves with corpus size; the baseline's does.** Across a 13× growth in the
 bundle, `readb-bare`'s billed cost stayed inside $0.084–0.101 while the baseline's top question
 climbed from $0.21 to $0.29. Its cumulative prompt tokens are steadier still — 90,672–91,270 at
-2000 concepts, within 1% of the 150-concept figure.
+2000 concepts, within 1% of the 150-concept median.
 
 The honest reading of that stability is narrower than it looks. `readb-bare` is sitting close to
 the harness floor at every size: its cost is set by **neither** the corpus nor the answer, but by
@@ -371,6 +394,6 @@ should have been a shape the model could not mistake for an answer.
 # Reproducing
 
 Harness, corpus generator, battery, scorer, raw per-run records and full transcripts are in
-[`benchmarks/`](../../../benchmarks/README.md). Each batch has a `manifest-<batch>.json`
+[`benchmarks/`](../../../benchmarks/README.md). Each of the five batches has a `manifest-<batch>.json`
 recording the runtime version, readb version, model, effort, price table, corpus checksums,
 generation seed, per-arm `PATH` and machine.
