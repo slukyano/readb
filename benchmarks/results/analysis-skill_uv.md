@@ -51,7 +51,7 @@ from both sides, so which constant is removed is a choice. Both rules are shown.
 
 | arm | one floor per run: billed | cache-neutral | one prompt prefix per turn |
 |---|---|---|---|
-| readb-skill | 1.00× | 1.00× | -1.25× |
+| readb-skill | 1.00× | 1.00× | 1.00× |
 
 ## Cost ratio to baseline, by the shape a question was declared to favour
 

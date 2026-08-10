@@ -8,7 +8,7 @@ tags:
 timestamp: '2026-08-10T00:00:00Z'
 branch: sprint/004
 created: '2026-08-10'
-status: Implementing
+status: Done
 tasks:
 - 024-measure-agent-efficiency
 ---
@@ -46,7 +46,7 @@ readb, have the reviewer check the results, and iterate until the reviewer is sa
 
 ## Task checklist
 
-- [ ] 024-measure-agent-efficiency — experiment design, corpus generator, harness, runs,
+- [x] 024-measure-agent-efficiency — experiment design, corpus generator, harness, runs,
       analysis, and a dated `Research` concept under `docs/dev/research/`
 
 ## Implementation checklist
@@ -66,9 +66,11 @@ readb, have the reviewer check the results, and iterate until the reviewer is sa
        batch, and the published cost basis was the flattering one
 9. [x] Corrective runs — skill arm re-measured with `uv` present (36 runs), harness floor
        measured (4 runs)
-10. [ ] Reviewer round 3 — verification of the corrections
-11. [x] `docs/dev/research/agent-efficiency.md` written and corrected
-12. [x] Gates — ruff clean, 188 package tests, 21 harness tests
+10. [x] Reviewer rounds 3 and 4 — verification of the corrections; verdict *fit to publish*
+11. [x] Independent review of the whole sprint diff — two blockers, one fixed here (transcript
+        provenance), one left to the maintainer (branch history)
+12. [x] `docs/dev/research/agent-efficiency.md` written and corrected
+13. [x] Gates — ruff clean, 188 package tests, 27 harness tests
 
 ## Faults the pilots caught (before any measured run)
 
@@ -81,6 +83,43 @@ readb, have the reviewer check the results, and iterate until the reviewer is sa
   the agent's system prompt.
 - **`--safe-mode` suppresses `--plugin-dir`.** Arm C would have run as arm A under arm C's label.
 
+## Sprint summary
+
+One task, delivered: readb's efficiency claim is now measured rather than asserted.
+
+**The result.** On a 600-concept bundle, an agent told readb exists spends **13% less money** per
+question than one working from files (0.87× billed, [0.75–0.97]); 24% less on a cache-neutral
+basis or with the harness floor subtracted. The saving comes from **fewer turns**, not from
+reading less — ingestion is unchanged at 0.97×. There is **no accuracy effect** and **no
+wall-clock effect** at this size. The advantage concentrates in join-shaped questions (0.46× on a
+three-predicate multi-hop) and reverses on a single-field group-by (1.15×). A size sweep points
+to the gap widening with the bundle: 0.70× at 150 concepts, 0.60× at 600, 0.43× at 2000. The
+shipped skill lands at parity (1.01×), though it does make the agent terser (output 0.70×).
+
+**What it cost.** 232 headless agent runs across five committed batches, $25.05.
+
+**How much of the sprint was spent being wrong.** Four adversarial review rounds plus an
+independent diff review, and each one found something that would have been published as fact:
+
+- The first design was ruled *not fit to run* — `--safe-mode` suppresses `--plugin-dir`, so the
+  skill arm would have measured an unloaded plugin while the write-up read the null as a finding.
+- The battery had no shape where readb could lose. Four were added; readb loses two of them.
+- The skill arm's first 36 runs measured a broken environment: the shipped skill leads with
+  `uvx readb` and the arm had no `uv`. Published as 1.21× before it was understood; re-measured
+  at 1.01×. That defect is real outside the benchmark and is now `030-skill-uvx-assumption`.
+- The published cost basis was the flattering one. Both are published now, money leading.
+- Four cells of one table were hand-computed and wrong. The analyzer gained the flag that makes
+  them generated.
+- The transcript directory was flat, so each batch overwrote the last: 68 published runs lost
+  their tool-level evidence. Every survivor is re-filed by session id; the harness now refuses
+  to overwrite one.
+
+**Deliberately not done**, and stated as limitations rather than passed over: a second
+measurement block on another day (no wall-clock noise floor), baseline runs with native
+structured search enabled, an arm isolating the skill's content from its discovery, and any
+README figure — the numbers do not move a public claim until a follow-up re-runs the
+pre-registered analysis.
+
 ## Open questions
 
 _(none — every deferral has a named home: `030-skill-uvx-assumption` holds the skill's `uv`
@@ -92,3 +131,7 @@ assumption; the unrun conditions are stated as limitations 1, 8 and 9 in the res
 - 2026-08-10 — design reviewed (verdict: not fit to run), rebuilt; corpus, harness and battery
   built; 144-run matrix and 32-run size sweep executed; results audited; skill arm re-measured
   after the audit found its environment broken; write-up corrected. Spend across all batches $25.05.
+- 2026-08-10 — close-out: `024` Done and archived, sprint Done, summary written. Four review
+  rounds on the experiment and one on the sprint diff; the last diff blocker (the author's
+  username in the branch's own history) is left for the maintainer, since the fix rewrites
+  history.

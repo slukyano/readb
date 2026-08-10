@@ -1,6 +1,16 @@
 # Task Bundle Log
 
 ## 2026-08-10
+* **Sprint 004 closed**: [Measure readb's efficiency gains](archive/024-measure-agent-efficiency.md)
+  `Draft -> Done`; sprint `Implementing -> Done`. readb's efficiency claim is measured for the
+  first time: 13% less money per question than unguided file access on a 600-concept bundle
+  (0.87x billed, [0.75-0.97]), from fewer turns rather than less reading, with no accuracy or
+  wall-clock effect and the advantage concentrated in join-shaped questions. Four adversarial
+  review rounds retracted one arm along the way — the shipped skill's `uvx readb` example cannot
+  run where readb is installed but uv is not, now
+  [030](tasks/030-skill-uvx-assumption.md). Harness, raw records and transcripts under
+  `benchmarks/`; the write-up is
+  [docs/dev/research/agent-efficiency.md](../docs/dev/research/agent-efficiency.md).
 * **readb 0.2.0 released**: Published to PyPI via the new tag-triggered workflow (Trusted
   Publishing, PEP 740 attestations) with the GitHub release cut from the changelog section. The
   TestPyPI rehearsal caught `__version__` reporting 0.1.0 from a 0.2.0 build — a third version

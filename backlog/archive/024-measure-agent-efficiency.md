@@ -2,7 +2,7 @@
 type: Task
 title: Measure readb's efficiency gains for agents over unguided bundle access
 description: A/B-benchmark an agent on OKF-style bundles — no guidance vs. using readb — measuring wall-clock speedup and token-usage reduction on large enough repos.
-status: Designed
+status: Done
 priority: medium
 tags:
 - research
