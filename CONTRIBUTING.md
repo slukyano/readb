@@ -46,7 +46,8 @@ Releases are cut by the maintainer. Pushing the tag is the release: everything a
 [`.github/workflows/release.yml`](.github/workflows/release.yml).
 
 1. **Bump the version** in `pyproject.toml` (the single version source) and in
-   `.claude-plugin/plugin.json`, which a test keeps in step with it.
+   `.claude-plugin/plugin.json`. Tests keep both in step, and `readb.__version__` derives from
+   the installed distribution metadata rather than repeating the number a third time.
 2. **Close the changelog section**: rename `Unreleased` to `[X.Y.Z] - YYYY-MM-DD`, add a fresh
    empty `Unreleased`, and update the comparison links at the bottom. This section becomes the
    GitHub release notes verbatim, so an empty one fails the release.

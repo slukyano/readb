@@ -14,9 +14,19 @@ to the source bundle.
 
 from __future__ import annotations
 
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version as _installed_version
+
 from readb.database import Database
 
-__version__ = "0.1.0"
+try:
+    # Derived, never written down twice: pyproject.toml is the single version source, and a
+    # literal here would silently disagree with the distribution the moment one is bumped
+    # without the other — which is invisible to tests and shows up only as `readb --version`
+    # reporting the wrong number from an installed build.
+    __version__ = _installed_version("readb")
+except PackageNotFoundError:  # a source tree that was never installed
+    __version__ = "0+unknown"
 
 __all__ = ["Database", "open", "__version__"]
 
