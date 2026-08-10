@@ -166,7 +166,13 @@ def integrity(arm: Arm, tools: list[dict], result: dict, transcript: str) -> dic
         "supported": len(tools) > 0,
         # The baseline must never touch readb: if it did, the arm is contaminated.
         "leak_baseline_readb": (not arm.readb_on_path) and ("readb" in transcript.lower()),
-        "compacted": '"compact' in transcript or "context low" in transcript.lower(),
+        # Look for an actual compaction event, not the word: the init event lists every
+        # built-in slash command, `compact` among them, so a substring match on the raw
+        # stream flags every run ever recorded.
+        "compacted": any(
+            marker in transcript
+            for marker in ('"compact_boundary"', '"isCompactSummary":true', '"subtype":"compact')
+        ),
         "permission_denials": result.get("permission_denials") or [],
     }
 
