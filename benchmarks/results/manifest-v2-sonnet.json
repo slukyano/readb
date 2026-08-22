@@ -1,6 +1,6 @@
 {
-  "started_utc": "2026-08-22T05:13:16.560112+00:00",
-  "git_sha": "655eb20ea37942eac85f9c1b9d251171815eea44",
+  "started_utc": "2026-08-22T05:42:26.504729+00:00",
+  "git_sha": "36542335d47440b023e8bbee4ef72382a15d9169",
   "claude_version": "2.1.239 (Claude Code)",
   "readb_version": "readb, version 0.2.0",
   "readb_bin": "/tmp/kbbench-v2/benchvenv/bin/readb",
@@ -33,6 +33,7 @@
   "corpus_generation": {
     "ops": {
       "concepts": 600,
+      "cross_checked": true,
       "malformed": 0,
       "messy": true,
       "needle_phrase": "the circuit breaker tripped during a partial region drain",
@@ -40,6 +41,7 @@
     },
     "ops-malformed": {
       "concepts": 600,
+      "cross_checked": true,
       "malformed": 12,
       "messy": true,
       "needle_phrase": "the circuit breaker tripped during a partial region drain",
@@ -47,12 +49,14 @@
     },
     "ops-tidy": {
       "concepts": 600,
+      "cross_checked": true,
       "malformed": 0,
       "messy": false,
       "needle_phrase": "the circuit breaker tripped during a partial region drain",
       "seed": 24
     },
     "backlog": {
+      "cross_checked": true,
       "feature_phrase": "face grouping",
       "messy": true,
       "product": "Lumenstore (invented for this corpus)",

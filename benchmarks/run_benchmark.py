@@ -834,12 +834,18 @@ def recipe_preflight(cfg, corpora: dict, truths: dict) -> dict:
         stage.mkdir(parents=True)
         (stage / "corpus").symlink_to(directory.resolve(), target_is_directory=True)
         placeholders = recipe_placeholders(truths[name])
+        # A corpus seeded with unparseable files makes a YAML-aware command fail on each of
+        # them, and the loop's exit code is its last iteration's. That is an honest property
+        # of the corpus, not a broken recipe — and the errors reaching the agent's stderr
+        # are part of what the hazard questions are about. Output is still required.
+        tolerates_failure = bool((truths[name].get("_meta") or {}).get("malformed"))
         for _, template in recipe:
             command = template.format(**placeholders)
             done = subprocess.run(
                 command, shell=True, cwd=stage, env=env, capture_output=True, text=True
             )
-            if done.returncode != 0 or not done.stdout.strip():
+            failed = done.returncode != 0 and not tolerates_failure
+            if failed or not done.stdout.strip():
                 raise SystemExit(
                     f"preflight failed: coached command for {name!r} produced nothing — "
                     f"{command}\n{done.stderr[:400]}"
