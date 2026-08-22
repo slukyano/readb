@@ -352,6 +352,9 @@ def ground_truth(records: list[dict], sprints: list[dict], by_name: dict) -> dic
             "Task": len(records),
             "Sprint": len(sprints),
             "open": sum(1 for r in records if r["status"] in ("Draft", "Designed")),
+            # Recorded so the harness can check the coached shell recipe against a known
+            # number rather than merely against a zero exit code.
+            "Draft": sum(1 for r in records if r["status"] == "Draft"),
         },
         "b1": {"answer": b1},
         "b2": {"sprint": active["name"], "branch": active["branch"], "answer": b2},
