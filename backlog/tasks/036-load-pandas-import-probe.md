@@ -61,3 +61,69 @@ This hits `uvx readb` hardest, since an isolated tool environment never has pand
   that beats a load pass which is itself 3× slower than it should be proves very little.
 - Benchmark v1 and v2 wall-clock figures for the readb arms were measured with this cost included.
   Nothing token-billed changes, but [035](035-benchmark-v3-cached.md) should say so.
+
+## Design
+
+**Public-surface delta: none.** No command, flag, output, API name, path or config key changes.
+The load simply gets faster; a caller cannot observe anything else.
+
+### The change
+
+`load_bundle` wraps the insert pass — every `_build_table` call, and nothing else — in a guard
+that makes the probe fail immediately instead of walking `sys.path`:
+
+```python
+@contextmanager
+def _suppress_pandas_probe():
+    """DuckDB probes for pandas per bound value; a failed import is never cached by Python."""
+    absent = "pandas" not in sys.modules
+    if absent:
+        sys.modules["pandas"] = None
+    try:
+        yield
+    finally:
+        if absent:
+            del sys.modules["pandas"]
+```
+
+`sys.modules[name] = None` is the documented sentinel for "this import fails": Python raises
+`ImportError` on sight of it without touching the finders. The guard is entered only when pandas
+has not already been imported, so a caller who *is* using pandas keeps it — measured at 1022 ms
+against 1027 ms unguarded, i.e. no effect — and `import pandas` still works normally once the
+guard releases.
+
+Placement is the load path only. The field editor never inserts rows and never imports duckdb; it
+is untouched.
+
+### The known limitation, stated rather than hidden
+
+`sys.modules` is process-global. A *different thread* importing pandas for the first time during
+the window in which a bundle is loading would see the sentinel and get an `ImportError`. This is
+accepted rather than solved:
+
+- the window is the insert pass of one load, measured in tens to hundreds of milliseconds;
+- it only exists for a program that both embeds `readb.open()` and first-imports pandas
+  concurrently on another thread;
+- the alternatives cost more than the defect — see below.
+
+It is documented in the loader's docstring where the guard lives, so the next reader does not have
+to re-derive why a `sys.modules` write is sitting in a read-only load path.
+
+### Tests
+
+- **A counting test, not a timing test.** A `sys.meta_path` finder that counts `find_spec("pandas")`
+  calls, installed around a real `load_bundle` of a fixture bundle with several populated columns:
+  the count must be 0. Deterministic, and it fails loudly if a future duckdb release moves the
+  probe somewhere the guard does not cover.
+- The guard restores state: `"pandas" not in sys.modules` after a load that started without it.
+- The guard is inert when pandas is already imported: with a stub module pre-inserted into
+  `sys.modules`, that exact object is still there afterwards.
+- The existing load-path suite is the correctness net — the guard must change no query result.
+
+### Alternatives weighed
+
+| Option | Why not |
+| --- | --- |
+| Insert through a temp JSON/CSV read natively by DuckDB | Removes per-value conversion entirely and needs no `sys.modules` write, but replaces the whole insert path, adds a temp-file write to a read-only load, and gives up the typed bind path that `coerce` feeds. Disproportionate to the defect. |
+| Set the sentinel once at import time and leave it | Simpler, but permanently breaks pandas for any process that imports readb. Unacceptable for a library. |
+| Wait for an upstream duckdb fix | Not this project's timeline. Worth reporting upstream regardless; the guard is removable in one commit if a release caches the negative probe. |
