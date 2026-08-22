@@ -6,8 +6,9 @@ tags:
 - benchmarks
 - agents
 measured: 2026-08-10
+probed: 2026-08-21
 created: 2026-08-10
-timestamp: '2026-08-10T00:00:00Z'
+timestamp: '2026-08-21T00:00:00Z'
 ---
 
 Produced by the backlog task `024-measure-agent-efficiency` (sprint-004). readb's pitch to agents
@@ -100,7 +101,7 @@ question asks for the count including them, in every arm's prompt.
 
 | Metric | Definition |
 | --- | --- |
-| **Cost, as billed** | Recomputed from token counts at cache prices, against a price table committed with the results. Reproduces the runtime's own `total_cost_usd` to the cent, which is the check that the table is right. **The headline.** |
+| **Cost, as billed** | Recomputed from token counts at cache prices, against a price table committed with the results. Tracks the runtime's own `total_cost_usd` to a median 0.8% (see limitation 14), which is the check that the table is right. **The headline.** |
 | Cost, cache-neutral | The same recomputation with every input token priced as fresh. Reported beside the billed figure because the two disagree, and quoting only the flattering one would be dishonest. |
 | New tokens ingested | `input + cache_creation` — content the agent had to pull in, as opposed to prompt prefix re-sent from cache. |
 | Cumulative prompt tokens | All input counts summed over turns. Turn-driven: each turn re-sends the whole prefix. |
@@ -134,8 +135,8 @@ that has nothing to do with readb. Floor-subtracted ratios are given alongside t
 # Results
 
 144 runs (4 arms × 12 questions × 3 repeats) on 2026-08-10, plus a 36-run re-measurement of the
-skill arm, a 32-run size sweep and 4 floor runs. Total spend across every batch, including the
-retracted one, $25.05.
+skill arm, a 32-run size sweep, 4 floor runs and a 6-run post-hoc probe. Total spend across
+every batch, including the retracted one, $25.66.
 
 **36 of the 144 are excluded** — the whole first `readb-skill` arm, retracted for the environment
 defect in finding 6. Those records were flagged `retracted` and the analyzer drops them; the
@@ -251,9 +252,15 @@ benchmark: **the skill's leading example fails on any machine where readb is ins
 is not.** That is now backlog task `030-skill-uvx-assumption`.
 
 **7. Coaching alone changes little.** `shell-coached` sits at 0.96× the baseline's billed cost
-(0.93× floor-subtracted). A worked `grep`/`awk` recipe buys a few percent; readb's advantage is
-not an artefact of being told what to do, and holds against the coached arm too — **0.90× billed,
-0.76× cache-neutral**.
+(0.93× floor-subtracted). A worked `grep`/`awk` recipe buys a few percent, so readb's advantage
+is not an artefact of being told what to do.
+
+Against the coached arm directly, though, the saving is **not established at this n**:
+**0.90× billed [0.79–1.05]** and 0.76× cache-neutral [0.60–1.01] — both intervals cross 1.00.
+By the criterion finding 2 uses, the cost saving is demonstrated against the *uncoached*
+baseline and only *consistent with* a saving against the arm this document itself calls readb's
+honest competitor. The point estimates agree with the headline; the evidence behind them is
+weaker, and twelve questions at three repeats cannot separate 0.90× from 1.00×.
 
 **8. An agent given readb often declines to use it — correctly.** In 12 of 36 `readb-bare` runs
 no readb command was issued, and those 12 are exactly the four file-favouring questions (Q7, Q9,
@@ -271,8 +278,8 @@ same corpus, same arms, rephrased from file-and-text language into concept-and-f
 is `Service`, including any whose frontmatter is malformed."* Phrasing alone flipped the tool
 choice: `readb-bare` invoked readb in **3 of 3** runs, against 0 of 3 on the original wording.
 
-It still answered 192, every time — because **readb tells the agent what it skipped**. The first
-command is `readb schema`, and readb writes one warning per unparseable file to stderr:
+It still answered 192, every time. readb is not silent about what it drops: the first command is
+`readb schema`, and readb writes one warning per unparseable file to stderr:
 
 ```
 skipping services/svc-9001-edge-collector.md: malformed YAML frontmatter
@@ -282,12 +289,22 @@ skipping services/svc-9001-edge-collector.md: malformed YAML frontmatter
 The agent read those warnings, ran the query anyway, saw 180, cross-checked against
 `ls corpus/services | wc -l` → 192, confirmed all 12 skipped files declare `type: Service`, and
 answered 192 with the arithmetic shown. The permissive-load contract is silent in the *result set*
-but not in the *process output*, and that turns out to be the difference: an agent sees the
-warning at exactly the moment it matters.
+but not in the *process output*.
+
+**What the probe does and does not establish.** It shows that an agent using readb on this
+question reached the right answer, and that readb's warnings were present and read. It does
+**not** isolate those warnings as the cause: the probe's own prompt says "including any whose
+frontmatter is malformed", which pre-warns every arm, and all three runs cross-checked with
+`ls`/`grep` independently. Establishing the mechanism needs a wording that does not mention
+malformed files at all. The tool-choice flip is 3/3 against 0/3 — suggestive, but Fisher's exact
+gives p≈0.10 at this n, so read it as a signal, not a settled effect.
 
 On the rephrased question readb is also the cheaper tool — `readb-bare` at **0.65×** the
-baseline's cost, against 0.87× on the original file-oriented wording. Which phrasing a user
-happens to choose moves the result more than the arms do.
+baseline's cost within the probe, against 0.87× on the original wording in the main matrix. That
+cross-batch comparison is loose: the probe ran on a later runtime build (2.1.239 against the
+matrix's 2.1.226), under a billing regime reporting 0.676× list (limitation 13), and with `uv` on
+the readb arm's `PATH` where the matrix had none. The within-probe ratio is sound; reading it
+against the matrix's 0.87× is indicative only.
 
 ## Size sweep
 
@@ -375,9 +392,14 @@ should have been a shape the model could not mistake for an answer.
 - No wall-clock benefit at 600 concepts (1.03×). The sweep suggests one at 2000, but reverses for
   repeated queries in one session.
 - Nothing about other models, other agent runtimes, or real (non-synthetic) bundles.
-- No statistical significance claim. Three repeats support medians and intervals; the
-  cache-neutral cost interval crosses 1.00 (upper bound 1.001), and the sweep's n=2 cells support
-  a direction only.
+- No statistical significance claim. Three repeats support medians and approximate intervals;
+  the cache-neutral cost interval crosses 1.00 (upper bound 1.001), the sweep's n=2 cells support
+  a direction only, and **against the coached arm the billed interval crosses 1.00 as well**
+  (0.90× [0.79–1.05]) — the saving is established against the uncoached baseline, not against a
+  coached one.
+- No equivalence claim on accuracy. Every arm scored at ceiling, and a battery nobody fails
+  cannot detect a difference; "no accuracy effect" here is absence of evidence, not evidence of
+  absence.
 - Whether the baseline's cost grows with the corpus or with the answer size — the sweep confounds
   them.
 - No README figure follows from this document. Publishing a headline number needs a follow-up
@@ -387,20 +409,42 @@ should have been a shape the model could not mistake for an answer.
 
 1. **One model, one runtime, one machine, one day.** The wall-clock noise floor was not
    established by a second measurement block.
-2. **Synthetic corpus.** Generator and seed are committed, but a generated bundle's frontmatter
-   is more regular than a real one's, which flatters both arms' pipelines.
+2. **Synthetic corpus.** Generator and seed are committed, but every frontmatter key is written
+   as one greppable `key: value` line, far more regular than a real bundle. That regularity
+   flatters the `grep`/`awk` recipes specifically — a messier corpus would break them more often
+   than it would break SQL — so this most likely biases *against* readb.
 3. **The battery is author-written.** Twelve questions, five of them chosen specifically to be
    hard for readb, but the selection is still not neutral. Per-question results are published so
-   the composition can be judged.
+   the composition can be judged. Four shapes that could move the conclusion are absent: a
+   **body-and-frontmatter hybrid** ("which tier-1 services' runbooks mention X"), which is the
+   most realistic genuinely contested case since readb exposes `__body`; an **output-heavy
+   enumeration** (list all 180 services with owner and tier), where readb's turn advantage should
+   shrink; a **zero-result or false-presupposition** question; and anything exercising **real
+   bundle messiness** — quoted values, inline versus block lists, drifting key names. Every
+   question also names the exact field names, which coaches all arms equally but unrealistically.
 4. **Read path only.** `readb set` is not exercised; nothing here speaks to the write path.
-5. **n = 3** in the main matrix, **n = 2** in the sweep.
+5. **n = 3** in the main matrix, **n = 2** in the sweep, and **n = 1 per arm** for the floor —
+   so the floor-subtracted figures rest on a single measurement each. The bootstrap resamples
+   *questions* only, ignoring within-question uncertainty, and a percentile bootstrap of a median
+   over twelve points undercovers its nominal level: read every interval as approximate and
+   narrower than honest. The headline's direction survives a cruder test that makes no such
+   assumption — 10 of 12 questions fall below 1.00 (sign test p≈0.04).
 6. **Q6's answer template was defective**, as described above.
 7. **The cost model is a recomputation**, not an invoice: token counts times a committed price
-   table. It reproduces the runtime's own figure to the cent, which is the check that the table
-   is right.
-8. Arms measuring the skill's *content* separately from its *discovery*, and a cross-check
-   against the runtime's own plugin-evaluation harness, were designed but not run.
-9. **No arm had `Grep` or `Glob`.** In this runtime build they are deferred tools reached through
+   table. It tracks the runtime's own figure to a median 0.8% (limitation 14), which is the
+   check that the table is right.
+8. **Designed conditions that were never run, and controls quietly dropped.** Arms measuring the
+   skill's *content* separately from its *discovery*, and a cross-check
+   against the runtime's own plugin-evaluation harness, were designed but not run. Three controls
+   the design promised were also dropped without being renegotiated: a read-only corpus (mode
+   `555`/`444`), two discarded warmup runs, and a sweep at 120 concepts — the sweep ran at 150.
+   None affects a published number, but the design should have been corrected rather than
+   quietly diverged from.
+9. **The skill arm was never interleaved.** Every other arm's runs are round-robined against the
+   others; `skill_uv` ran alone, 09:12–09:20, against a baseline measured 08:06–08:44. Its
+   comparison therefore carries an ordering and cache-warmth confound the matrix was built to
+   avoid.
+10. **No arm had `Grep` or `Glob`.** In this runtime build they are deferred tools reached through
    a search step, and no run reached for them. Across the 144 published runs (108 main matrix
    plus the 36 re-measured skill runs) the records counted **453 tool calls**, and the 128 runs
    whose transcripts were still intact at the time of counting broke down as `Bash` 357,
@@ -409,10 +453,10 @@ should have been a shape the model could not mistake for an answer.
    truncated, pre-formatted results rather than piping raw text into the context, so its absence
    plausibly *inflates* the file-reading arms' cost. The measured gap is an upper bound on
    readb's advantage over a fully-equipped agent.
-10. **Half of every measured run is fixed overhead** — $0.053 of a $0.088–0.101 median. Absolute
+11. **Half of every measured run is fixed overhead** — $0.053 of a $0.088–0.101 median. Absolute
     figures here are not "the cost of answering a question with readb"; they are that cost plus a
     constant, and the constant dilutes every ratio toward 1.00.
-11. **The raw per-run records and transcripts are not committed.** They were, and it went badly:
+12. **The raw per-run records and transcripts are not committed.** They were, and it went badly:
     the transcript directory was flat until batches were namespaced, so each batch that reused an
     (arm, question, repeat) cell overwrote an earlier batch's evidence, and 68 published runs lost
     their tool-level detail before anyone noticed. Weighed against 4 MB of a public repository and
@@ -424,21 +468,22 @@ should have been a shape the model could not mistake for an answer.
     re-measurement also carries one asymmetry worth naming: reaching `uv` meant putting
     `/opt/homebrew/bin` on that arm's `PATH`, so the skill arm could see binaries the readb-free
     arms could not. Across all 36 runs the only one it invoked from there was `uvx`, 35 times.
-12. **The corpus no longer rebuilds byte-for-byte.** A post-hoc fix to the generator (the fuzzy
+13. **The corpus no longer rebuilds byte-for-byte.** A post-hoc fix to the generator (the fuzzy
     candidates for Q11 are now spread across the runbooks rather than planted at fixed indices,
     so they no longer degrade on a small corpus) moved which four runbooks carry a `# Failover`
     section. Rebuilding at seed 24 therefore produces a different checksum from the one
     `manifest-run.json` records — the mechanism worked exactly as intended and caught the drift.
     Everything Q10 depends on is unchanged and was re-verified: 192 files declaring
     `type: Service`, 12 unparseable, readb reporting 180.
-13. **A published cost basis outlived its billing regime.** Recomputed cost reproduced the
-    runtime's own `total_cost_usd` to within 1% across all 216 recorded runs (median 0.992). Runs
+14. **A published cost basis outlived its billing regime.** Recomputed cost tracks the runtime's
+    own `total_cost_usd` closely but not exactly: median deviation **0.8%**, with 40 of the 216
+    recorded runs off by more than 1% and one retracted run off by 20.5%. Runs
     made later, for the `q10b` probe, report at **0.676×** list price — a flat plan discount not
     in effect during the measured batches. This is the reason cost here is recomputed from token
     counts against a committed price table rather than quoted from the runtime: ratios within a
     batch are unaffected, but absolute dollars from different batches are not comparable.
 
-14. **`manifest-run.json` was reconstructed after the fact.** The harness of the time wrote one
+15. **`manifest-run.json` was reconstructed after the fact.** The harness of the time wrote one
     `manifest.json` that later batches overwrote. The corpora it records are the same directories
     the batch read, hashed afterwards and unmodified since, but it is a reconstruction and says
     so. Later batches carry manifests written during the run.

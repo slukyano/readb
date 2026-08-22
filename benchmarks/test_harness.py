@@ -8,6 +8,7 @@ the package's own suite does not collect this directory, and the sdist does not 
 from __future__ import annotations
 
 import json
+import pathlib
 import sys
 from pathlib import Path
 
@@ -256,3 +257,20 @@ def test_bootstrap_declines_to_invent_an_interval_from_two_points():
 def test_median_of_nothing_is_nan_not_a_crash():
     assert analyze.med([]) != analyze.med([])
     assert analyze.fmt(float("nan"), 2) == "—"
+
+
+def test_uv_shim_grants_uv_and_nothing_else(tmp_path):
+    """The skill arm needs uv; it must not thereby inherit a whole package manager's bin."""
+    from run_benchmark import uv_shim
+
+    path = pathlib.Path(uv_shim(tmp_path))
+    assert path.parent == tmp_path
+    assert set(p.name for p in path.iterdir()) <= {"uv", "uvx"}
+
+
+def test_only_the_skill_arm_carries_uv():
+    """`readb-bare`'s preamble shows the bare binary, so it has no business with uvx."""
+    from run_benchmark import ARMS
+
+    assert ARMS["readb-skill"].uv_on_path is True
+    assert not any(a.uv_on_path for name, a in ARMS.items() if name != "readb-skill")

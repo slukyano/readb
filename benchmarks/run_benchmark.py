@@ -113,12 +113,25 @@ class Arm:
 # The shipped skill's first runnable example is `uvx readb …`. An arm that has readb but
 # not `uv` cannot execute the thing the skill documents, and measures the failure instead
 # of the skill — which is exactly what the first batch did.
-UV_DIR = str(Path(shutil.which("uv") or "/opt/homebrew/bin/uv").parent)
+#
+# Only the skill arm needs it: `readb-bare`'s preamble shows the bare binary and never
+# mentions uvx. And it is granted through a shim directory holding uv and uvx alone —
+# putting the whole of Homebrew's bin on one arm's PATH would hand it rg, jq, gawk and
+# several hundred other tools the arms it is compared against do not have.
+def uv_shim(workroot: Path) -> str:
+    shim = workroot / ".uv-shim"
+    shim.mkdir(parents=True, exist_ok=True)
+    for name in ("uv", "uvx"):
+        source, link = shutil.which(name), shim / name
+        if source and not link.exists():
+            link.symlink_to(source)
+    return str(shim)
+
 
 ARMS = {
     "baseline": Arm("baseline", PREAMBLE_BASELINE, False, ISOLATION, False),
     "shell-coached": Arm("shell-coached", PREAMBLE_SHELL, False, ISOLATION, False),
-    "readb-bare": Arm("readb-bare", PREAMBLE_READB, True, ISOLATION, False, uv_on_path=True),
+    "readb-bare": Arm("readb-bare", PREAMBLE_READB, True, ISOLATION, False),
     "readb-skill": Arm(
         "readb-skill",
         PREAMBLE_BASELINE,
@@ -260,7 +273,7 @@ def run_one(arm: Arm, question, repeat: int, cfg, truth: dict, corpus: Path) -> 
         "LANG": os.environ.get("LANG", "en_US.UTF-8"),
         "PATH": ":".join(
             ([str(cfg.readb_bin.parent)] if arm.readb_on_path else [])
-            + ([UV_DIR] if arm.uv_on_path else [])
+            + ([cfg.uv_shim] if arm.uv_on_path else [])
             + [BASE_PATH]
         ),
     }
@@ -425,7 +438,7 @@ def preflight(cfg) -> dict:
             continue
         path = ":".join(
             ([str(cfg.readb_bin.parent)] if arm.readb_on_path else [])
-            + ([UV_DIR] if arm.uv_on_path else [])
+            + ([cfg.uv_shim] if arm.uv_on_path else [])
             + [BASE_PATH]
         )
         wanted = ([("readb", ["readb", "--version"])] if arm.readb_on_path else []) + (
@@ -510,6 +523,7 @@ def main() -> None:
     cfg.transcripts.mkdir(parents=True, exist_ok=True)
     cfg.results.parent.mkdir(parents=True, exist_ok=True)
     cfg.workroot.mkdir(parents=True, exist_ok=True)
+    cfg.uv_shim = uv_shim(cfg.workroot)
 
     truths = {
         "clean": json.loads(cfg.truth_clean.read_text()),
@@ -551,7 +565,7 @@ def main() -> None:
         "arm_paths": {
             name: ":".join(
                 ([str(cfg.readb_bin.parent)] if arm.readb_on_path else [])
-                + ([UV_DIR] if arm.uv_on_path else [])
+                + ([cfg.uv_shim] if arm.uv_on_path else [])
                 + [BASE_PATH]
             )
             for name, arm in ARMS.items()
