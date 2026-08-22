@@ -422,7 +422,11 @@ def generate(concepts: int, seed: int) -> tuple[list[Concept], dict]:
         )
 
     truth = ground_truth(services, runbooks, incidents, decisions)
-    truth["q9"] = {"runbook": runbooks[3]["name"], "answer": runbooks[3]["service"]}
+    # Not a fixed index: at small corpus sizes `step` falls to 3 and position 3 is itself a
+    # fuzzy-retrieval plant, so Q9 would ask about a runbook Q11 also depends on.
+    planted = {r["name"] for r in fuzzy_targets}
+    q9_runbook = next(r for r in runbooks if r["name"] not in planted)
+    truth["q9"] = {"runbook": q9_runbook["name"], "answer": q9_runbook["service"]}
     truth["q11"] = {
         "answer": fuzzy_targets[0]["name"],
         "distractors": [r["name"] for r in fuzzy_targets[1:]],
@@ -726,6 +730,10 @@ def write(
             "naive_count": top_parsed[1],
         }
 
+    # Chosen after every answer is known, so the check has everything to exclude.
+    services = [c.record for c in concepts if c.subdir == "services"]
+    truth["recipe_example"] = {"service": pick_recipe_example([s["name"] for s in services], truth)}
+
     _assert_no_leak_in_index(out_dir, truth)
     _cross_check(out_dir, truth, malformed)
 
@@ -739,8 +747,44 @@ def write(
         "malformed": malformed,
         "messy": messy,
         "needle_phrase": NEEDLE_PHRASE,
+        # Written only after `_cross_check` returned, so a truth file carrying this flag
+        # provably had every answer re-derived from the bytes on disk.
+        "cross_checked": True,
     }
     truth_path.write_text(json.dumps(truth, indent=2, sort_keys=True) + "\n")
+
+
+def pick_recipe_example(candidates: list[str], truth: dict) -> str:
+    """A name the coached recipe may quote without handing an arm part of an answer.
+
+    The coached preamble names one real concept so its commands are runnable as shown. v1
+    took `truth["q3"]["answer"][0]` — a member of the set Q3 asks the agent to produce — so
+    the coached arm read one of its own answers in its preamble. The contamination favoured
+    the competitor rather than readb, but it made that arm's numbers incomparable to the
+    others', and no exclusion rule caught it.
+
+    The example is now chosen from outside **every** answer in the truth, and asserted.
+    """
+    answers = {a.lower() for a in _every_string(truth)}
+    for name in candidates:
+        if name.lower() not in answers:
+            return name
+    raise AssertionError("every candidate for the coached recipe's example is part of an answer")
+
+
+def _every_string(value) -> list[str]:
+    """Every string anywhere in a truth structure, however deeply nested.
+
+    A shallower walk would miss the names inside `b2`'s and `b6`'s answer mappings, which
+    are exactly the ones a coached example must not collide with.
+    """
+    if isinstance(value, str):
+        return [value]
+    if isinstance(value, dict):
+        return [s for item in value.items() for s in _every_string(item)]
+    if isinstance(value, (list, tuple)):
+        return [s for item in value for s in _every_string(item)]
+    return []
 
 
 def _flatten_answers(truth: dict) -> list[str]:
@@ -773,11 +817,10 @@ def _cross_check(out_dir: Path, truth: dict, malformed: int) -> None:
     off disk with PyYAML and must agree — a generator bug would otherwise be scored as
     an agent's error, penalising whichever arm was right.
     """
-    try:
-        import yaml
-    except ImportError:  # the cross-check is a safety net, not a hard dependency
-        print("warning: PyYAML unavailable, skipping the independent cross-check")
-        return
+    # A hard requirement, not a safety net that can be skipped. The cross-check is the only
+    # guard against a generator bug being scored as an agent's error, and a `print()` that
+    # scrolls past in a long generation log is not a guard.
+    import yaml
 
     parsed: list[dict] = []
     unparseable = 0
@@ -856,6 +899,82 @@ def _cross_check(out_dir: Path, truth: dict, malformed: int) -> None:
         raise AssertionError(
             f"cross-check disagrees on q14: {len(q14)} vs {len(truth['q14']['answer'])}"
         )
+
+    named = {r["__name"]: r for r in parsed}
+    services_by_name = {n: r for n, r in named.items() if r.get("type") == "Service"}
+    runbooks = [r for r in parsed if r.get("type") == "Runbook"]
+    incidents = [r for r in parsed if r.get("type") == "Incident"]
+    decisions = [r for r in parsed if r.get("type") == "Decision"]
+
+    def disagrees(label: str, derived, declared) -> None:
+        if derived != declared:
+            raise AssertionError(f"cross-check disagrees on {label}: {derived} != {declared}")
+
+    q2: dict[str, int] = {}
+    for record in services_by_name.values():
+        q2[record["status"]] = q2.get(record["status"], 0) + 1
+    disagrees("q2", q2, truth["q2"])
+
+    by_team_parsed: dict[str, int] = {}
+    for record in services_by_name.values():
+        by_team_parsed[record["team"]] = by_team_parsed.get(record["team"], 0) + 1
+    top = sorted(by_team_parsed.items(), key=lambda kv: (-kv[1], kv[0]))[0]
+    disagrees("q6", {"team": top[0], "count": top[1]}, dict(truth["q6"]))
+
+    disagrees(
+        "q4",
+        sorted(
+            r["__name"]
+            for r in runbooks
+            if (svc := services_by_name.get(r["service"]))
+            and svc["tier"] == 1
+            and svc["status"] == "deprecated"
+        ),
+        truth["q4"],
+    )
+    disagrees(
+        "q5",
+        sorted(r["__name"] for r in incidents if truth["q5"]["service"] in r["services"]),
+        truth["q5"]["answer"],
+    )
+
+    sev1 = {n for r in incidents if r["severity"] == "sev1" for n in r["services"]}
+    disagrees("q8.sev1_services", sorted(sev1), truth["q8"]["sev1_services"])
+    disagrees(
+        "q8",
+        sorted(
+            r["__name"]
+            for r in runbooks
+            if r["status"] == "stale"
+            and r["service"] in sev1
+            and (svc := services_by_name.get(r["service"]))
+            and svc["tier"] == 1
+        ),
+        truth["q8"]["answer"],
+    )
+
+    disagrees("q9", named[truth["q9"]["runbook"]]["service"], truth["q9"]["answer"])
+    disagrees(
+        "q12",
+        {
+            "a": sum(1 for r in services_by_name.values() if r["tier"] == 1),
+            "b": sum(1 for r in runbooks if r["status"] == "current"),
+            "c": sum(1 for r in incidents if r["severity"] == "sev1"),
+            "d": sum(1 for r in decisions if r["status"] == "accepted"),
+            "e": sum(1 for r in services_by_name.values() if r["team"] == "identity"),
+        },
+        dict(truth["q12"]),
+    )
+
+    # Q11's discriminator lives in a body, so it is re-derived from the written text: the
+    # one failover section that actually promotes the standby.
+    promoted = sorted(
+        path.stem
+        for path in sorted((out_dir / "runbooks").glob("*.md"))
+        if "promoted to accept writes" in path.read_text()
+    )
+    if promoted != [truth["q11"]["answer"]]:
+        raise AssertionError(f"q11's discriminator is not unique: {promoted}")
 
     if malformed:
         by_team: dict[str, int] = {}

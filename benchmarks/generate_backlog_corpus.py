@@ -30,7 +30,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from generate_corpus import _frontmatter  # noqa: E402
+from generate_corpus import _frontmatter, pick_recipe_example  # noqa: E402
 
 STATUSES = ["Draft", "Designed", "Done", "Dropped"]
 # Weighted so the archive is the larger half, as a backlog of any age is.
@@ -307,9 +307,8 @@ def ground_truth(records: list[dict], sprints: list[dict], by_name: dict) -> dic
     active = next(s for s in sprints if s["status"] != "Done")
     # b2 — the active sprint's scope, each task mapped to the approach its design names.
     # A task still in Draft has no design, which the `none` convention expresses.
-    b2 = {
-        name: (by_name[name]["approach"] or "none") for name in active["tasks"] if name in by_name
-    }
+    # Every name in a sprint's scope is sampled from `records`, so the lookup cannot miss.
+    b2 = {name: (by_name[name]["approach"] or "none") for name in active["tasks"]}
 
     # b3 — a finished sprint, and which of its tasks actually shipped. Chosen as the last
     # Done sprint whose scope contains both delivered and undelivered work: a sprint where
@@ -389,6 +388,13 @@ def write(
     names = [d.name for d in docs]
     if len(set(names)) != len(names):
         raise AssertionError("concept names must be unique across the bundle")
+
+    # The coached recipe quotes one real task so its commands run as shown. It must not be
+    # a member of any answer set, or the coached arm reads part of an answer in its own
+    # preamble — see `pick_recipe_example`.
+    open_tasks = [d.name for d in docs if d.subdir == "tasks"]
+    truth["recipe_example"] = {"task": pick_recipe_example(open_tasks, truth)}
+
     _cross_check(out_dir, truth)
 
     truth["_meta"] = {
@@ -397,6 +403,8 @@ def write(
         "sprints": truth["counts"]["Sprint"],
         "messy": messy,
         "feature_phrase": FEATURE_PHRASE,
+        # Written only after `_cross_check` returned.
+        "cross_checked": True,
         "product": "Lumenstore (invented for this corpus)",
     }
     truth_path.parent.mkdir(parents=True, exist_ok=True)
@@ -429,11 +437,9 @@ def _cross_check(out_dir: Path, truth: dict) -> None:
     Ground truth above comes from the generation parameters; this comes from the bytes.
     A generator bug would otherwise be scored as an agent's error.
     """
-    try:
-        tasks, sprints = _read_back(out_dir)
-    except ImportError:  # the cross-check is a safety net, not a hard dependency
-        print("warning: PyYAML unavailable, skipping the independent cross-check")
-        return
+    # A hard requirement: the cross-check is the only guard against a generator bug being
+    # scored as an agent's error, and a warning printed into a long log is not a guard.
+    tasks, sprints = _read_back(out_dir)
 
     status_of = {t["__name"]: t.get("status") for t in tasks}
     checks: dict[str, tuple] = {}

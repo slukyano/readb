@@ -1,7 +1,7 @@
 ---
 type: Research
 title: Does readb still make an agent cheaper when the shell arm is armed and the corpus is messy?
-description: A five-arm, two-model, 783-run benchmark of one agent answering 26 pre-registered questions over four OKF bundles, with three declared endpoints and no pooled headline.
+description: A five-arm, two-model benchmark of one agent answering 26 pre-registered questions over four OKF bundles, with three declared endpoints and no pooled headline.
 tags:
 - benchmarks
 - agents
@@ -12,8 +12,7 @@ timestamp: '2026-08-22T00:00:00Z'
 
 Produced by the backlog task `031-benchmark-v2` (sprint-005), and the direct follow-on from
 [v1](agent-efficiency.md). Everything below was fixed before the first measured run and is
-recorded in [the pre-registration](agent-efficiency-v2-preregistration.md); this document reports
-what came back.
+recorded in [the pre-registration](agent-efficiency-v2-preregistration.md).
 
 **The numbers describe two models, one agent runtime, four synthetic corpora and one battery, at
 three repeats per cell.** Nothing here supports a claim beyond that.

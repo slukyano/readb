@@ -832,3 +832,151 @@ def test_the_floor_is_the_median_of_its_repeats(tmp_path, capsys):
     # median floor 0.1: (0.6-0.1)/(1.0-0.1) = 0.56. The last-record floor of 9.9 would have
     # made both sides negative and printed a dash instead.
     assert "0.56x" in out
+
+
+# --- corrections found by the independent review ------------------------------
+
+
+def test_an_empty_answer_line_is_no_answer():
+    """Otherwise a run that trailed off scores exactly right on the two empty-truth questions."""
+    assert extract_answer("ANSWER:") is None
+    assert extract_answer("ANSWER:    ") is None
+    assert extract_answer("ANSWER: none") == "none"
+
+
+def test_an_empty_truth_demands_the_none_token_not_an_empty_line():
+    for qid, truth in (
+        ("q16", {"q16": {"team": "x", "tier": 1, "status": "y", "answer": []}}),
+        ("q17", {"q17": {"field": "owner", "answer": []}}),
+    ):
+        question = BY_ID[qid]
+        assert score(question, "none", truth)[0]
+        for degenerate in ("", "   ", "no matches were found"):
+            assert not score(question, degenerate, truth)[0], (qid, degenerate)
+
+
+def test_an_arithmetic_answer_scores_its_result_not_its_first_operand():
+    """The hazard questions ask for a sum, and writing it out is the natural thing to do."""
+    question = BY_ID["q10"]
+    truth = {"q10": {"answer": 612}}
+    assert score(question, "600 + 12 = 612", truth)[0]
+    assert score(question, "612", truth)[0]
+    assert score(question, "612 files", truth)[0]
+    assert not score(question, "600", truth)[0]
+
+
+def test_formatting_is_never_scored_as_a_wrong_answer():
+    question = BY_ID["q3"]
+    truth = {"q3": {"team": "x", "answer": ["svc-0001", "svc-0002"]}}
+    for raw in ("svc-0001, svc-0002.", "- svc-0001\n- svc-0002", "* svc-0001, * svc-0002"):
+        assert score(question, raw, truth)[0], raw
+
+
+def test_a_name_with_an_apposition_is_the_same_name():
+    question = BY_ID["q7"]
+    truth = {"q7": {"answer": "inc-0042"}}
+    assert score(question, "inc-0042 (the incident)", truth)[0]
+    assert score(question, "inc-0042", truth)[0]
+    # ...and the fallback cannot rescue a wrong name.
+    assert not score(question, "inc-0001 is the one", truth)[0]
+
+
+def test_the_coached_example_is_drawn_from_outside_every_answer(tmp_path):
+    """v1 quoted `q3["answer"][0]` — a member of the very set Q3 asks the agent to produce."""
+    import generate_backlog_corpus as backlog
+    from generate_corpus import _every_string
+    from run_benchmark import recipe_placeholders
+
+    concepts, truth = generate(300, seed=7)
+    write(tmp_path / "ops", tmp_path / "ops.json", concepts, truth, seed=7)
+    docs, btruth = backlog.generate(120, 8, seed=7)
+    backlog.write(tmp_path / "bl", tmp_path / "bl.json", docs, btruth, seed=7)
+
+    for path in (tmp_path / "ops.json", tmp_path / "bl.json"):
+        written = json.loads(path.read_text())
+        answers = {
+            s.lower()
+            for key, value in written.items()
+            if key not in ("recipe_example", "_meta")
+            for s in _every_string(value)
+        }
+        for value in recipe_placeholders(written).values():
+            assert value.lower() not in answers, f"{value} is part of an answer"
+
+
+def test_a_truth_without_a_recipe_example_stops_the_run():
+    from run_benchmark import recipe_placeholders
+
+    with pytest.raises(SystemExit, match="recipe_example"):
+        recipe_placeholders({"q3": {"answer": ["a"]}})
+
+
+def test_the_coached_recipe_can_relate_two_kinds_and_read_a_list():
+    """E1's whole scope is join-shaped, and three backlog questions turn on list fields."""
+    from run_benchmark import RECIPES
+
+    for name in ("ops", "backlog"):
+        glosses = " ".join(gloss for gloss, _ in RECIPES[name])
+        assert "relate" in glosses, f"{name}'s recipe teaches no join"
+        assert "list-valued" in glosses, f"{name}'s recipe teaches no list field"
+        assert len(RECIPES[name]) == 5
+
+
+def test_the_cross_check_is_recorded_as_having_run(tmp_path):
+    """A `print()` that scrolls past in a generation log is not a guard."""
+    import generate_backlog_corpus as backlog
+
+    concepts, truth = generate(300, seed=7)
+    write(tmp_path / "ops", tmp_path / "ops.json", concepts, truth, seed=7)
+    assert json.loads((tmp_path / "ops.json").read_text())["_meta"]["cross_checked"] is True
+    docs, btruth = backlog.generate(120, 8, seed=7)
+    backlog.write(tmp_path / "bl", tmp_path / "bl.json", docs, btruth, seed=7)
+    assert json.loads((tmp_path / "bl.json").read_text())["_meta"]["cross_checked"] is True
+
+
+def test_the_ops_cross_check_catches_a_corrupted_join_answer(tmp_path):
+    """It re-derives every ops answer now, not the eight that were easy to reach."""
+    concepts, truth = generate(300, seed=7)
+    truth["q8"]["answer"] = truth["q8"]["answer"][:-1] or ["bogus"]
+    with pytest.raises(AssertionError, match="q8"):
+        write(tmp_path / "kb", tmp_path / "t.json", concepts, truth, seed=7)
+
+
+def test_a_missing_shared_tool_stops_the_run(tmp_path):
+    """Every arm is told it has these; being told so falsely is the exit-127 failure again."""
+    from run_benchmark import assert_shared_tools_exist
+
+    empty = tmp_path / "shim"
+    empty.mkdir()
+    with pytest.raises(SystemExit, match="named to every arm"):
+        assert_shared_tools_exist(str(empty))
+
+
+def test_an_answer_with_no_tool_call_is_recorded_not_rescored():
+    """The pre-registration drops the `supported` check; it stays a diagnostic."""
+    import inspect
+
+    import run_benchmark
+
+    source = inspect.getsource(run_benchmark.run_one)
+    assert 'if not checks["supported"]' not in source
+    assert integrity(_Arm(True), [], {}, "")["supported"] is False
+
+
+def test_a_name_kind_question_can_be_matched_by_a_read():
+    """`tool_choice` must be able to emit `read`, or three questions can never match."""
+    assert classify_tool_choice([{"name": "Bash", "input": {"command": "cat corpus/a/x.md"}}]) == (
+        "read"
+    )
+    assert (
+        classify_tool_choice(
+            [{"name": "Bash", "input": {"command": "sed -n '1,20p' corpus/a/x.md"}}]
+        )
+        == "read"
+    )
+    assert (
+        classify_tool_choice(
+            [{"name": "Bash", "input": {"command": "cat corpus/a/*.md | grep foo"}}]
+        )
+        == "shell"
+    )

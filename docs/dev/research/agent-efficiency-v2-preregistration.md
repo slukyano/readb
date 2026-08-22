@@ -180,8 +180,10 @@ model that artifact is written for, and adding it would buy a fourth cell of an 
 uses. Repeats stay at 3 — v1's within-cell variation is 8.6% against 33% between questions, so
 repeats buy nothing and questions are the axis that pays.
 
-The floor block replaces every question with a trivial prompt through the identical harness, to
-measure the fixed overhead both arms pay before any work happens.
+The floor block replaces every question with a trivial prompt through the identical harness. It
+measures the **runtime's** fixed cost under each arm's configuration — the plugin load, the PATH,
+the session setup. It deliberately does **not** include an arm's own preamble: the preamble is that
+arm's treatment, and subtracting a treatment from itself would hide part of what is being measured.
 
 The sweep runs `baseline`, `shell-coached` and `readb-bare` on **`q2`, `q3` and `q15`** against both
 `ops` and `ops-tidy`. `q2` and `q3` filter on string values, which messiness may quote; `q15`
@@ -206,9 +208,12 @@ where a uniform scale cancels, so no ratio is affected.
 # What is recorded, beyond v1
 
 - **Tool choice.** Each question declares the tool an expert would reach for; the harness
-  classifies what the agent actually used (`readb` outright if it ran readb at all, otherwise
-  searching or reading by which it did more of, ties to searching). Reported as a matrix per arm
-  and model. **It is a result, never a reason to edit a prompt.**
+  classifies what the agent actually used. `readb` wins outright if any command invoked it.
+  Otherwise each shell command is classified by its **target**, not its binary: a command naming
+  exactly one `.md` file, with no glob and no pipe, is a *read*; anything else naming a search
+  binary is a *search*. `Read` counts as a read, `Grep`/`Glob` as searches, and the run takes
+  whichever it did more of, ties to searching. Reported as a matrix per arm and model. **It is a
+  result, never a reason to edit a prompt.**
 - **Failure counts** — failed tool results, and failed readb calls specifically, read from tool
   results rather than from the call list.
 - **Trap diagnostics** — whether readb's skip warning reached the transcript, so an un-warned wrong
@@ -218,7 +223,9 @@ where a uniform scale cancels, so no ratio is affected.
 
 # Dropped from v1 because it measured nothing
 
-The `supported` check (at least one tool call — zero failures were structurally guaranteed); wall
+The `supported` check as a **scoring rule** — v1 forced a run with no tool call to score zero, and
+zero such runs occurred, so it measured nothing. It remains a recorded diagnostic and appears in the
+integrity table, but it no longer alters a score. Also dropped: wall
 clock and output tokens leave the headline tables; cache-neutral cost is demoted to an appendix,
 having never disagreed with billed cost in direction; and the n=1 floor becomes three repeats per
 arm and model.
@@ -230,7 +237,30 @@ timed out, the runtime reported an error, readb leaked into a readb-free arm, or
 denied mid-run. Every exclusion is listed by arm, question and repeat in the analysis output. No
 run is excluded for being an outlier.
 
+# Revisions, before the first surviving run
+
+An independent review of the harness on 2026-08-22, run before any surviving measured data existed,
+found defects in the instrument. Every run made until then — 77 of them, $6.28 — was **deleted**,
+not retracted, so this document still precedes the first measured run. The corrections:
+
+| # | Defect | Correction |
+| --- | --- | --- |
+| 1 | The coached preamble quoted `q3["answer"][0]` and `b1["answer"][0]`, so `shell-coached` read one of its own answers in its treatment. v1 had the same defect. | The example is drawn from outside **every** answer in the truth, asserted at generation. |
+| 2 | An empty `ANSWER:` line parsed as the empty set and scored exactly correct on the two questions whose truth is empty. | An empty capture is no answer; an empty truth requires the literal `none`. |
+| 3 | Tool choice could never emit `read`, so the three questions declaring it could never match. | Shell commands are classified by target rather than by binary (above). |
+| 4 | The ops cross-check re-derived 8 of 18 answers, though this document claimed all of them. | All 18 are re-derived from the written bytes; a mutation test proves each is caught. |
+| 5 | Both cross-checks degraded to a printed warning when PyYAML was absent. | PyYAML is required, and `_meta.cross_checked` records that the check ran. |
+| 6 | The analyzer never grouped by corpus, so a results file spanning two renderings would pool them. | It refuses to run pooled tables on such a file without `--corpus` or `--sweep-only`. |
+| 7 | `_as_int` took the first integer, scoring `600 + 12 = 612` as 600 — penalising exactly the arm that did the malformed accounting. | Text after the last `=` wins. |
+| 8 | `_norm_token` kept trailing punctuation and list bullets, and the `name` kind scored an apposition as wrong. | Both normalised; the first-token fallback can rescue a right answer and never a wrong one. |
+| 9 | The coached recipe taught only scalar, single-directory operations, while E1's whole scope is join-shaped and three backlog questions turn on list fields. | Two commands added: a joinable per-file TSV row, and a list-field rollup. The rollup is checked against ground truth in preflight. |
+| 10 | `TASK_INTRO` promised six tools that nothing verified. | The run refuses to start unless every one of them is on the shim. |
+| 11 | The per-turn overhead column subtracted a whole floor *run* per turn rather than one prompt prefix. | It divides the floor's cumulative tokens by the floor's own turn count. |
+| 12 | The endpoint table reported the number of shared questions rather than the number of pairs tested. | It reports the pairs the test actually saw. |
+
+Corrections 1, 2, 7, 8 and 9 change what a number would be, which is why no earlier data survives.
+
 # Deviations
 
-Any departure from this document is listed in the write-up under its own heading, with what changed
-and why. An empty list is itself a claim, and is stated as one.
+Any departure from this document *after* the first surviving run is listed in the write-up under
+its own heading, with what changed and why. An empty list is itself a claim, and is stated as one.

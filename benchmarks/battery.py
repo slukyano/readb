@@ -568,8 +568,24 @@ def placeholders(truth: dict) -> dict:
 
 
 def extract_answer(text: str) -> str | None:
+    """The last `ANSWER:` line's content, or None when there is none to read.
+
+    A bare `ANSWER:` with nothing after it counts as **no answer**. Without that, an empty
+    capture parses as the empty set and scores exactly correct on the two questions whose
+    truth is empty — so a run that simply trailed off would be recorded as right, and as
+    having produced a parseable answer.
+    """
     matches = ANSWER_RE.findall(text or "")
-    return matches[-1].strip() if matches else None
+    if not matches:
+        return None
+    last = matches[-1].strip()
+    return last or None
+
+
+# Bullets and quotes an agent may wrap a name in, and the sentence punctuation it may end
+# one with. Stripped so that formatting is never scored as a wrong answer — arms format
+# differently by construction, and the normalizer must not pick a winner.
+_TRIM = "`'\"*.,;:!?()[]"
 
 
 def _norm_token(token: str) -> str:
@@ -577,13 +593,17 @@ def _norm_token(token: str) -> str:
 
     Arms name things differently by construction — readb emits a bare `__name`, a shell
     pipeline emits `services/svc-0042.md`, a reading agent may emit a title — so the
-    normalizer strips directories, the `.md` suffix, surrounding punctuation and case.
+    normalizer strips list bullets, directories, the `.md` suffix, surrounding punctuation
+    and case.
     """
-    token = token.strip().strip("`'\"*")
+    token = token.strip()
+    while token[:2] in ("- ", "* ", "+ "):
+        token = token[2:].strip()
+    token = token.strip(_TRIM).strip()
     token = token.rsplit("/", 1)[-1]
     if token.endswith(".md"):
         token = token[:-3]
-    return token.strip().lower()
+    return token.strip(_TRIM).strip().lower()
 
 
 def _is_none(raw: str) -> bool:
@@ -598,7 +618,15 @@ def _parse_set(raw: str) -> set[str]:
 
 
 def _as_int(text: str) -> int | None:
-    """Digits out of a free-text value, or None. A lone `-` is not a number."""
+    """Digits out of a free-text value, or None. A lone `-` is not a number.
+
+    Text after the last `=` wins. The hazard questions ask an agent to add unparseable
+    files to a parsed count, and writing the sum out — `600 + 12 = 612` — is the natural
+    thing to do; taking the first integer would score the pre-trap number and penalise
+    exactly the arm that did the accounting.
+    """
+    if "=" in text:
+        text = text.rsplit("=", 1)[1]
     match = re.search(r"-?\d+", text)
     return int(match.group()) if match else None
 
@@ -662,8 +690,10 @@ def _score_mapping_str(raw: str, expected: dict) -> tuple[bool, float, object]:
     that answers `worker-queue`. The key set must still match exactly — naming a task that
     is not in scope is a different answer, not a verbose one.
     """
-    if _is_none(raw) and not expected:
-        return True, 1.0, {}
+    if not expected:
+        # Symmetric with the set kind: an empty answer must be *stated*, not implied by a
+        # line that happens to carry no `=`.
+        return (_is_none(raw), 1.0 if _is_none(raw) else 0.0, {})
     got = _parse_pairs(raw)
     agreed = sum(
         1
@@ -680,8 +710,14 @@ def score(question: Question, raw_answer: str | None, truth: dict) -> tuple[bool
         return False, 0.0, None
     expected = question.truth(truth)
     if question.kind == "set":
-        got = _parse_set(raw_answer)
         want = {str(e).lower() for e in expected}
+        if not want:
+            # An empty answer must be *stated*. Letting a line that parsed to no tokens
+            # satisfy an empty truth would score a run that trailed off as exactly correct
+            # on the two questions whose answer is nothing.
+            stated = _is_none(raw_answer)
+            return stated, 1.0 if stated else 0.0, []
+        got = _parse_set(raw_answer)
         return got == want, f1(got, want), sorted(got)
     if question.kind == "mapping":
         got = _parse_mapping(raw_answer)
@@ -693,8 +729,14 @@ def score(question: Question, raw_answer: str | None, truth: dict) -> tuple[bool
     if question.kind == "record":
         return _score_record(raw_answer, expected)
     if question.kind == "name":
+        want = str(expected).lower()
         got = _norm_token(raw_answer)
-        exact = got == str(expected).lower()
+        # `inc-0042 (the incident)` named the same concept as `inc-0042`. The first token
+        # is tried only when the whole line does not match, so this can turn a right answer
+        # written loosely into a pass and can never turn a wrong name into one.
+        if got != want and " " in got:
+            got = _norm_token(got.split()[0])
+        exact = got == want
         return exact, 1.0 if exact else 0.0, got
     if question.kind == "number":
         got = _as_int(raw_answer)

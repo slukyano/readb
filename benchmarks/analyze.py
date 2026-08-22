@@ -241,7 +241,6 @@ def run_endpoint(endpoint: dict, clean: list[dict], strata_of: dict) -> dict:
         against = question_exactness(rows, endpoint["against"], None)
         shared = sorted(set(arm) & set(against))
         diffs = [arm[q] - against[q] for q in shared]
-        ratios = diffs
         if shared:
             effect = (
                 f"{statistics.mean(arm[q] for q in shared):.0%} vs "
@@ -252,7 +251,10 @@ def run_endpoint(endpoint: dict, clean: list[dict], strata_of: dict) -> dict:
         interval = ""
 
     test = wilcoxon(diffs)
-    return {**endpoint, "questions": len(shared), "effect": effect, "ci": interval, "test": test}
+    # The pairs actually compared, not the questions both arms happened to answer: a
+    # question whose median cost is missing or non-positive is dropped inside the loop, and
+    # reporting `len(shared)` would over-state what the test saw.
+    return {**endpoint, "questions": len(diffs), "effect": effect, "ci": interval, "test": test}
 
 
 # --- the report ---------------------------------------------------------------
@@ -279,6 +281,15 @@ def main() -> None:
         "pre-registered endpoints have their own comparator and ignore this.",
     )
     ap.add_argument(
+        "--corpus",
+        help="keep only runs against this corpus, for a results file that spans several",
+    )
+    ap.add_argument(
+        "--sweep-only",
+        action="store_true",
+        help="print only the messy/tidy comparison, for a batch that deliberately spans corpora",
+    )
+    ap.add_argument(
         "--skip-endpoints",
         action="store_true",
         help="omit the pre-registered endpoint tests, for a batch that is not the main matrix",
@@ -290,6 +301,25 @@ def main() -> None:
     records = load(args.results)
     if args.baseline_from:
         records += [r for r in load(args.baseline_from) if r["arm"] == BASELINE]
+    if args.corpus:
+        records = [r for r in records if r.get("corpus") == args.corpus]
+
+    # A question that appears under two corpora is the sweep, where every table other than
+    # the sweep's own would silently pool a messy run with a tidy one for the same question
+    # — and E1 (q3) and the scan stratum (q2, q15) are exactly the cells that would move.
+    # The README says to analyse the sweep on its own; this makes the code say it too.
+    spanning = sorted(
+        q
+        for q in {r["question"] for r in records}
+        if len({r.get("corpus") for r in records if r["question"] == q}) > 1
+    )
+    if spanning and not (args.corpus or args.sweep_only):
+        raise SystemExit(
+            f"{len(spanning)} question(s) appear under more than one corpus "
+            f"({', '.join(spanning)}). Pass --sweep-only for the messy/tidy table alone, or "
+            f"--corpus NAME to pick one rendering; pooling them would put two renderings "
+            f"in the same cell."
+        )
     dropped = [(r, why) for r in records if (why := invalid(r))]
     clean = [r for r in records if not invalid(r)]
     arms = sorted({r["arm"] for r in records}, key=lambda a: (a != BASELINE, a))
@@ -305,7 +335,7 @@ def main() -> None:
     print(f"Models: {', '.join(models)}. Arms: {', '.join(arms)}. Questions: {len(questions)}.\n")
 
     # --- the endpoints, first, because everything after them is descriptive ----
-    if not args.skip_endpoints:
+    if not args.skip_endpoints and not args.sweep_only:
         print("## Pre-registered endpoints\n")
         results = [run_endpoint(e, clean, strata_of) for e in ENDPOINTS]
         raw = [r["test"]["p"] if r["test"] else 1.0 for r in results]
@@ -332,7 +362,7 @@ def main() -> None:
         by_arm_model[(r.get("model"), r["arm"])].append(r)
 
     # --- per model ------------------------------------------------------------
-    for model in models:
+    for model in [] if args.sweep_only else models:
         rows_for_model = [r for r in clean if (r.get("model") or "?") == model]
         if not rows_for_model:
             continue
@@ -462,7 +492,9 @@ def main() -> None:
         print()
 
     # --- hazard diagnostics ---------------------------------------------------
-    hazard = [r for r in clean if strata_of.get(r["question"]) == "hazard"]
+    hazard = (
+        [] if args.sweep_only else [r for r in clean if strata_of.get(r["question"]) == "hazard"]
+    )
     if hazard:
         print("## The malformed-file hazard\n")
         print(
@@ -534,6 +566,12 @@ def main() -> None:
             print()
 
     # --- per question ---------------------------------------------------------
+    if args.sweep_only:
+        print(
+            f"\nTotal reported spend: ${sum(r.get('cost_reported_usd') or 0 for r in records):.2f}"
+        )
+        return
+
     print("## By question\n")
     print(
         "| question | stratum | shape | expert | model | arm | n | exact | ingested "
@@ -575,11 +613,19 @@ def main() -> None:
         floors = {
             key: {
                 metric: med([r[metric] for r in rows if r.get(metric) is not None])
-                for metric in ("cost_billed_usd", "cumulative_prompt_tokens")
+                for metric in ("cost_billed_usd", "cumulative_prompt_tokens", "num_turns")
             }
             for key, rows in floor_rows.items()
         }
         print("\n## Overhead-subtracted cost ratios — a choice, not a correction\n")
+        print(
+            "The floor is a trivial prompt through the identical harness, so it measures the "
+            "**runtime's** fixed cost under each arm's configuration — not that arm's own "
+            "preamble, which is its treatment and is deliberately never subtracted. A ratio "
+            "below 1.00 always moves further from 1.00 when a constant is removed from both "
+            "sides, so which constant is removed is a choice; both rules are shown, neither "
+            "as the authoritative one.\n"
+        )
         print("| model | arm | one floor per run | one prompt prefix per turn |")
         print("|---|---|---|---|")
         for model in models:
@@ -604,17 +650,20 @@ def main() -> None:
                 )
                 arm_turns = question_medians(rows_for_model, arm, model, "num_turns")
                 base_turns = question_medians(rows_for_model, BASELINE, model, "num_turns")
+
+                # One prompt *prefix*, not one whole floor run. A floor run takes a couple
+                # of turns of its own, so its cumulative prompt tokens are already several
+                # prefixes; multiplying that by the real run's turn count over-subtracts far
+                # enough to drive both sides negative, which is why this column printed a
+                # dash for every arm in v1.
+                def prefix(key: tuple) -> float:
+                    floor = floors[key]
+                    return floor["cumulative_prompt_tokens"] / (floor["num_turns"] or 1)
+
                 per_turn = []
                 for q in sorted(set(arm_tok) & set(base_tok)):
-                    b = (
-                        base_tok[q]
-                        - base_turns.get(q, 0)
-                        * (floors[(model, BASELINE)]["cumulative_prompt_tokens"])
-                    )
-                    v = (
-                        arm_tok[q]
-                        - arm_turns.get(q, 0) * (floors[(model, arm)]["cumulative_prompt_tokens"])
-                    )
+                    b = base_tok[q] - base_turns.get(q, 0) * prefix((model, BASELINE))
+                    v = arm_tok[q] - arm_turns.get(q, 0) * prefix((model, arm))
                     if b > 0 and v > 0:
                         per_turn.append(v / b)
                 print(
@@ -624,8 +673,11 @@ def main() -> None:
                 )
 
     print("\n## Integrity\n")
-    print("| model | arm | runs | skill fired | compacted | denials | readb never used |")
-    print("|" + "---|" * 7)
+    print(
+        "| model | arm | runs | no tool call | skill fired | compacted | denials "
+        "| readb never used |"
+    )
+    print("|" + "---|" * 8)
     for model in models:
         for arm in arms:
             rows = by_arm_model.get((model, arm)) or []
@@ -634,6 +686,7 @@ def main() -> None:
             expects_readb = arm.startswith("readb")
             print(
                 f"| {model.replace('claude-', '')} | {arm} | {len(rows)} | "
+                f"{sum(1 for r in rows if not r.get('supported'))} | "
                 f"{sum(1 for r in rows if r.get('skill_readb_used'))} | "
                 f"{sum(1 for r in rows if r.get('compacted'))} | "
                 f"{sum(1 for r in rows if r.get('permission_denials'))} | "

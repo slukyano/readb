@@ -118,6 +118,16 @@ PREAMBLE_READB = (
 # straw man in the competitor arm is worth more to readb's numbers than any real effect.
 _COUNT_VALUES = '| sed -E "s/.*:[[:space:]]*//; s/^[\'\\"]|[\'\\"]$//g" | sort | uniq -c'
 
+# v1's recipe taught three scalar, single-directory operations. E1's whole scope is
+# join-shaped questions, and three backlog questions turn on list-valued fields, so a
+# recipe that cannot relate two kinds of document or read a list is not the honest
+# competitor it claims to be — it is a straw man, and a straw man in the competitor arm is
+# worth more to readb's published ratio than any real effect could be. Commands 4 and 5
+# close that: one emits a joinable row per file, the other rolls up a list field.
+#
+# Both are written as per-file loops on purpose: `yq --front-matter=extract` over a glob
+# fails part-way through these corpora, because it reads each markdown body as further YAML
+# documents. The preflight runs every command shown and would catch it.
 OPS_RECIPE = (
     (
         "lists the files carrying a given frontmatter field, quoted or not",
@@ -130,6 +140,17 @@ OPS_RECIPE = (
     (
         "reads one field out of a single file's frontmatter",
         "yq --front-matter=extract '.tier' corpus/services/{service}.md",
+    ),
+    (
+        "emits one tab-separated row per concept, which `join`, `awk` or `sort` can relate "
+        "to rows from another directory",
+        'for f in corpus/services/*.md; do printf "%s\\t" "$(basename "$f" .md)"; '
+        "yq --front-matter=extract -o=tsv '[.team, .tier, .status]' \"$f\"; done",
+    ),
+    (
+        "rolls up a list-valued field across a directory",
+        "for f in corpus/incidents/*.md; do yq --front-matter=extract '.services[]' "
+        '"$f"; done | sort | uniq -c',
     ),
 )
 
@@ -146,6 +167,18 @@ BACKLOG_RECIPE = (
         "reads one field out of a single file's frontmatter",
         "yq --front-matter=extract '.status' corpus/tasks/{task}.md",
     ),
+    (
+        "emits one tab-separated row per concept, which `join`, `awk` or `sort` can relate "
+        "to rows from another directory",
+        'for f in corpus/tasks/*.md corpus/archive/*.md; do printf "%s\\t" '
+        '"$(basename "$f" .md)"; yq --front-matter=extract -o=tsv \'[.status, .priority]\' '
+        '"$f"; done',
+    ),
+    (
+        "rolls up a list-valued field across a directory",
+        "for f in corpus/tasks/*.md corpus/archive/*.md; do yq --front-matter=extract "
+        "'.tags[]' \"$f\"; done | sort | uniq -c",
+    ),
 )
 
 # One recipe per corpus *family*: coaching an arm with paths that do not exist in the
@@ -159,23 +192,33 @@ RECIPES = {
 
 
 def recipe_placeholders(truth: dict) -> dict:
-    """Real names from the corpus, so a coached command is runnable as shown."""
-    values = {}
-    if "q3" in truth:
-        values["service"] = truth["q3"]["answer"][0]
-    if "b1" in truth:
-        values["task"] = truth["b1"]["answer"][0]
-    return values
+    """Real names from the corpus, so a coached command is runnable as shown.
+
+    Drawn from `recipe_example`, which the generator picks from outside every answer set
+    and asserts. Taking the name from an answer — as v1 did — hands the coached arm part of
+    an answer in its own preamble.
+    """
+    example = truth.get("recipe_example")
+    if not example:
+        raise SystemExit(
+            "this corpus's truth has no `recipe_example`; regenerate it, since the coached "
+            "preamble would otherwise have to quote a name out of an answer set"
+        )
+    return dict(example)
 
 
 def shell_preamble(recipe: tuple[tuple[str, str], ...], placeholders: dict) -> str:
-    examples = ", ".join(
-        f"`{command.format(**placeholders)}` {gloss}" for gloss, command in recipe[:-1]
+    """The coached arm's treatment, rendered from the executable command list.
+
+    A list rather than a sentence: five commands strung together with commas is a paragraph
+    an agent has to parse before it can use any of them, and the coaching is the treatment.
+    """
+    lines = "\n".join(
+        f"- `{command.format(**placeholders)}`\n  {gloss}" for gloss, command in recipe
     )
-    gloss, command = recipe[-1]
     return (
-        "You are working in a directory that holds a knowledge base. For example, "
-        f"{examples}, and `{command.format(**placeholders)}` {gloss}.\n\n"
+        "You are working in a directory that holds a knowledge base. Worked examples "
+        f"against it:\n\n{lines}\n\n"
     )
 
 
@@ -368,8 +411,30 @@ SEARCH_BINARIES = (
     "wc",
     "head",
     "tail",
+    "cat",
 )
 _SEARCH_RE = re.compile(r"\b(" + "|".join(SEARCH_BINARIES) + r")\b")
+_MD_PATH = re.compile(r"\S+\.md\b")
+_GLOB = re.compile(r"[*?\[]")
+
+
+def _bash_kind(command: str) -> str | None:
+    """What one shell command did to the corpus: read one document, or search many.
+
+    The target decides, not the binary. `sed -n '1,20p' corpus/x.md` reads one file even
+    though `sed` is a search tool, and `cat corpus/*.md | grep foo` searches many even
+    though `cat` is not. Classifying by binary alone made `read` unreachable from Bash —
+    and three questions declare `read` as their expert tool, so no arm could ever match
+    them.
+    """
+    if "readb" in command:
+        return "readb"
+    paths = _MD_PATH.findall(command)
+    if len(paths) == 1 and not _GLOB.search(command) and "|" not in command:
+        return "read"
+    if _SEARCH_RE.search(command):
+        return "shell"
+    return "read" if paths else None
 
 
 def classify_tool_choice(tools: list[dict]) -> str:
@@ -382,12 +447,11 @@ def classify_tool_choice(tools: list[dict]) -> str:
     """
     if not tools:
         return "none"
-    commands = [str(t["input"].get("command", "")) for t in tools if t["name"] == "Bash"]
-    if any("readb" in command for command in commands):
+    kinds = [_bash_kind(str(t["input"].get("command", ""))) for t in tools if t["name"] == "Bash"]
+    if "readb" in kinds:
         return "readb"
-    search = sum(1 for command in commands if _SEARCH_RE.search(command))
-    search += sum(1 for t in tools if t["name"] in ("Grep", "Glob"))
-    reads = sum(1 for t in tools if t["name"] == "Read")
+    search = kinds.count("shell") + sum(1 for t in tools if t["name"] in ("Grep", "Glob"))
+    reads = kinds.count("read") + sum(1 for t in tools if t["name"] == "Read")
     if not search and not reads:
         return "other"
     return "shell" if search >= reads else "read"
@@ -590,9 +654,9 @@ def run_one(
     usage = result.get("usage", {}) or {}
     checks = integrity(arm, tools, result, stdout, tool_results)
 
-    # An answer produced without a single tool call was not derived from the corpus.
-    if not checks["supported"]:
-        correct, partial = False, 0.0
+    # v1 forced such a run to score zero. The pre-registration drops that check — zero
+    # failures were structurally guaranteed, so it measured nothing — and `supported` is
+    # kept as a recorded diagnostic, reported in the integrity table, not as a scoring rule.
 
     record = {
         "arm": arm.name,
@@ -672,7 +736,11 @@ def preflight(cfg, corpora: dict, truths: dict) -> dict:
     """
     probe = "List the names of every skill available to you, comma separated. If none, reply NONE."
     seen = {}
-    for name in ("baseline", "readb-skill"):
+    wanted_arms = cfg.arms.split(",")
+    # Only for a batch that actually runs the skill arm: the Haiku and sweep blocks exclude
+    # it, and probing it there spends two API calls and can abort on an arm never used.
+    skill_pair = ("baseline", "readb-skill") if "readb-skill" in wanted_arms else ()
+    for name in skill_pair:
         arm = ARMS[name]
         out = subprocess.run(
             [
@@ -693,10 +761,11 @@ def preflight(cfg, corpora: dict, truths: dict) -> dict:
         )
         text = json.loads(out.stdout).get("result", "") if out.stdout.strip() else ""
         seen[name] = "readb" in text.lower()
-    if seen.get("baseline"):
-        raise SystemExit("preflight failed: the baseline arm can see a readb skill")
-    if not seen.get("readb-skill"):
-        raise SystemExit("preflight failed: arm readb-skill did not load the readb skill")
+    if skill_pair:
+        if seen.get("baseline"):
+            raise SystemExit("preflight failed: the baseline arm can see a readb skill")
+        if not seen.get("readb-skill"):
+            raise SystemExit("preflight failed: arm readb-skill did not load the readb skill")
 
     # Skill visibility was never the thing that broke. What broke was an arm that could not
     # run the command its own documentation leads with, so probe each arm's constructed PATH
@@ -713,10 +782,10 @@ def preflight(cfg, corpora: dict, truths: dict) -> dict:
             [("uv", ["uvx", "--version"])] if arm.uv_on_path else []
         )
         for binary, argv in wanted:
-            probe = subprocess.run(
+            check = subprocess.run(
                 argv, env={"PATH": path, "HOME": os.environ["HOME"]}, capture_output=True
             )
-            if probe.returncode != 0:
+            if check.returncode != 0:
                 raise SystemExit(
                     f"preflight failed: arm {name} cannot execute {binary} on its PATH "
                     f"({path}) — this is the defect that retracted 36 runs once already"
@@ -726,6 +795,22 @@ def preflight(cfg, corpora: dict, truths: dict) -> dict:
     if "shell-coached" in cfg.arms.split(","):
         seen["recipes"] = recipe_preflight(cfg, corpora, truths)
     return seen
+
+
+def assert_shared_tools_exist(tools_shim: str) -> None:
+    """Every tool `TASK_INTRO` promises must be on the shim it promises it from.
+
+    `shim` skips a binary the host does not have, silently. Every arm would then be told,
+    in identical words, that it has a tool it does not — and the shell arms, the only ones
+    that would reach for it, would burn turns on exit 127. That is precisely the failure
+    that retracted 36 runs of v1.
+    """
+    missing = [name for name in SHARED_TOOLS if not (Path(tools_shim) / name).exists()]
+    if missing:
+        raise SystemExit(
+            f"refusing to run: {', '.join(missing)} are named to every arm by TASK_INTRO "
+            f"but are not on this machine, so every arm would be promised a tool it lacks"
+        )
 
 
 def recipe_preflight(cfg, corpora: dict, truths: dict) -> dict:
@@ -759,7 +844,8 @@ def recipe_preflight(cfg, corpora: dict, truths: dict) -> dict:
                     f"preflight failed: coached command for {name!r} produced nothing — "
                     f"{command}\n{done.stderr[:400]}"
                 )
-        # The listing command is the one whose answer is known, so it is the one checked.
+        notes = []
+        # The listing command is checked against a known count, not merely a zero exit.
         expected = _recipe_expectation(name, truths[name])
         if expected is not None:
             command = recipe[0][1].format(**placeholders)
@@ -773,9 +859,29 @@ def recipe_preflight(cfg, corpora: dict, truths: dict) -> dict:
                     f"files where the ground truth has {expected} — the recipe under-matches "
                     f"this corpus, which would make the competitor arm a straw man\n{command}"
                 )
-            checked[name] = f"{found} files, matches ground truth"
-        else:
-            checked[name] = "runs, no ground truth to check against"
+            notes.append(f"listing finds {found}, matches ground truth")
+
+        # And the list-field rollup, where a corpus has a rollup in its truth. A recipe that
+        # silently drops list entries would leave three backlog questions uncoachable.
+        rollup = _rollup_expectation(name, truths[name])
+        if rollup is not None:
+            command = recipe[4][1].format(**placeholders)
+            done = subprocess.run(
+                command, shell=True, cwd=stage, env=env, capture_output=True, text=True
+            )
+            counted = {}
+            for line in done.stdout.splitlines():
+                parts = line.split()
+                if len(parts) == 2 and parts[0].isdigit():
+                    counted[parts[1].strip("\"'")] = int(parts[0])
+            if counted != rollup:
+                raise SystemExit(
+                    f"preflight failed: the coached list rollup for {name!r} disagrees with "
+                    f"the ground truth\n{command}\ngot {counted}\nwant {rollup}"
+                )
+            notes.append(f"rollup of {len(counted)} values matches ground truth")
+
+        checked[name] = "; ".join(notes) or "runs, no ground truth to check against"
         shutil.rmtree(stage, ignore_errors=True)
     return checked
 
@@ -786,6 +892,13 @@ def _recipe_expectation(name: str, truth: dict) -> int | None:
         return len(truth["q15"]["answer"])  # every tier-1 service
     if name == "backlog" and "counts" in truth:
         return truth["counts"]["Draft"]  # every Draft task lives in `tasks/`
+    return None
+
+
+def _rollup_expectation(name: str, truth: dict) -> dict | None:
+    """What the coached list-field rollup must produce, where the truth records it."""
+    if name == "backlog" and "b8" in truth:
+        return dict(truth["b8"]["answer"])
     return None
 
 
@@ -894,6 +1007,8 @@ def main() -> None:
     assert_workroot_is_neutral(cfg.workroot)
     cfg.tools_shim = shim(cfg.workroot, "tools", SHARED_TOOLS)
     cfg.uv_shim = shim(cfg.workroot, "uv", UV_TOOLS)
+    # Outside preflight, so `--skip-preflight` cannot skip past it.
+    assert_shared_tools_exist(cfg.tools_shim)
 
     corpora, truths = {}, {}
     for spec in cfg.corpus:
