@@ -265,7 +265,7 @@ def costs(usage: dict) -> dict:
 # --- one run ------------------------------------------------------------------
 
 
-def run_one(arm: Arm, question, repeat: int, cfg, truth: dict, corpus: Path) -> dict:
+def run_one(arm: Arm, question, repeat: int, cfg, truth: dict, corpus: Path, model: str) -> dict:
     # The working directory name must not contain the tool's name: the cwd is echoed
     # into the system prompt, and "readb" sitting there would prime the baseline arm.
     workdir = cfg.workroot / f"kb-{uuid.uuid4().hex[:12]}"
@@ -293,7 +293,7 @@ def run_one(arm: Arm, question, repeat: int, cfg, truth: dict, corpus: Path) -> 
         "-p",
         prompt,
         "--model",
-        cfg.model,
+        model,
         "--effort",
         cfg.effort,
         "--output-format",
@@ -337,8 +337,9 @@ def run_one(arm: Arm, question, repeat: int, cfg, truth: dict, corpus: Path) -> 
 
     # Namespaced by batch: a re-measurement of one arm must not overwrite the evidence for
     # the batch it replaces. The first arm-C batch lost its transcripts this way.
+    slug = model.replace("claude-", "").replace("-", "")
     transcript_path = (
-        cfg.transcripts / cfg.results.stem / f"{arm.name}-{question.id}-r{repeat}.jsonl"
+        cfg.transcripts / cfg.results.stem / f"{slug}-{arm.name}-{question.id}-r{repeat}.jsonl"
     )
     transcript_path.parent.mkdir(parents=True, exist_ok=True)
     # Never overwrite: a transcript is the only evidence its run happened, and a batch that
@@ -347,7 +348,7 @@ def run_one(arm: Arm, question, repeat: int, cfg, truth: dict, corpus: Path) -> 
     while transcript_path.exists():
         suffix += 1
         transcript_path = transcript_path.with_name(
-            f"{arm.name}-{question.id}-r{repeat}.{suffix}.jsonl"
+            f"{slug}-{arm.name}-{question.id}-r{repeat}.{suffix}.jsonl"
         )
     transcript_path.write_text(scrub(stdout))
 
@@ -368,7 +369,7 @@ def run_one(arm: Arm, question, repeat: int, cfg, truth: dict, corpus: Path) -> 
         "favours": question.favours,
         "repeat": repeat,
         "corpus": question.corpus,
-        "model": cfg.model,
+        "model": model,
         # modelUsage also carries the runtime's small side-calls on another model; the
         # dated id worth recording is the one that did the work.
         "model_dated": max(
@@ -418,7 +419,7 @@ def preflight(cfg) -> dict:
                 "-p",
                 probe,
                 "--model",
-                cfg.model,
+                cfg.models.split(",")[0],
                 "--output-format",
                 "json",
                 "--no-session-persistence",
@@ -479,11 +480,11 @@ def git_sha() -> str:
     return out.stdout.strip() or "unknown"
 
 
-def done_cells(results: Path) -> set[tuple[str, str, int]]:
+def done_cells(results: Path) -> set[tuple[str, str, str, int]]:
     if not results.exists():
         return set()
     return {
-        (rec["arm"], rec["question"], rec["repeat"])
+        (rec["arm"], rec["question"], rec.get("model", ""), rec["repeat"])
         for rec in (json.loads(line) for line in results.read_text().splitlines() if line.strip())
         if not rec.get("retracted")
     }
@@ -503,7 +504,11 @@ def main() -> None:
     ap.add_argument("--workroot", type=Path, default=Path("/tmp/kbbench"))
     ap.add_argument("--transcripts", type=Path)
     ap.add_argument("--repeats", type=int, default=3)
-    ap.add_argument("--model", default="claude-sonnet-5")
+    ap.add_argument(
+        "--models",
+        default="claude-sonnet-5",
+        help="comma-separated; model is a factor in the matrix, recorded per run",
+    )
     ap.add_argument("--effort", default="medium")
     ap.add_argument("--autocompact", type=int, default=1000000)
     ap.add_argument(
@@ -555,7 +560,7 @@ def main() -> None:
         "python": sys.version,
         "platform": platform.platform(),
         "machine": platform.machine(),
-        "model": cfg.model,
+        "models": cfg.models,
         "effort": cfg.effort,
         "autocompact": cfg.autocompact,
         "per_run_budget_usd": cfg.budget,
@@ -594,18 +599,20 @@ def main() -> None:
     # Interleave: arms round-robin inside each repeat and the question order rotates per
     # repeat, so no arm systematically inherits a warm cache or a quiet machine.
     plan = []
+    models = cfg.models.split(",")
     for repeat in range(1, cfg.repeats + 1):
         offset = (repeat - 1) % len(questions)
         for question in questions[offset:] + questions[:offset]:
-            for arm in arms:
-                if (arm.name, question.id, repeat) not in already:
-                    plan.append((arm, question, repeat))
+            for model in models:
+                for arm in arms:
+                    if (arm.name, question.id, model, repeat) not in already:
+                        plan.append((arm, question, repeat, model))
 
     print(f"{len(plan)} runs to go ({len(already)} already recorded)", flush=True)
     spent = 0.0
-    for i, (arm, question, repeat) in enumerate(plan, 1):
+    for i, (arm, question, repeat, model) in enumerate(plan, 1):
         record = run_one(
-            arm, question, repeat, cfg, truths[question.corpus], corpora[question.corpus]
+            arm, question, repeat, cfg, truths[question.corpus], corpora[question.corpus], model
         )
         spent += record.get("cost_reported_usd") or 0.0
         with cfg.results.open("a") as fh:
@@ -623,7 +630,8 @@ def main() -> None:
         if arm.expects_skill and not record["skill_readb_used"]:
             flags.append("skill-not-fired")
         print(
-            f"[{i}/{len(plan)}] {arm.name:12s} {question.id:4s} r{repeat} "
+            f"[{i}/{len(plan)}] {record['model'].replace('claude-', ''):12s} "
+            f"{arm.name:12s} {question.id:5s} r{repeat} "
             f"ok={record['correct']!s:5s} f1={record['partial_credit']:.2f} "
             f"{record['wall_s']:6.1f}s ingested={record['new_tokens_ingested']:>7,} "
             f"turns={record.get('num_turns')} readb={record['readb_invocations']} "
