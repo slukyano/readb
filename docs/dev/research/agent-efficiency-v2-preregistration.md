@@ -180,6 +180,14 @@ model that artifact is written for, and adding it would buy a fourth cell of an 
 uses. Repeats stay at 3 — v1's within-cell variation is 8.6% against 33% between questions, so
 repeats buy nothing and questions are the axis that pays.
 
+The floor block replaces every question with a trivial prompt through the identical harness, to
+measure the fixed overhead both arms pay before any work happens.
+
+The sweep runs `baseline`, `shell-coached` and `readb-bare` on **`q2`, `q3` and `q15`** against both
+`ops` and `ops-tidy`. `q2` and `q3` filter on string values, which messiness may quote; `q15`
+filters on `tier`, a number, which messiness never quotes — so the third question is a control
+inside the sweep, and a sweep effect that shows up on it too is not an effect of quoting.
+
 Arms round-robin inside each repeat and the question order rotates per repeat, so no arm
 systematically inherits a warm cache or a quiet machine.
 
