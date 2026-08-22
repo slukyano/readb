@@ -6,30 +6,83 @@ the ratio, then the median ratio across questions — with a percentile bootstra
 resampled over questions, because the dominant variance here is between question shapes,
 not between repeats of one question.
 
-    python benchmarks/analyze.py --results benchmarks/results/run.jsonl
+**v2 does not chase a pooled number.** Pooling across all 26 questions produces a figure
+set by the battery's composition, and a power computation on v1's raw data says why:
+separating 0.90x from 1.00x on the pooled coached contrast has 22% power at 12 questions,
+51% at 36, and 63% at 48. Three endpoints are declared instead, before any run, and
+Holm-corrected together (`ENDPOINTS` below). Everything else this file prints is
+descriptive, the pooled coached ratio explicitly so.
+
+    python benchmarks/analyze.py --results benchmarks/results/v2.jsonl
 """
 
 from __future__ import annotations
 
 import argparse
+import itertools
 import json
+import math
 import random
 import statistics
 from collections import defaultdict
 from pathlib import Path
 
 DEFAULT_BASELINE = "baseline"
+# The headline metrics. Wall clock, output tokens and cache-neutral cost left the headline
+# after v1: none of them ever disagreed with billed cost in direction, and two headline
+# bases doubled the length of every sentence about the result.
 METRICS = [
     ("cost_billed_usd", "cost, as billed (USD)", 4),
-    ("cost_cache_neutral_usd", "cost, cache-neutral (USD)", 4),
     ("new_tokens_ingested", "new tokens ingested", 0),
-    ("wall_s", "wall clock (s)", 1),
-    ("output_tokens", "output tokens", 0),
     ("num_turns", "turns", 1),
     ("cumulative_prompt_tokens", "cumulative prompt tokens", 0),
 ]
+APPENDIX_METRICS = [
+    ("cost_cache_neutral_usd", "cost, cache-neutral (USD)", 4),
+    ("wall_s", "wall clock (s)", 1),
+    ("output_tokens", "output tokens", 0),
+]
 BASELINE = DEFAULT_BASELINE
 BOOTSTRAP = 10_000
+
+# --- the pre-registered endpoints ---------------------------------------------
+# Fixed before the first measured run. Each names a contrast, a model, a stratum, and the
+# statistic; the three p-values are corrected together by Holm.
+ENDPOINTS = [
+    {
+        "id": "E1",
+        "what": "billed cost, join stratum",
+        "arm": "readb-bare",
+        "against": "shell-coached",
+        "model": "claude-sonnet-5",
+        "strata": ("join",),
+        "measure": "cost",
+        "why": "the eight questions where v1's per-question effect was largest",
+    },
+    {
+        "id": "E2",
+        "what": "billed cost, backlog stratum",
+        "arm": "readb-bare",
+        "against": "shell-coached",
+        "model": "claude-sonnet-5",
+        "strata": ("backlog",),
+        "measure": "cost",
+        "why": (
+            "recorded in advance: that bundle is small, so runs sit near the harness floor "
+            "and a compressed ratio is the expected honest outcome. Parity is a finding"
+        ),
+    },
+    {
+        "id": "E3",
+        "what": "exactness, every question",
+        "arm": "readb-bare",
+        "against": "shell-coached",
+        "model": "claude-haiku-4-5",
+        "strata": None,
+        "measure": "exact",
+        "why": "the accuracy dimension has variance on a weaker model, where v1 had none",
+    },
+]
 
 
 def load(path: Path) -> list[dict]:
@@ -72,6 +125,139 @@ def bootstrap_ci(ratios: list[float], seed: int = 24) -> tuple[float, float]:
     return draws[int(0.025 * BOOTSTRAP)], draws[int(0.975 * BOOTSTRAP)]
 
 
+# --- the exact test -----------------------------------------------------------
+# Pre-registered, and pure stdlib on purpose: a benchmark whose published p-value cannot be
+# recomputed without installing a scientific stack is one nobody will recompute.
+
+EXACT_MAX = 18  # above this, 2**n sign assignments stop being enumerable
+PERMUTATIONS = 200_000
+
+
+def _average_ranks(values: list[float]) -> list[float]:
+    order = sorted(range(len(values)), key=lambda i: values[i])
+    ranks = [0.0] * len(values)
+    position = 0
+    while position < len(order):
+        end = position
+        while end + 1 < len(order) and values[order[end + 1]] == values[order[position]]:
+            end += 1
+        shared = (position + end) / 2 + 1
+        for index in order[position : end + 1]:
+            ranks[index] = shared
+        position = end + 1
+    return ranks
+
+
+def wilcoxon(diffs: list[float], seed: int = 24) -> dict | None:
+    """Two-sided Wilcoxon signed-rank test by exact sign-flip enumeration.
+
+    Zero differences are dropped, which is the standard handling. Ties in |difference| get
+    average ranks; the null distribution is then the sign-flip permutation distribution of
+    the signed-rank sum, which stays exact in the presence of those ties. Above `EXACT_MAX`
+    non-zero pairs the enumeration is replaced by a seeded Monte Carlo over the same null,
+    and the result says so.
+    """
+    kept = [d for d in diffs if d != 0]
+    n = len(kept)
+    if n < 5:
+        return None
+    ranks = _average_ranks([abs(d) for d in kept])
+    observed = sum(rank if d > 0 else -rank for d, rank in zip(kept, ranks, strict=True))
+    target = abs(observed)
+
+    if n <= EXACT_MAX:
+        hits = sum(
+            1
+            for signs in itertools.product((1, -1), repeat=n)
+            if abs(sum(s * r for s, r in zip(signs, ranks, strict=True))) >= target - 1e-9
+        )
+        p = hits / (2**n)
+        method = f"exact ({2**n} sign assignments)"
+    else:
+        rng = random.Random(seed)
+        hits = sum(
+            1
+            for _ in range(PERMUTATIONS)
+            if abs(sum(r if rng.random() < 0.5 else -r for r in ranks)) >= target - 1e-9
+        )
+        p = (hits + 1) / (PERMUTATIONS + 1)
+        method = f"Monte Carlo ({PERMUTATIONS:,} sign flips, seed {seed})"
+    return {"n": n, "statistic": observed, "p": p, "method": method}
+
+
+def holm(pvalues: list[float]) -> list[float]:
+    """Holm-Bonferroni adjusted p-values, kept monotone."""
+    order = sorted(range(len(pvalues)), key=lambda i: pvalues[i])
+    adjusted = [0.0] * len(pvalues)
+    running = 0.0
+    for step, index in enumerate(order):
+        value = min(1.0, (len(pvalues) - step) * pvalues[index])
+        running = max(running, value)
+        adjusted[index] = running
+    return adjusted
+
+
+# --- helpers over the record set ----------------------------------------------
+
+
+def question_medians(rows: list[dict], arm: str, model: str | None, key: str) -> dict[str, float]:
+    grouped = defaultdict(list)
+    for r in rows:
+        if r["arm"] != arm or (model and r.get("model") != model):
+            continue
+        if r.get(key) is not None:
+            grouped[r["question"]].append(r[key])
+    return {q: med(values) for q, values in grouped.items()}
+
+
+def question_exactness(rows: list[dict], arm: str, model: str | None) -> dict[str, float]:
+    grouped = defaultdict(list)
+    for r in rows:
+        if r["arm"] != arm or (model and r.get("model") != model):
+            continue
+        grouped[r["question"]].append(1.0 if r["correct"] else 0.0)
+    return {q: statistics.mean(values) for q, values in grouped.items()}
+
+
+def run_endpoint(endpoint: dict, clean: list[dict], strata_of: dict) -> dict:
+    rows = [r for r in clean if r.get("model") == endpoint["model"]]
+    if endpoint["strata"]:
+        rows = [r for r in rows if strata_of.get(r["question"]) in endpoint["strata"]]
+
+    if endpoint["measure"] == "cost":
+        arm = question_medians(rows, endpoint["arm"], None, "cost_billed_usd")
+        against = question_medians(rows, endpoint["against"], None, "cost_billed_usd")
+        shared = sorted(set(arm) & set(against))
+        diffs, ratios = [], []
+        for q in shared:
+            if arm[q] > 0 and against[q] > 0:
+                diffs.append(math.log(arm[q] / against[q]))
+                ratios.append(arm[q] / against[q])
+        effect = f"{med(ratios):.2f}x" if ratios else "—"
+        lo, hi = bootstrap_ci(ratios)
+        interval = f"[{lo:.2f}–{hi:.2f}]" if lo == lo else ""
+    else:
+        arm = question_exactness(rows, endpoint["arm"], None)
+        against = question_exactness(rows, endpoint["against"], None)
+        shared = sorted(set(arm) & set(against))
+        diffs = [arm[q] - against[q] for q in shared]
+        ratios = diffs
+        if shared:
+            effect = (
+                f"{statistics.mean(arm[q] for q in shared):.0%} vs "
+                f"{statistics.mean(against[q] for q in shared):.0%}"
+            )
+        else:
+            effect = "—"
+        interval = ""
+
+    test = wilcoxon(diffs)
+    return {**endpoint, "questions": len(shared), "effect": effect, "ci": interval, "test": test}
+
+
+# --- the report ---------------------------------------------------------------
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--results", required=True, type=Path)
@@ -89,8 +275,13 @@ def main() -> None:
     ap.add_argument(
         "--baseline-arm",
         default=DEFAULT_BASELINE,
-        help="the arm every ratio is taken against (default: baseline). Comparing against the "
-        "coached arm is a published table, so it must come from a command, not a calculator.",
+        help="the arm every descriptive ratio is taken against (default: baseline). The "
+        "pre-registered endpoints have their own comparator and ignore this.",
+    )
+    ap.add_argument(
+        "--skip-endpoints",
+        action="store_true",
+        help="omit the pre-registered endpoint tests, for a batch that is not the main matrix",
     )
     args = ap.parse_args()
     global BASELINE
@@ -102,182 +293,354 @@ def main() -> None:
     dropped = [(r, why) for r in records if (why := invalid(r))]
     clean = [r for r in records if not invalid(r)]
     arms = sorted({r["arm"] for r in records}, key=lambda a: (a != BASELINE, a))
+    models = sorted({r.get("model") or "?" for r in records})
     questions = sorted({r["question"] for r in records})
     shape_of = {r["question"]: (r["shape"], r["favours"]) for r in records}
+    strata_of = {r["question"]: r.get("stratum", "?") for r in records}
+    expert_of = {r["question"]: r.get("expert_tool", "?") for r in records}
+    strata = sorted({strata_of[q] for q in questions})
 
-    print("# Benchmark results\n")
-    print(f"{len(records)} runs recorded, {len(dropped)} excluded as invalid, {len(clean)} used.\n")
+    print("# Benchmark results — v2\n")
+    print(f"{len(records)} runs recorded, {len(dropped)} excluded as invalid, {len(clean)} used.")
+    print(f"Models: {', '.join(models)}. Arms: {', '.join(arms)}. Questions: {len(questions)}.\n")
 
-    by_arm = defaultdict(list)
-    for r in clean:
-        by_arm[r["arm"]].append(r)
-
-    print("## Per arm, all questions pooled\n")
-    print("| arm | n | exact | partial credit | " + " | ".join(m[1] for m in METRICS) + " |")
-    print("|" + "---|" * (len(METRICS) + 4))
-    for arm in arms:
-        rows = by_arm[arm]
-        if not rows:
-            # Dashes alone read as missing data; this arm's runs were excluded on purpose.
+    # --- the endpoints, first, because everything after them is descriptive ----
+    if not args.skip_endpoints:
+        print("## Pre-registered endpoints\n")
+        results = [run_endpoint(e, clean, strata_of) for e in ENDPOINTS]
+        raw = [r["test"]["p"] if r["test"] else 1.0 for r in results]
+        adjusted = holm(raw)
+        print("| id | contrast | model | questions | effect | p | Holm p | test |")
+        print("|" + "---|" * 8)
+        for result, p_adj in zip(results, adjusted, strict=True):
+            test = result["test"]
+            raw_p = f"{test['p']:.4f}" if test else "—"
+            holm_p = f"{p_adj:.4f}" if test else "—"
+            method = test["method"] if test else "too few pairs"
             print(
-                f"| {arm} | 0 | — | — |"
-                + " — |" * len(METRICS)
-                + " *(all runs excluded — see below)*"
+                f"| {result['id']} | {result['arm']} vs {result['against']}, {result['what']} "
+                f"| {result['model'].replace('claude-', '')} | {result['questions']} "
+                f"| {result['effect']} {result['ci']} | {raw_p} | {holm_p} | {method} |"
             )
-            continue
-        exact = sum(1 for r in rows if r["correct"]) / len(rows)
-        partial = statistics.mean(r.get("partial_credit") or 0 for r in rows)
-        cells = [fmt(med([r[k] for r in rows if r.get(k) is not None]), d) for k, _, d in METRICS]
-        print(f"| {arm} | {len(rows)} | {exact:.0%} | {partial:.2f} | " + " | ".join(cells) + " |")
+        print()
+        for result in results:
+            print(f"- **{result['id']}** — {result['why']}.")
+        print()
 
-    print("\n## Ratio to baseline, paired by question (below 1.00 favours the arm)\n")
-    print("| arm | " + " | ".join(f"{m[1]} [95% CI]" for m in METRICS) + " |")
-    print("|" + "---|" * (len(METRICS) + 1))
-    base = {
-        (k, q): med(
-            [
-                r[k]
-                for r in clean
-                if r["arm"] == BASELINE and r["question"] == q and r.get(k) is not None
-            ]
+    by_arm_model = defaultdict(list)
+    for r in clean:
+        by_arm_model[(r.get("model"), r["arm"])].append(r)
+
+    # --- per model ------------------------------------------------------------
+    for model in models:
+        rows_for_model = [r for r in clean if (r.get("model") or "?") == model]
+        if not rows_for_model:
+            continue
+        print(f"## {model}\n")
+        print("### Per arm, all questions pooled\n")
+        header = "| arm | n | exact | partial | answer parsed | " + " | ".join(
+            m[1] for m in METRICS
         )
-        for k, _, _ in METRICS
-        for q in questions
-    }
-    for arm in arms:
-        if arm == BASELINE:
-            continue
-        cells = []
-        for key, _, _ in METRICS:
-            ratios = []
-            for q in questions:
-                values = [
-                    r[key]
-                    for r in clean
-                    if r["arm"] == arm and r["question"] == q and r.get(key) is not None
-                ]
-                b = base.get((key, q))
-                if values and b and b == b and b != 0:
-                    ratios.append(med(values) / b)
-            if ratios:
-                lo, hi = bootstrap_ci(ratios)
-                ci = f" [{lo:.2f}–{hi:.2f}]" if lo == lo else ""
-                cells.append(f"{med(ratios):.2f}×{ci}")
-            else:
-                cells.append("—")
-        print(f"| {arm} | " + " | ".join(cells) + " |")
-
-    print("\n## By question shape\n")
-    print(
-        "| question | shape | favours | arm | n | exact | ingested | cost (neutral) "
-        "| wall (s) | turns | readb calls |"
-    )
-    print("|" + "---|" * 11)
-    for q in questions:
-        shape, favours = shape_of[q]
+        print(header + " |")
+        print("|" + "---|" * (len(METRICS) + 5))
         for arm in arms:
-            rows = [r for r in clean if r["question"] == q and r["arm"] == arm]
+            rows = by_arm_model.get((model, arm)) or []
             if not rows:
                 continue
             exact = sum(1 for r in rows if r["correct"]) / len(rows)
+            partial = statistics.mean(r.get("partial_credit") or 0 for r in rows)
+            parsed = sum(1 for r in rows if r.get("answer_parsed")) / len(rows)
+            cells = [
+                fmt(med([r[k] for r in rows if r.get(k) is not None]), d) for k, _, d in METRICS
+            ]
             print(
-                f"| {q} | {shape} | {favours} | {arm} | {len(rows)} | {exact:.0%} | "
-                f"{fmt(med([r['new_tokens_ingested'] for r in rows]), 0)} | "
-                f"{fmt(med([r['cost_cache_neutral_usd'] for r in rows]), 4)} | "
-                f"{fmt(med([r['wall_s'] for r in rows]), 1)} | "
-                f"{fmt(med([r['num_turns'] for r in rows if r.get('num_turns')]), 1)} | "
-                f"{fmt(med([r['readb_invocations'] for r in rows]), 1)} |"
+                f"| {arm} | {len(rows)} | {exact:.0%} | {partial:.2f} | {parsed:.0%} | "
+                + " | ".join(cells)
+                + " |"
             )
 
+        print(f"\n### Ratio to `{BASELINE}`, paired by question (below 1.00 favours the arm)\n")
+        print("| arm | " + " | ".join(f"{m[1]} [95% CI]" for m in METRICS) + " |")
+        print("|" + "---|" * (len(METRICS) + 1))
+        for arm in arms:
+            if arm == BASELINE:
+                continue
+            cells = []
+            for key, _, _ in METRICS:
+                arm_med = question_medians(rows_for_model, arm, model, key)
+                base_med = question_medians(rows_for_model, BASELINE, model, key)
+                ratios = [
+                    arm_med[q] / base_med[q]
+                    for q in sorted(set(arm_med) & set(base_med))
+                    if base_med[q] and base_med[q] == base_med[q]
+                ]
+                if ratios:
+                    lo, hi = bootstrap_ci(ratios)
+                    ci = f" [{lo:.2f}–{hi:.2f}]" if lo == lo else ""
+                    cells.append(f"{med(ratios):.2f}x{ci}")
+                else:
+                    cells.append("—")
+            print(f"| {arm} | " + " | ".join(cells) + " |")
+
+        print(f"\n### Billed-cost ratio to `{BASELINE}` by stratum\n")
+        counts = {s: sum(1 for q in questions if strata_of[q] == s) for s in strata}
+        print("| arm | " + " | ".join(f"{s} (n={counts[s]})" for s in strata) + " |")
+        print("|" + "---|" * (len(strata) + 1))
+        for arm in arms:
+            if arm == BASELINE:
+                continue
+            cells = []
+            arm_med = question_medians(rows_for_model, arm, model, "cost_billed_usd")
+            base_med = question_medians(rows_for_model, BASELINE, model, "cost_billed_usd")
+            for stratum in strata:
+                ratios = [
+                    arm_med[q] / base_med[q]
+                    for q in sorted(set(arm_med) & set(base_med))
+                    if strata_of[q] == stratum and base_med[q]
+                ]
+                cells.append(f"{med(ratios):.2f}x" if ratios else "—")
+            print(f"| {arm} | " + " | ".join(cells) + " |")
+
+        print("\n### Tool choice — what the agent reached for, against what a question declares\n")
+        print(
+            "A result, never a reason to edit a prompt. `match` is the share of runs whose "
+            "chosen tool equalled the question's declared expert tool.\n"
+        )
+        choices = ("readb", "shell", "read", "other", "none")
+        print("| arm | " + " | ".join(choices) + " | match | failed calls | failed readb |")
+        print("|" + "---|" * (len(choices) + 4))
+        for arm in arms:
+            rows = by_arm_model.get((model, arm)) or []
+            if not rows:
+                continue
+            cells = [str(sum(1 for r in rows if r.get("tool_choice") == c)) for c in choices]
+            match = sum(1 for r in rows if r.get("tool_match")) / len(rows)
+            print(
+                f"| {arm} | "
+                + " | ".join(cells)
+                + f" | {match:.0%} "
+                + f"| {sum(r.get('failed_tool_results') or 0 for r in rows)} "
+                + f"| {sum(r.get('failed_readb_calls') or 0 for r in rows)} |"
+            )
+
+        # --- the nudge contrast -----------------------------------------------
+        if {(model, "readb-bare"), (model, "readb-nudged")} <= set(by_arm_model):
+            print("\n### The nudge — `readb-nudged` against `readb-bare`\n")
+            bare = by_arm_model[(model, "readb-bare")]
+            nudged = by_arm_model[(model, "readb-nudged")]
+            bare_med = question_medians(rows_for_model, "readb-bare", model, "cost_billed_usd")
+            nudged_med = question_medians(rows_for_model, "readb-nudged", model, "cost_billed_usd")
+            shared = sorted(set(bare_med) & set(nudged_med))
+            ratios = [nudged_med[q] / bare_med[q] for q in shared if bare_med[q]]
+            test = wilcoxon([math.log(r) for r in ratios if r > 0])
+            print("| measure | readb-bare | readb-nudged |")
+            print("|---|---|---|")
+            for label, fn in (
+                ("exact", lambda rows: f"{sum(1 for r in rows if r['correct']) / len(rows):.0%}"),
+                (
+                    "tool match",
+                    lambda rows: f"{sum(1 for r in rows if r.get('tool_match')) / len(rows):.0%}",
+                ),
+                (
+                    "readb reached for",
+                    lambda rows: (
+                        f"{sum(1 for r in rows if r.get('tool_choice') == 'readb') / len(rows):.0%}"
+                    ),
+                ),
+                (
+                    "billed cost (median)",
+                    lambda rows: fmt(med([r["cost_billed_usd"] for r in rows]), 4),
+                ),
+                ("turns (median)", lambda rows: fmt(med([r["num_turns"] for r in rows]), 1)),
+            ):
+                print(f"| {label} | {fn(bare)} | {fn(nudged)} |")
+            print(
+                f"\nPaired cost ratio, nudged/bare: **{med(ratios):.2f}x** over {len(ratios)} "
+                f"questions"
+                + (f", p = {test['p']:.4f} ({test['method']})." if test else ", too few pairs.")
+            )
+        print()
+
+    # --- hazard diagnostics ---------------------------------------------------
+    hazard = [r for r in clean if strata_of.get(r["question"]) == "hazard"]
+    if hazard:
+        print("## The malformed-file hazard\n")
+        print(
+            "`saw warning` counts runs where readb's skip warning reached the transcript. A "
+            "wrong answer with the warning seen and a wrong answer without it are different "
+            "findings: the first says the warning did not work, the second says the hazard is "
+            "silent.\n"
+        )
+        print("| model | arm | question | n | exact | saw warning | tool |")
+        print("|" + "---|" * 7)
+        for model in models:
+            for arm in arms:
+                for q in sorted({r["question"] for r in hazard}):
+                    rows = [
+                        r
+                        for r in hazard
+                        if r["question"] == q and r["arm"] == arm and r.get("model") == model
+                    ]
+                    if not rows:
+                        continue
+                    exact = sum(1 for r in rows if r["correct"]) / len(rows)
+                    warned = sum(1 for r in rows if r.get("saw_skip_warning"))
+                    tools = "/".join(sorted({r.get("tool_choice") or "?" for r in rows}))
+                    print(
+                        f"| {model.replace('claude-', '')} | {arm} | {q} | {len(rows)} | "
+                        f"{exact:.0%} | {warned}/{len(rows)} | {tools} |"
+                    )
+        print()
+
+    # --- the messiness sweep --------------------------------------------------
+    corpora = {r.get("corpus") for r in clean}
+    if "ops" in corpora and "ops-tidy" in corpora:
+        swept = sorted(
+            {r["question"] for r in clean if r.get("corpus") == "ops-tidy"}
+            & {r["question"] for r in clean if r.get("corpus") == "ops"}
+        )
+        if swept:
+            print("## Messy against tidy — the same questions, two renderings\n")
+            print("| model | arm | question | messy cost | tidy cost | messy/tidy | exact m/t |")
+            print("|" + "---|" * 7)
+            for model in models:
+                for arm in arms:
+                    for q in swept:
+                        pair = {}
+                        for corpus in ("ops", "ops-tidy"):
+                            pair[corpus] = [
+                                r
+                                for r in clean
+                                if r["question"] == q
+                                and r["arm"] == arm
+                                and r.get("model") == model
+                                and r.get("corpus") == corpus
+                            ]
+                        if not (pair["ops"] and pair["ops-tidy"]):
+                            continue
+                        cost = {
+                            c: med([r["cost_billed_usd"] for r in rows]) for c, rows in pair.items()
+                        }
+                        exact = {
+                            c: sum(1 for r in rows if r["correct"]) / len(rows)
+                            for c, rows in pair.items()
+                        }
+                        ratio = cost["ops"] / cost["ops-tidy"] if cost["ops-tidy"] else float("nan")
+                        print(
+                            f"| {model.replace('claude-', '')} | {arm} | {q} | "
+                            f"{fmt(cost['ops'], 4)} | {fmt(cost['ops-tidy'], 4)} | "
+                            f"{fmt(ratio, 2)}x | {exact['ops']:.0%}/{exact['ops-tidy']:.0%} |"
+                        )
+            print()
+
+    # --- per question ---------------------------------------------------------
+    print("## By question\n")
+    print(
+        "| question | stratum | shape | expert | model | arm | n | exact | ingested "
+        "| cost (billed) | turns | readb calls |"
+    )
+    print("|" + "---|" * 12)
+    for q in questions:
+        shape, _ = shape_of[q]
+        for model in models:
+            for arm in arms:
+                rows = [
+                    r
+                    for r in clean
+                    if r["question"] == q and r["arm"] == arm and (r.get("model") or "?") == model
+                ]
+                if not rows:
+                    continue
+                exact = sum(1 for r in rows if r["correct"]) / len(rows)
+                print(
+                    f"| {q} | {strata_of[q]} | {shape} | {expert_of[q]} "
+                    f"| {model.replace('claude-', '')} | {arm} | {len(rows)} | {exact:.0%} | "
+                    f"{fmt(med([r['new_tokens_ingested'] for r in rows]), 0)} | "
+                    f"{fmt(med([r['cost_billed_usd'] for r in rows]), 4)} | "
+                    f"{fmt(med([r['num_turns'] for r in rows if r.get('num_turns')]), 1)} | "
+                    f"{fmt(med([r['readb_invocations'] for r in rows]), 1)} |"
+                )
+
+    # --- the floor ------------------------------------------------------------
     if args.floor:
         # Subtracting one floor per run treats the fixed overhead as belonging to neither arm.
         # It is a choice, not a correction: a ratio below 1 always moves further from 1 when a
         # constant is removed from both sides. Published beside the raw figure, never instead.
-        floors = {r["arm"]: r for r in load(args.floor)}
-        if BASELINE not in floors:
-            raise SystemExit(f"--floor has no run for the baseline arm {BASELINE!r}")
-        print("\n## Overhead-subtracted cost ratios — two rules, neither authoritative\n")
-        print(
-            "A ratio below 1.00 always moves further from 1.00 when the same constant is removed\n"
-            "from both sides, so which constant is removed is a choice. Both rules are shown.\n"
-        )
-        print("| arm | one floor per run: billed | cache-neutral | one prompt prefix per turn |")
+        floors = {(r.get("model"), r["arm"]): r for r in load(args.floor)}
+        print("\n## Overhead-subtracted cost ratios — a choice, not a correction\n")
+        print("| model | arm | one floor per run | one prompt prefix per turn |")
         print("|---|---|---|---|")
-        for arm in arms:
-            if arm == BASELINE or arm not in floors:
+        for model in models:
+            if (model, BASELINE) not in floors:
                 continue
-            cells = []
-            for key in ("cost_billed_usd", "cost_cache_neutral_usd"):
-                ratios = []
-                for q in questions:
-                    b = base.get((key, q))
-                    v = med([r[key] for r in clean if r["arm"] == arm and r["question"] == q])
-                    if b == b and b and v == v:
-                        lo_b = b - floors[BASELINE][key]
-                        lo_v = v - floors[arm][key]
-                        if lo_b > 0 and lo_v > 0:
-                            ratios.append(lo_v / lo_b)
-                cells.append(f"{med(ratios):.2f}×" if ratios else "—")
-
-            # The per-turn rule: each turn re-sends the whole prompt prefix, so remove one
-            # floor-sized prefix per turn from the cumulative token count. Extra turns are
-            # caused by the approach, which is the argument for charging them to it.
-            per_turn = []
-            for q in questions:
-
-                def adjusted(a: str, question: str = q) -> float:
-                    rows = [r for r in clean if r["arm"] == a and r["question"] == question]
-                    cum = med([r["cumulative_prompt_tokens"] for r in rows])
-                    turns = med([r["num_turns"] for r in rows if r.get("num_turns")])
-                    return cum - turns * floors[a]["cumulative_prompt_tokens"]
-
-                b, v = adjusted(BASELINE), adjusted(arm)
-                if b == b and b > 0 and v == v and v > 0:
-                    per_turn.append(v / b)
-            cells.append(f"{med(per_turn):.2f}×" if per_turn else "—")
-            print(f"| {arm} | " + " | ".join(cells) + " |")
-
-    # The headline ratio is a median over questions, so it tracks the battery's shape mix.
-    # Publishing it by declared shape is the honest sensitivity analysis.
-    print("\n## Cost ratio to baseline, by the shape a question was declared to favour\n")
-    favours = sorted({shape_of[q][1] for q in questions})
-    print(
-        "| arm | "
-        + " | ".join(f"{f} (n={sum(1 for q in questions if shape_of[q][1] == f)})" for f in favours)
-        + " |"
-    )
-    print("|" + "---|" * (len(favours) + 1))
-    for arm in arms:
-        if arm == BASELINE:
-            continue
-        cells = []
-        for fav in favours:
-            ratios = []
-            for q in questions:
-                if shape_of[q][1] != fav:
+            rows_for_model = [r for r in clean if (r.get("model") or "?") == model]
+            for arm in arms:
+                if arm == BASELINE or (model, arm) not in floors:
                     continue
-                v = [r["cost_billed_usd"] for r in clean if r["arm"] == arm and r["question"] == q]
-                b = base.get(("cost_billed_usd", q))
-                if v and b and b == b:
-                    ratios.append(med(v) / b)
-            cells.append(f"{med(ratios):.2f}×" if ratios else "—")
-        print(f"| {arm} | " + " | ".join(cells) + " |")
+                arm_med = question_medians(rows_for_model, arm, model, "cost_billed_usd")
+                base_med = question_medians(rows_for_model, BASELINE, model, "cost_billed_usd")
+                ratios = []
+                for q in sorted(set(arm_med) & set(base_med)):
+                    lo_b = base_med[q] - floors[(model, BASELINE)]["cost_billed_usd"]
+                    lo_v = arm_med[q] - floors[(model, arm)]["cost_billed_usd"]
+                    if lo_b > 0 and lo_v > 0:
+                        ratios.append(lo_v / lo_b)
+
+                arm_tok = question_medians(rows_for_model, arm, model, "cumulative_prompt_tokens")
+                base_tok = question_medians(
+                    rows_for_model, BASELINE, model, "cumulative_prompt_tokens"
+                )
+                arm_turns = question_medians(rows_for_model, arm, model, "num_turns")
+                base_turns = question_medians(rows_for_model, BASELINE, model, "num_turns")
+                per_turn = []
+                for q in sorted(set(arm_tok) & set(base_tok)):
+                    b = (
+                        base_tok[q]
+                        - base_turns.get(q, 0)
+                        * (floors[(model, BASELINE)]["cumulative_prompt_tokens"])
+                    )
+                    v = (
+                        arm_tok[q]
+                        - arm_turns.get(q, 0) * (floors[(model, arm)]["cumulative_prompt_tokens"])
+                    )
+                    if b > 0 and v > 0:
+                        per_turn.append(v / b)
+                print(
+                    f"| {model.replace('claude-', '')} | {arm} | "
+                    f"{f'{med(ratios):.2f}x' if ratios else '—'} | "
+                    f"{f'{med(per_turn):.2f}x' if per_turn else '—'} |"
+                )
 
     print("\n## Integrity\n")
-    print("| arm | runs | unsupported | skill fired | compacted | denials | readb never used |")
+    print("| model | arm | runs | skill fired | compacted | denials | readb never used |")
     print("|" + "---|" * 7)
-    for arm in arms:
-        rows = by_arm[arm]
-        if not rows:
-            continue
-        expects_readb = arm != BASELINE
-        print(
-            f"| {arm} | {len(rows)} | {sum(1 for r in rows if not r.get('supported'))} | "
-            f"{sum(1 for r in rows if r.get('skill_readb_used'))} | "
-            f"{sum(1 for r in rows if r.get('compacted'))} | "
-            f"{sum(1 for r in rows if r.get('permission_denials'))} | "
-            f"{sum(1 for r in rows if expects_readb and not r.get('readb_used'))} |"
-        )
+    for model in models:
+        for arm in arms:
+            rows = by_arm_model.get((model, arm)) or []
+            if not rows:
+                continue
+            expects_readb = arm.startswith("readb")
+            print(
+                f"| {model.replace('claude-', '')} | {arm} | {len(rows)} | "
+                f"{sum(1 for r in rows if r.get('skill_readb_used'))} | "
+                f"{sum(1 for r in rows if r.get('compacted'))} | "
+                f"{sum(1 for r in rows if r.get('permission_denials'))} | "
+                f"{sum(1 for r in rows if expects_readb and not r.get('readb_used'))} |"
+            )
+
+    print("\n## Appendix — the demoted metrics\n")
+    print("| model | arm | " + " | ".join(m[1] for m in APPENDIX_METRICS) + " |")
+    print("|" + "---|" * (len(APPENDIX_METRICS) + 2))
+    for model in models:
+        for arm in arms:
+            rows = by_arm_model.get((model, arm)) or []
+            if not rows:
+                continue
+            cells = [
+                fmt(med([r[k] for r in rows if r.get(k) is not None]), d)
+                for k, _, d in APPENDIX_METRICS
+            ]
+            print(f"| {model.replace('claude-', '')} | {arm} | " + " | ".join(cells) + " |")
 
     if dropped:
         print("\n## Excluded runs\n")
@@ -287,10 +650,11 @@ def main() -> None:
     wrong = [r for r in clean if not r["correct"]]
     if wrong:
         print("\n## Every wrong answer\n")
-        for r in sorted(wrong, key=lambda r: (r["question"], r["arm"])):
+        for r in sorted(wrong, key=lambda r: (r["question"], r.get("model") or "", r["arm"])):
             print(
-                f"- {r['question']} {r['arm']} r{r['repeat']}: answered `{r.get('parsed_answer')}` "
-                f"(partial {r.get('partial_credit')})"
+                f"- {r['question']} {(r.get('model') or '').replace('claude-', '')} {r['arm']} "
+                f"r{r['repeat']}: answered `{r.get('parsed_answer')}` "
+                f"(partial {r.get('partial_credit')}, tool {r.get('tool_choice')})"
             )
 
     print(f"\nTotal reported spend: ${sum(r.get('cost_reported_usd') or 0 for r in records):.2f}")
