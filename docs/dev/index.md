@@ -37,6 +37,11 @@ into a different decision: write a new ADR and mark the old one `Superseded`.
 readb query "SELECT __name, status, title FROM adr ORDER BY __name" --bundle ./docs/dev
 ```
 
+## Proposed
+
+* [0005 — readb stays a Python package; per-invocation cost is fixed and cached, not rewritten](adr/0005-stay-on-python.md)
+* [0006 — The persistent cache writes only under an existing .readb/, keyed on path+size+mtime, all-or-nothing](adr/0006-cache-consent-and-key.md)
+
 ## Accepted
 
 * [0002 — Name the package readb (dist, import, and CLI aligned)](adr/0002-package-name-readb.md)
