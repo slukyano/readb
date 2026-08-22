@@ -26,6 +26,7 @@ okf_version: "0.1"
 * [Submit the readb plugin to the community marketplace](tasks/027-plugin-marketplace-submission.md) - discovery only: `gh skill install` already works; the hint protocol needs an official listing.
 * [An unknown table should name the bundle's tables](tasks/032-unknown-table-error.md) - DuckDB's catalog error is passed through verbatim, suggesting a DuckDB internal table.
 * [The shipped skill is invoked on fewer than half the runs where it is available](tasks/033-skill-discovery-rate.md) - discovery, not content; measured by benchmark v2.
+* [The field editor cannot change a list-valued key](tasks/037-field-editor-list-values.md) - `set` refuses a list and `unset` destroys it; adding a task to a sprint needs a hand edit.
 * [The load pass spends two thirds of its time on a failed pandas import](tasks/036-load-pandas-import-probe.md) - DuckDB probes for pandas per bound value; the load is ~2.9x slower than it should be.
 * [Benchmark v3 — re-measure every arm with the cache enabled](tasks/035-benchmark-v3-cached.md) - one full re-measure after the cache and the revised skill description land.
 * [Persistent index cache behind the load seam](tasks/034-persistent-index-cache.md) - stop re-parsing the whole bundle every invocation; the `.readb/` index the loader seam was built for.

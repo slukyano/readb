@@ -11,6 +11,7 @@ created: '2026-08-22'
 status: Designing
 tasks:
 - 028-evaluate-rust-rewrite
+- 036-load-pandas-import-probe
 - 034-persistent-index-cache
 - 033-skill-discovery-rate
 - 032-unknown-table-error
@@ -53,6 +54,8 @@ two fixes.
 
 - [ ] 028-evaluate-rust-rewrite — decide Python vs. Rust on the measured evidence; ADR either way;
       no product code
+- [ ] 036-load-pandas-import-probe — DuckDB probes for pandas twice per non-NULL bound value; the
+      load runs ~2.9x slower than it should at every bundle size measured
 - [ ] 034-persistent-index-cache — the `.readb/` index behind `load_bundle`, plus the ADR on how a
       read-only tool may write a cache
 - [ ] 033-skill-discovery-rate — the shipped skill's `description` surface; the skill was loaded on
@@ -60,8 +63,9 @@ two fixes.
 - [ ] 032-unknown-table-error — a mistyped table names the bundle's tables and `readb schema`
       instead of DuckDB's `duckdb_indexes`
 
-Design order: `028` → `034` → `033` → `032`. Implementation order: `032`, `033`, then `034` as the
-long pole.
+Design order: `028` → `036` → `034` → `033` → `032`. Implementation order: **`036` first**, then
+`032`, `033`, and `034` as the long pole. `036` precedes `034` because a cache benchmarked against
+a load pass that is itself three times slower than it should be proves nothing.
 
 ## Scope decisions taken at approval
 
@@ -72,12 +76,17 @@ long pole.
   [`035-benchmark-v3-cached`](../tasks/035-benchmark-v3-cached.md). The revised description is
   frozen before that run; it is never tuned against the benchmark.
 
+- **`036-load-pandas-import-probe` was added to scope mid-design**, found while measuring the load
+  pass for `028`. It is the only high-priority task in the backlog and it gates `034`'s measurement.
+
 ## Open questions
 
 _(none yet)_
 
 ## Session log
 
+* **2026-08-22** — `036` added to scope during 028's design measurements (approved in session);
+  `037` drafted for the dogfooding gap that hand-editing this file exposed.
 * **2026-08-22** — Scope approved: four tasks, branch `sprint/006`. `034` drafted during the
   scoping session (no task held the caching work before); `035` drafted to hold the post-cache
   re-measure. `029` considered and left out.
