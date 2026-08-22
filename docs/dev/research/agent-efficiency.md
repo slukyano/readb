@@ -89,10 +89,11 @@ count taken through readb alone omits the 12 broken records — readb reports 18
   under a path that does not contain the string `readb` (the agent's cwd reaches its system
   prompt).
 - Runs are interleaved by arm and the question order rotates per repeat.
-- Full stream transcripts are kept, which is what makes the integrity checks above possible at
-  all. 68 of them were later overwritten by subsequent batches and are gone — see limitation 11;
-  the integrity checks ran against every transcript at the time each run was recorded, and their
-  verdicts are stored per record.
+- Full stream transcripts are captured, which is what makes the integrity checks above possible
+  at all: each check runs against the transcript as the run is recorded, and its verdict is
+  stored on the run's record. Neither the transcripts nor the per-run records are committed —
+  see *Reproducing* — so the checks' verdicts, not their raw inputs, are what this repository
+  keeps.
 
 ## Metrics
 
@@ -136,8 +137,8 @@ skill arm, a 32-run size sweep and 4 floor runs. Total spend across every batch,
 retracted one, $25.05.
 
 **36 of the 144 are excluded** — the whole first `readb-skill` arm, retracted for the environment
-defect in finding 6. Its records stay in `run.jsonl` flagged `retracted`, and the analyzer drops
-them; the arm's published numbers come from the re-measurement. Of the 108 that remain, **none**
+defect in finding 6. Those records were flagged `retracted` and the analyzer drops them; the
+arm's published numbers come from the re-measurement. Of the 108 that remain, **none**
 was excluded for any other reason: no leak into a readb-free arm, no permission denial, no
 context compaction, no harness fault.
 
@@ -241,9 +242,8 @@ baseline's — close to `readb-bare`'s 0.65× — so the skill does change what 
 where it does not change what the run costs. It buys `readb-bare`'s terseness and spends the
 saving on discovering and reading itself.
 
-(The "17 of 36" figure above was measured during the adversarial audit of the first batch, before
-that batch's transcripts were overwritten by the re-run — see limitation 11. The numeric records
-survive in `run.jsonl`, flagged `retracted`, and are excluded from every table here.)
+(The "17 of 36" figure above was measured during the adversarial audit of the first batch. Those
+runs were flagged `retracted` and excluded from every table here.)
 
 The artefact is worth keeping as a finding in its own right, because it is not confined to a
 benchmark: **the skill's leading example fails on any machine where readb is installed but `uv`
@@ -378,8 +378,9 @@ should have been a shape the model could not mistake for an answer.
    against the runtime's own plugin-evaluation harness, were designed but not run.
 9. **No arm had `Grep` or `Glob`.** In this runtime build they are deferred tools reached through
    a search step, and no run reached for them. Across the 144 published runs (108 main matrix
-   plus the 36 re-measured skill runs) the records count **453 tool calls**, and the 128 of those
-   runs whose transcripts survive break down as `Bash` 357, `Skill` 28, `Read` 5 — nothing else.
+   plus the 36 re-measured skill runs) the records counted **453 tool calls**, and the 128 runs
+   whose transcripts were still intact at the time of counting broke down as `Bash` 357,
+   `Skill` 28, `Read` 5 — nothing else.
    Every arm was therefore an agent with a shell, not an agent with native structured search. This is identical across arms, but structured search returns
    truncated, pre-formatted results rather than piping raw text into the context, so its absence
    plausibly *inflates* the file-reading arms' cost. The measured gap is an upper bound on
@@ -387,19 +388,18 @@ should have been a shape the model could not mistake for an answer.
 10. **Half of every measured run is fixed overhead** — $0.053 of a $0.088–0.101 median. Absolute
     figures here are not "the cost of answering a question with readb"; they are that cost plus a
     constant, and the constant dilutes every ratio toward 1.00.
-11. **68 of the published runs have no surviving transcript.** The transcript directory was flat
-    until batches were namespaced, so every batch that reused an (arm, question, repeat) cell
-    overwrote the earlier batch's evidence: the skill re-measurement took the 36 retracted
-    skill runs, and the two size sweeps took 16 main-matrix cells (Q3, Q4, Q8, Q12 at r1/r2 in
-    the two file-reading arms) and then 16 of `sweep_150`'s own. Every affected record is
-    flagged `transcript_lost` and its numeric fields are intact — the 128 surviving transcripts
-    are re-filed under the batch that actually produced them, matched by session id. What is
-    gone is tool-level evidence, which is why the tool counts in limitation 9 are given over the
-    surviving subset. The harness now refuses to overwrite a transcript. The
+11. **The raw per-run records and transcripts are not committed.** They were, and it went badly:
+    the transcript directory was flat until batches were namespaced, so each batch that reused an
+    (arm, question, repeat) cell overwrote an earlier batch's evidence, and 68 published runs lost
+    their tool-level detail before anyone noticed. Weighed against 4 MB of a public repository and
+    a third party's runtime internals published verbatim, the raw output is no longer kept — the
+    aggregated analyses and the per-batch manifests are, and the harness plus the seed regenerates
+    the rest. What this costs the reader: the figures here can be recomputed from `analysis.md`,
+    but not re-derived from raw output without re-running the experiment. The tool counts in
+    limitation 9 were taken over the transcripts that survived, not all of them. The skill
     re-measurement also carries one asymmetry worth naming: reaching `uv` meant putting
-    `/opt/homebrew/bin` on that arm's `PATH`, so the skill arm could see binaries the
-    readb-free arms could not. Across all 36 runs the only one it invoked from there was `uvx`,
-    35 times.
+    `/opt/homebrew/bin` on that arm's `PATH`, so the skill arm could see binaries the readb-free
+    arms could not. Across all 36 runs the only one it invoked from there was `uvx`, 35 times.
 12. **`manifest-run.json` was reconstructed after the fact.** The harness of the time wrote one
     `manifest.json` that later batches overwrote. The corpora it records are the same directories
     the batch read, hashed afterwards and unmodified since, but it is a reconstruction and says
@@ -407,8 +407,12 @@ should have been a shape the model could not mistake for an answer.
 
 # Reproducing
 
-Harness, corpus generator, battery, scorer, raw per-run records and full transcripts are in
-[`benchmarks/`](../../../benchmarks/README.md). Each of the five committed batches has a `manifest-<batch>.json`
-recording the runtime version, readb version, model, effort, price table, corpus checksums,
-generation seed and machine. The four written during a run carry the per-arm `PATH` as a
-structured field; the reconstructed `manifest-run.json` carries it as a note.
+The harness, corpus generator, battery, scorer, the aggregated analyses and a
+`manifest-<batch>.json` per batch are in [`benchmarks/`](../../../benchmarks/README.md). Each
+manifest records the runtime version, readb version, model, effort, price table, corpus
+checksums, generation seed and machine; the four written during a run carry the per-arm `PATH` as
+a structured field, and the reconstructed `manifest-run.json` carries it as a note.
+
+Raw per-run records and transcripts are **not** committed (limitation 11). Re-running the harness
+against the same seed regenerates them; the manifests are what make a new batch comparable to
+this one.
