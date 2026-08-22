@@ -104,8 +104,9 @@ add a second model as a noise source and a standing temptation to tune.
 ## Endpoints — three, declared in advance
 
 Pooling across 26 questions produces a number set by the battery's composition, so v2 does not
-chase one. A power computation on v1's raw data settles why: separating 0.90× from 1.00× on the
-pooled coached contrast has 22% power at 12 questions, 51% at 36 and 63% at 48.
+chase one. A power computation carried over from v1's analysis motivates this: separating 0.90×
+from 1.00× on the pooled coached contrast has 22% power at 12 questions, 51% at 36 and 63% at 48.
+Those figures are not reproducible from data committed here — see limitation 11.
 
 | id | Contrast | Model | Scope |
 | --- | --- | --- | --- |
@@ -145,8 +146,9 @@ the headline, cache-neutral cost as a second headline basis, and the n=1 floor.
 
 # Results
 
-**783 runs on 2026-08-22** — 390 Sonnet, 312 Haiku, 27 floors, 54 sweep — for $51.91. **None was
-excluded.** No leak into a readb-free arm, no permission denial, no context compaction, no harness
+**783 runs on 2026-08-22** — 390 Sonnet, 312 Haiku, 27 floors, 54 sweep. **$50.92 billed** by the
+committed price tables, which is the basis every figure below uses; the runtime reported $51.91 for
+the same runs, a 1.9% difference from its own side-calls. **None was excluded.** No leak into a readb-free arm, no permission denial, no context compaction, no harness
 fault, no API error, and every one of the 702 battery runs produced an `ANSWER` line that parsed.
 
 An earlier 77-run batch was **deleted** before any of this, when an independent review found
@@ -177,7 +179,10 @@ fewer than five of the 26 questions, so there is nothing for a paired test to se
 shell recipe, by the same margin.** This is the finding that matters, and it is not the one v1
 would have predicted.
 
-| Sonnet 5 | exact | billed | ingested | turns |
+Medians, not means, throughout — the distributions are long-tailed and one runaway run would carry
+a mean:
+
+| Sonnet 5 | exact | billed (median) | ingested (median) | turns (median) |
 | --- | --- | --- | --- | --- |
 | `baseline` | 85% | $0.0914 | 11,778 | 6.0 |
 | `shell-coached` | 97% | $0.0702 | 10,288 | 3.0 |
@@ -185,7 +190,7 @@ would have predicted.
 | `readb-nudged` | 100% | $0.0668 | 10,152 | 4.0 |
 | `readb-skill` | 96% | $0.0792 | 12,384 | 5.0 |
 
-| Haiku 4.5 | exact | billed | ingested | turns |
+| Haiku 4.5 | exact | billed (median) | ingested (median) | turns (median) |
 | --- | --- | --- | --- | --- |
 | `baseline` | 77% | $0.0492 | 10,883 | 8.0 |
 | `shell-coached` | 92% | $0.0291 | 8,298 | 4.0 |
@@ -200,15 +205,26 @@ intervals exclude 1.00:
 | `readb-bare` | **0.72×** [0.62–0.95] | **0.75×** [0.57–0.89] |
 | `shell-coached` | **0.75×** [0.71–0.85] | **0.69×** [0.55–0.78] |
 
-readb against a *coached* shell agent is the contrast the endpoints test, and there it is a wash.
+readb against a *coached* shell agent is the contrast the endpoints test, and there it is a wash —
+including where it goes against readb:
+
+| vs `shell-coached`, pooled | Sonnet | Haiku |
+| --- | --- | --- |
+| `readb-bare` | 0.98× [0.88–1.22] | **1.07×** [0.92–1.21] |
+| `readb-nudged` | 0.99× [0.81–1.20] | 1.07× [0.90–1.11] |
+| `baseline` | 1.33× [1.18–1.41] | 1.46× [1.29–1.83] |
+
 **The gain is structure, not SQL.** An agent told how to attack a directory of frontmatter — by any
-means — costs about 30% less and answers 12 to 15 points more accurately than one left to read
-files.
+means — costs a quarter to a third less and answers 12 to 15 points more accurately than one left
+to read files. Which structured means it is given does not move the bill.
 
 **2. There is an accuracy effect this time, and v1 missed it because nothing could fail.** v1
 reported no accuracy difference: every arm sat at ceiling on a regular corpus and an easy battery.
-v2's baseline drops to 85% on Sonnet and 77% on Haiku, and both structured arms recover it. The
-variance came from the harder battery, not from the messier corpus — see finding 6.
+v2's baseline drops to 85% on Sonnet and 77% on Haiku, and both structured arms recover it. How
+much of that variance comes from the harder battery and how much from the messier corpus is **not
+resolved here**: the sweep (finding 6) found one accuracy cell moving with rendering, and five of
+Sonnet baseline's twelve misses are on questions carried from v1 verbatim, where v1's baseline
+scored 100% against a tidy corpus. Both explanations are live.
 
 **3. The advantage is concentrated in join-shaped work, and it is larger on the weaker model.**
 Billed cost against baseline, by stratum:
@@ -221,9 +237,25 @@ Billed cost against baseline, by stratum:
 | `hazard` (3) | 0.69× | 0.74× | 0.79× | 0.80× |
 | `retrieval` (3) | 1.02× | 0.86× | 0.99× | 1.00× |
 
-readb loses `retrieval` outright, as designed — finding one document by what it says is a job for
-`rg`, and a whole-bundle load is pure overhead. It is weakest on `backlog`, the small bundle, as
-E2 predicted.
+readb has no advantage on `retrieval`, as designed — finding one document by what it says is a job
+for `rg`, and a whole-bundle load is pure overhead (1.02× on Sonnet, 0.99× on Haiku).
+
+Against the coached competitor rather than the baseline, the same table is much flatter, and on
+Haiku the join advantage disappears entirely:
+
+| stratum | Sonnet `readb-bare` | Haiku `readb-bare` |
+| --- | --- | --- |
+| `join` (8) | **0.74×** | 0.96× |
+| `hazard` (3) | 0.89× | 1.12× |
+| `retrieval` (3) | 0.98× | 1.02× |
+| `backlog` (8) | 1.02× | 1.29× |
+| `scan` (4) | 1.22× | 0.99× |
+
+Against a coached competitor the picture inverts by model: on Sonnet the join advantage survives
+at 0.74× (this is E1, which the test could not separate from parity), while readb *loses* `scan`
+at 1.22×; on Haiku the join advantage is gone at 0.96× and readb loses `backlog` badly at 1.29×.
+So this finding's headline — advantage concentrated in join-shaped work, larger on the weaker
+model — holds **against an uncoached agent** and does not survive against a coached one.
 
 **4. The nudge changes what the agent reaches for, and not what it costs.** One frozen sentence,
 against the un-nudged arm:
@@ -241,29 +273,44 @@ readb on questions where readb is the wrong tool. Tool-match rate does not impro
 79% on Sonnet, 78% → 74% on Haiku): the extra readb calls land on questions whose declared expert
 tool is not readb. **On this evidence the sentence is not worth adding to the shipped skill.**
 
-**5. The malformed-file warning is a real mitigation whose effect depends on the model.** This is
-the sharpest new result. On the un-warned trap, where a naive `GROUP BY` names the wrong team:
+**5. The malformed-file hazard is a property of the model, not of the tool.** On the un-warned
+trap, where a naive `GROUP BY` names the wrong team:
 
-| q18, un-warned | `baseline` | `shell-coached` | `readb-bare` | `readb-nudged` |
-| --- | --- | --- | --- | --- |
-| Sonnet, exact | 67% | 0% | **100%** | **100%** |
-| Haiku, exact | 33% | 0% | **0%** | **0%** |
+| q18, un-warned | `baseline` | `shell-coached` | `readb-bare` | `readb-nudged` | `readb-skill` |
+| --- | --- | --- | --- | --- | --- |
+| Sonnet, exact | 67% | **100%** | **100%** | **100%** | **100%** |
+| Haiku, exact | 33% | 0% | 0% | 0% | — |
 
-Every readb run on both models **saw** the skip warning (3/3). On Sonnet the agent read it and
-corrected; on Haiku it read it and answered anyway. So readb's permissive load is not the silent
-hazard v1 assumed — its warning works — but it works only as well as the model reading it, and on
-a weaker model **readb plus an unread warning is worse than reading files** (0% against 33%).
-`shell-coached` fails the trap on both models for the opposite reason: its recipe never surfaces
-the malformed files at all.
+Sonnet gets it right whatever it uses; Haiku gets it wrong whatever it uses, and the only Haiku
+runs that ever land on the right answer are the uncoached baseline's (1 of 3). The tool an arm was
+given does not separate the outcomes at all — the model does.
+
+**Both tools surfaced the malformed files, and neither surfacing was enough on Haiku.** Every
+readb run on both models saw readb's skip warning (3/3). The coached shell recipe surfaces them
+even more loudly: its `yq` loop errors on each unparseable file by name. On Sonnet the shell agent
+read those errors, inspected one, concluded that the team field was intact and re-extracted with a
+regex to include them. On Haiku the shell agent saw the same errors and **re-ran the command with
+`2>/dev/null`**, silencing them.
+
+So readb's permissive load is not the silent hazard v1 assumed — the warning does reach the agent
+— but reaching the agent is not the same as being acted on, and on a weaker model no amount of
+surfacing helped. This rests on one question and three repeats per cell; it is an observation about
+two models, not a law.
 
 By contrast the *warned* versions, q10 and q10b, are answered correctly by every arm on both
 models. The warning in the prompt was doing all the work in v1.
 
-**6. Messiness does not matter, which retires a v1 limitation rather than confirming it.** v1
-suspected its uniformly-rendered corpus flattered the shell recipes. The sweep says it did not:
-running q2, q3 and q15 against both renderings, every messy/tidy cost ratio lands between 0.99×
-and 1.06×, except two where the *messy* corpus was cheaper. Exactness is identical on all nine
-cells but one. A quote-tolerant shell recipe pays nothing for mixed rendering.
+**6. Messiness costs nothing in money, and cost the uncoached arm one answer.** v1 suspected its
+uniformly-rendered corpus flattered the shell recipes. Running q2, q3 and q15 against both
+renderings, seven of nine messy/tidy cost ratios land between 0.99× and 1.06× and the other two
+(0.68×, 0.83×) favour the *messy* corpus — so a quote-tolerant shell recipe pays nothing for mixed
+rendering.
+
+Exactness is identical on eight of nine cells. The ninth goes in the direction v1 suspected:
+`baseline` on q3 scored 67% messy against 100% tidy. So the honest statement is narrower than
+"messiness does not matter" — it does not move cost, and does not move accuracy for the coached or
+readb arms, but it can cost an agent left to read files an answer. Three questions, one model, 54
+runs is thin ground either way, and this does not retire v1's limitation so much as bound it.
 
 **7. The shipped skill is discovered less than half the time.** `readb-skill` invoked the Skill
 tool on 37 of 78 runs and never touched readb at all on 41 — against 13 for `readb-bare`, which
@@ -276,6 +323,10 @@ The floor measures the **runtime's** fixed cost under each arm's configuration, 
 preamble, which is its treatment and is never subtracted. A ratio below 1.00 always moves further
 from 1.00 when a constant is removed from both sides, so both rules are shown and neither is
 authoritative:
+
+The per-turn rule drops any question where the subtraction goes negative, so it rests on fewer
+questions than the raw ratio does — 23 to 26 of 26 for most arms, and only 13 of 26 for the skill
+arm, whose floor is the largest.
 
 | vs `baseline` | raw | one floor per run | one prompt prefix per turn |
 | --- | --- | --- | --- |
@@ -291,9 +342,14 @@ into a win.
 
 **Supported.** On these corpora and this battery, at two models: an agent given readb answers
 questions about a bundle of frontmatter documents for **0.72× the money on Sonnet and 0.75× on
-Haiku** — both intervals excluding parity — and **12 to 15 accuracy points** above an agent left to
-read files, with the gain concentrated in questions that relate more than one document. readb's
-skip warning is read and acted on by a capable model.
+Haiku** — both bootstrap intervals excluding parity, with the caveat in limitation 10 — and **12 to
+15 accuracy points** above an agent left to read files, with the gain concentrated in questions
+that relate more than one document. Those figures are descriptive and were not part of the
+Holm-corrected family.
+
+**Observed, not supported.** That readb's skip warning is read and acted on. A Sonnet transcript
+reasons explicitly from it — but the comparator that never saw it reached the same 100%, so
+nothing here shows the warning was necessary or sufficient. One question, three repeats.
 
 **Not supported.** That readb beats a competently coached shell pipeline. All three pre-registered
 endpoints came back at parity or failed to resolve, on a battery twice v1's size. If a reader's
@@ -302,8 +358,9 @@ answer yes. If it is *"should this agent be given some structured way to attack 
 answers yes emphatically, and readb is one such way — one that needs no recipe written per corpus
 family, which the shell arm did need.
 
-**Contradicted.** H3: readb's engine does not hold accuracy where shell pipelines slip. On Haiku
-the two are indistinguishable at 92%.
+**Not supported.** H3: readb's engine does not hold accuracy where shell pipelines slip. On Haiku
+the two are indistinguishable at 92%. This is *not supported* rather than *contradicted* — an
+endpoint with too few discriminating pairs to test cannot contradict anything.
 
 # Deviations from the pre-registration
 
@@ -329,6 +386,24 @@ before the first surviving run, and every run reported here was produced by the 
    introductory $2/$10 became standard. Ratios are unaffected.
 8. **The hazard finding rests on three questions and one rigged corpus.** That readb's warning is
    read on Sonnet and ignored on Haiku is a two-model observation, not a law.
-9. **Tool choice is classified by a declared rule**, not by judgement. A run that used `readb` at
+9. **The bootstrap intervals are narrower than honest.** Every `[a–b]` here is a percentile
+   bootstrap resampling *questions only*, over per-question medians of three repeats, at a fixed
+   seed. It does not propagate within-question variance, so it understates uncertainty — v1 said
+   the same of its own intervals, and this version leans on them harder. The interval-excludes-1.00
+   claims in "Supported" carry that caveat.
+10. **The descriptive figures are not corrected for multiplicity.** Only E1–E3 entered the Holm
+   family. Every ratio, stratum cell and interval outside that family is exploratory, and the
+   number of them is large.
+11. **The power figures quoted in Method come from v1's analysis, not from data committed here.**
+   v1's raw per-run records were not committed (its limitation 11), so "22% power at 12 questions"
+   and "8.6% within-cell against 33% between questions" cannot be recomputed from this repository.
+   They motivated the design; they are not evidence produced by it.
+12. **The coached recipe is checked against ground truth on three corpora, not four.** On
+   `ops-malformed` — the corpus carrying the trap — preflight verifies only that each command
+   produces output, because the malformed files make a YAML-aware command fail by design.
+13. **`manifest-v2-floor.json` records only the Haiku half of the floor batch.** Both halves wrote
+   to one results file under one stem, so the second manifest overwrote the first. The runs
+   themselves are intact and carry their own model and price table per record.
+14. **Tool choice is classified by a declared rule**, not by judgement. A run that used `readb` at
    all is labelled `readb`; the `shell`/`read` split turns on whether a command names one file or
    many. The rule is in the pre-registration and was fixed before the runs.

@@ -17,8 +17,8 @@ rather than a description. Nothing below may be edited once a measured run exist
 that point retracts the runs it affects and says so in the write-up.
 
 [v1](agent-efficiency.md) measured readb's efficiency claim once and published fifteen limitations
-alongside the number. v2 addresses the six that can change a conclusion: an underpowered comparison
-against the honest competitor, a corpus regular enough to flatter shell pipelines, arms with no
+alongside the number (a sixteenth was added to it during this sprint). v2 addresses the six that
+can change a conclusion: an underpowered comparison against the honest competitor, a corpus regular enough to flatter shell pipelines, arms with no
 structured search tooling, a battery with no realistic workload and nothing needing a concept's
 body, a single model at the accuracy ceiling, and a hazard never tested un-warned.
 
@@ -146,8 +146,8 @@ strata and the declared expert tool are all fixed here.
 # Endpoints — three, Holm-corrected
 
 Pooling across all 26 questions produces a number set by the battery's composition, so v2 does not
-chase one. A power computation on v1's raw data settles why: separating 0.90× from 1.00× on the
-pooled coached contrast has **22% power at 12 questions, 51% at 36, 63% at 48**; 80% would need
+chase one. A power computation carried over from v1's analysis motivates this: separating 0.90×
+from 1.00× on the pooled coached contrast has **22% power at 12 questions, 51% at 36, 63% at 48**; 80% would need
 80–100, and v2's better shell tooling should shrink the pooled effect further.
 
 | id | Contrast | Model | Scope | Statistic |
