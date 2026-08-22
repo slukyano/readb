@@ -153,10 +153,12 @@ def shim(workroot: Path, label: str, names: tuple[str, ...]) -> str:
 # the best tooling a shell can offer, not the worst.
 SHARED_TOOLS = ("rg", "jq", "yq", "python3", "perl", "sqlite3")
 
-# `uv` is the exception: it goes to the skill arm alone. The shipped skill's leading example
-# is `uvx readb …`, so that arm cannot execute its own documentation without it — but handing
-# `uvx` to a readb-free arm would let it fetch readb, which is the leak the PATH control
-# exists to prevent.
+# `uv` is the exception: it goes to the skill arm alone, and now as insurance rather than as a
+# requirement. The skill's leading example used to be `uvx readb …`, so that arm could not
+# execute its own documentation without it; the example now invokes the bare binary, so `uv` is
+# unnecessary — but leaving it removes a way for the arm to fail on something other than what is
+# being measured, and the arm already has readb, so `uv` grants it nothing. Handing `uvx` to a
+# readb-free arm would let it fetch readb, which is the leak the PATH control exists to prevent.
 UV_TOOLS = ("uv", "uvx")
 
 

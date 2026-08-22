@@ -11,9 +11,11 @@ an in-memory DuckDB and runs SQL over it. The index is built on each run and thr
 markdown files are the only state, and loading or querying never writes anything.
 
 ```sh
-uvx readb query "SELECT title, year FROM book WHERE year < 1980" --bundle ./library
-uv tool install readb    # or install it once and drop the uvx prefix
+readb query "SELECT title, year FROM book WHERE year < 1980" --bundle ./library
 ```
+
+If that reports `command not found`, readb is not installed: `uvx readb query ...` runs it
+without installing, and `uv tool install readb` or `pip install readb` installs it once.
 
 ## When to reach for it
 

@@ -27,11 +27,19 @@ _QUERY_EXAMPLE = re.compile(r'readb query "((?:[^"\\]|\\.)+)"')
 # The command table documents the shape as `readb query "<SQL>"`; that placeholder is not an
 # example. Only whole-argument placeholders are dropped — `WHERE year < 1980` must survive.
 _PLACEHOLDER = re.compile(r"<[A-Z]+>")
+# The fenced shell blocks — the runnable surface an agent copies from.
+_SHELL_BLOCK = re.compile(r"```sh\n(.*?)```", re.DOTALL)
+# Runners that only work where that runner is itself installed.
+_RUNNER_PREFIXES = ("uvx ", "uv run ", "uv tool run ", "pipx run ", "python -m ")
 
 
 def _skill_queries() -> list[str]:
     found = _QUERY_EXAMPLE.findall(SKILL.read_text(encoding="utf-8"))
     return [sql for sql in found if not _PLACEHOLDER.fullmatch(sql)]
+
+
+def _shell_blocks() -> list[str]:
+    return _SHELL_BLOCK.findall(SKILL.read_text(encoding="utf-8"))
 
 
 def test_skill_exists_with_portable_frontmatter() -> None:
@@ -63,6 +71,29 @@ def test_skill_query_examples_run(sql: str) -> None:
         assert db.sql(sql), "the example runs but returns no rows"
     finally:
         db.close()
+
+
+def test_skill_leads_with_the_bare_binary() -> None:
+    # An agent copies the first runnable line it reads. Leading with `uvx readb` demands uv,
+    # which is absent wherever readb came from pip, pipx, Homebrew, a distribution package or a
+    # plain venv — the benchmark that found this spent 17 of 36 runs recovering from exit 127.
+    blocks = _shell_blocks()
+    assert blocks, "the skill has no shell examples"
+    first = blocks[0].strip().splitlines()[0]
+    assert first.startswith("readb "), f"the leading example must invoke readb directly: {first!r}"
+
+
+def test_no_shell_example_goes_through_a_runner() -> None:
+    # The durable half: the property survives as the skill grows, instead of pinning the one
+    # line known to be wrong today. A runner belongs in the prose fallback, never in a block an
+    # agent executes verbatim.
+    for block in _shell_blocks():
+        for line in block.splitlines():
+            command = line.strip()
+            offenders = [p for p in _RUNNER_PREFIXES if command.startswith(p)]
+            assert not offenders, (
+                f"a shell example runs readb through {offenders[0]!r}: {command!r}"
+            )
 
 
 def test_skill_python_example_runs() -> None:

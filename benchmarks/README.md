@@ -28,13 +28,15 @@ uv run pytest benchmarks
 | --- | --- | --- |
 | `baseline` | Orientation only | readb kept off `PATH` |
 | `shell-coached` | Orientation plus a worked `grep`/`awk` recipe | readb kept off `PATH` |
-| `readb-bare` | Orientation plus `readb query` / `readb schema` syntax | readb and `uv` on `PATH` |
+| `readb-bare` | Orientation plus `readb query` / `readb schema` syntax | readb on `PATH` |
 | `readb-skill` | Identical to `baseline` | readb and `uv` on `PATH`, the repository's plugin loaded so the shipped skill is discoverable |
 
 `shell-coached` exists because readb's honest competitor is a shell pipeline, not an uncoached
-agent. `uv` is on the readb arms' `PATH` because the shipped skill's leading example is
-`uvx readb` — an arm without it measures that failure instead of the skill, which is exactly what
-happened to the first `readb-skill` batch (retracted; see the research concept's finding 6).
+agent. `uv` is on the skill arm's `PATH` alone. It was once a requirement — the shipped skill's
+leading example was `uvx readb`, and an arm without `uv` measured that failure instead of the
+skill, which is exactly what happened to the first `readb-skill` batch (retracted; see the
+research concept's finding 6). The skill now leads with the bare binary, so `uv` is kept only as
+insurance against an arm failing on something other than what is being measured.
 
 Every arm runs with `--setting-sources ""`, so no personal configuration, skill, hook or MCP
 server reaches any of them; arm C differs from arm A by exactly one loaded skill. `--safe-mode`
