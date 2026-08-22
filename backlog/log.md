@@ -1,6 +1,15 @@
 # Task Bundle Log
 
 ## 2026-08-22
+* **Sprint 006 opened**: Scope approved — [the Rust decision](tasks/028-evaluate-rust-rewrite.md),
+  [the persistent index cache](tasks/034-persistent-index-cache.md),
+  [the skill's discovery rate](tasks/033-skill-discovery-rate.md) and
+  [the unknown-table error](tasks/032-unknown-table-error.md) on branch `sprint/006`
+  (`Designing`). Two tasks drafted while scoping: `034`, which had no task before despite being a
+  planned direction since the design brief, and [benchmark v3](tasks/035-benchmark-v3-cached.md),
+  which holds the full re-measure owed once the cache and the revised skill description land.
+  [The field editor's remaining edges](tasks/029-field-editor-remaining-edges.md) was weighed and
+  left out.
 * **Sprint 005 closed**: [benchmark v2](archive/031-benchmark-v2.md) and
   [the skill's uv assumption](archive/030-skill-uvx-assumption.md) `Designed -> Done`; sprint
   `Implementing -> Done`. v2 ran 783 pre-registered runs across two models and four corpora for

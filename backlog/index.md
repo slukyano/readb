@@ -8,6 +8,7 @@ okf_version: "0.1"
 
 # Sprints
 
+* [Sprint 006 — Decide the language question, then make the load cheap](sprints/sprint-006.md) - Designing.
 * [Sprint 005 — Benchmark v2: realistic workloads and a second model](sprints/sprint-005.md) - Done.
 * [Sprint 004 — Measure the efficiency claim](sprints/sprint-004.md) - Done.
 * [Sprint 003 — Post-0.1.0 adoption: usage skill, prior art, release automation](sprints/sprint-003.md) - Done.
@@ -25,6 +26,7 @@ okf_version: "0.1"
 * [Submit the readb plugin to the community marketplace](tasks/027-plugin-marketplace-submission.md) - discovery only: `gh skill install` already works; the hint protocol needs an official listing.
 * [An unknown table should name the bundle's tables](tasks/032-unknown-table-error.md) - DuckDB's catalog error is passed through verbatim, suggesting a DuckDB internal table.
 * [The shipped skill is invoked on fewer than half the runs where it is available](tasks/033-skill-discovery-rate.md) - discovery, not content; measured by benchmark v2.
+* [Benchmark v3 — re-measure every arm with the cache enabled](tasks/035-benchmark-v3-cached.md) - one full re-measure after the cache and the revised skill description land.
 * [Persistent index cache behind the load seam](tasks/034-persistent-index-cache.md) - stop re-parsing the whole bundle every invocation; the `.readb/` index the loader seam was built for.
 * [Evaluate rewriting readb in Rust](tasks/028-evaluate-rust-rewrite.md) - binary distribution and startup vs. the Python API, YAML semantics, and rebuild cost; sequenced behind the benchmark.
 
