@@ -50,7 +50,7 @@ Two design commitments carried into this sprint, both from the review rounds tha
 
 ## Task checklist
 
-- [ ] 030-skill-uvx-assumption — the skill's leading example must work where readb is installed
+- [x] 030-skill-uvx-assumption — the skill's leading example must work where readb is installed
       and `uv` is not
 - [ ] 031-benchmark-v2 — corpora, battery, harness changes, 783 runs, stratified analysis, and a
       second `Research` concept
@@ -60,7 +60,7 @@ skill rather than the artifact whose `uv` assumption retracted an arm of v1.
 
 ## Implementation checklist
 
-1. [ ] `030` — the skill's leading example, plus the two regression tests that keep it bare
+1. [x] `030` — the skill's leading example, plus the two regression tests that keep it bare
 2. [ ] `generate_corpus.py` — messy/tidy styling, the new plants and assertions, the
        malformed-team flip
 3. [ ] The backlog corpus generator — invented product, tasks/archive/sprints, mechanical ground
@@ -88,3 +88,5 @@ _(none yet)_
   alone, the fix inverts the leading example and states the recovery in prose, two mechanical
   tests keep the executable surface bare, and the task is ordered ahead of `031`. Design batch
   approved; both tasks `Designed`, sprint `Implementing`, design merge to `main`.
+- 2026-08-22 — `030` implemented and verified hands-on against a readb-without-`uv` PATH: the old
+  leading line exits 127 there, the new one returns rows. Implementation of `031` begins.
