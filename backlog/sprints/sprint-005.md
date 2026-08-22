@@ -5,7 +5,7 @@ description: Build and run the v2 agent-efficiency benchmark — a task-tracker-
 tags:
 - research
 - benchmarks
-timestamp: '2026-08-22T05:30:00Z'
+timestamp: '2026-08-22T07:00:00Z'
 branch: sprint/005
 created: '2026-08-22'
 status: Implementing
@@ -95,3 +95,9 @@ _(none yet)_
   five-arm harness with a corpus registry and per-model prices, the analyzer's three
   Holm-corrected endpoints on a pure-stdlib exact test, and 71 harness tests. Pre-registration
   committed before the first measured run. The 783-run matrix is under way.
+- 2026-08-22 — independent review of the harness found twelve defects, two of which would have
+  corrupted a published number: the coached preamble quoted one of its own answers (v1 has the
+  same defect, now recorded as its limitation 15), and an empty `ANSWER:` line scored exactly
+  right on the two empty-truth questions. All 77 runs made until then were deleted rather than
+  retracted, so the pre-registration still precedes the first measured run; its Revisions section
+  lists every correction. The matrix restarted on the corrected harness.
