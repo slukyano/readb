@@ -69,13 +69,39 @@ PREAMBLE_READB = (
 # The honest competitor to readb is not an uncoached agent — it is a shell pipeline. Without
 # this arm, arm B minus arm A measures "given a worked recipe" against "given none", and
 # would be read as "readb against file tools".
-PREAMBLE_SHELL = (
-    "You are working in a directory that holds a knowledge base. For example, "
-    "`rg -l '^tier: 1' corpus/services` lists the files carrying a given frontmatter "
-    "field, `rg -N '^status:' corpus/services | sort | uniq -c` counts one field's values "
-    "across a directory, and `yq '.tier' corpus/services/svc-0001.md` reads one field out "
-    "of a file's frontmatter.\n\n"
+# The coached recipe is data, not prose, so the exact commands an arm is shown can be
+# executed against a real corpus before any measured run. Coaching a command the arm cannot
+# run is what retracted 36 runs once already — and `yq '.tier' <file>` is such a command: it
+# prints the value and then fails, because it reads the markdown body as a second YAML
+# document. `--front-matter=extract` is the form that works.
+SHELL_RECIPE = (
+    ("lists the files carrying a given frontmatter field", "rg -l '^tier: 1' corpus/services"),
+    (
+        "counts one field's values across a directory",
+        "rg -N '^status:' corpus/services | sort | uniq -c",
+    ),
+    (
+        "reads one field out of a single file's frontmatter",
+        "yq --front-matter=extract '.tier' corpus/services/{service}.md",
+    ),
 )
+
+
+def recipe_placeholders(truth: dict) -> dict:
+    """Real names from the corpus, so a coached command is runnable as shown."""
+    return {"service": truth["q3"]["answer"][0]}
+
+
+def shell_preamble(recipe: tuple[tuple[str, str], ...], placeholders: dict) -> str:
+    examples = ", ".join(
+        f"`{command.format(**placeholders)}` {gloss}" for gloss, command in recipe[:-1]
+    )
+    gloss, command = recipe[-1]
+    return (
+        "You are working in a directory that holds a knowledge base. For example, "
+        f"{examples}, and `{command.format(**placeholders)}` {gloss}.\n\n"
+    )
+
 
 # Tool availability belongs in the SHARED intro, not in an arm's preamble: every arm has
 # the same tools on PATH, so every arm must be told so in the same words. Otherwise the
@@ -136,7 +162,7 @@ UV_TOOLS = ("uv", "uvx")
 
 ARMS = {
     "baseline": Arm("baseline", PREAMBLE_BASELINE, False, ISOLATION, False),
-    "shell-coached": Arm("shell-coached", PREAMBLE_SHELL, False, ISOLATION, False),
+    "shell-coached": Arm("shell-coached", "", False, ISOLATION, False),
     "readb-bare": Arm("readb-bare", PREAMBLE_READB, True, ISOLATION, False),
     "readb-skill": Arm(
         "readb-skill",
@@ -287,7 +313,10 @@ def run_one(arm: Arm, question, repeat: int, cfg, truth: dict, corpus: Path, mod
         if key in os.environ:
             env[key] = os.environ[key]
 
-    prompt = FLOOR_PROMPT if cfg.floor else arm.preamble + TASK_INTRO + render(question, truth)
+    # An empty preamble means the arm's treatment is the worked recipe, rendered from the
+    # executable command list against this corpus's own names.
+    preamble = arm.preamble or shell_preamble(SHELL_RECIPE, recipe_placeholders(truth))
+    prompt = FLOOR_PROMPT if cfg.floor else preamble + TASK_INTRO + render(question, truth)
     cmd = [
         CLAUDE_BIN,
         "-p",

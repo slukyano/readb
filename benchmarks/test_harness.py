@@ -294,3 +294,42 @@ def test_only_the_skill_arm_carries_uv():
 
     assert ARMS["readb-skill"].uv_on_path is True
     assert not any(a.uv_on_path for name, a in ARMS.items() if name != "readb-skill")
+
+
+def test_every_coached_command_actually_runs(tmp_path):
+    """The recipe is what an arm is told to do, so it must work against the real corpus.
+
+    Coaching a command the arm cannot execute is what invalidated 36 runs once already —
+    and `yq '.tier' <file>` is exactly such a command here: it prints the value and then
+    fails, because it reads the markdown body as a second YAML document.
+    """
+    import os
+    import shutil as _shutil
+    import subprocess
+
+    from run_benchmark import (
+        BASE_PATH,
+        SHARED_TOOLS,
+        SHELL_RECIPE,
+        recipe_placeholders,
+        shim,
+    )
+
+    concepts, truth = generate(240, seed=7)
+    write(tmp_path / "corpus", tmp_path / "truth.json", concepts, truth)
+    truth = json.loads((tmp_path / "truth.json").read_text())
+    env = {
+        "PATH": f"{shim(tmp_path, 'tools', SHARED_TOOLS)}:{BASE_PATH}",
+        "HOME": os.environ["HOME"],
+    }
+    missing = [t for t in ("rg", "yq") if not _shutil.which(t)]
+    if missing:
+        pytest.skip(f"recipe needs {missing}")
+
+    for _, template in SHELL_RECIPE:
+        command = template.format(**recipe_placeholders(truth))
+        done = subprocess.run(
+            command, shell=True, cwd=tmp_path, env=env, capture_output=True, text=True
+        )
+        assert done.returncode == 0, f"coached command failed: {command}\n{done.stderr}"
+        assert done.stdout.strip(), f"coached command produced nothing: {command}"
