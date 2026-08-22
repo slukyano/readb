@@ -36,7 +36,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from battery import QUESTIONS, extract_answer, render, score  # noqa: E402
+from battery import ALL_QUESTIONS, QUESTIONS, extract_answer, render, score  # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
@@ -493,7 +493,11 @@ def main() -> None:
     ap.add_argument("--total-budget", type=float, default=80.0)
     ap.add_argument("--timeout", type=int, default=1200)
     ap.add_argument("--arms", default=",".join(ARMS))
-    ap.add_argument("--questions", default=",".join(q.id for q in QUESTIONS))
+    ap.add_argument(
+        "--questions",
+        default=",".join(q.id for q in QUESTIONS),
+        help="default is the pre-registered battery; post-hoc probes must be named explicitly",
+    )
     ap.add_argument("--skip-preflight", action="store_true")
     ap.add_argument(
         "--floor",
@@ -563,7 +567,7 @@ def main() -> None:
     print(json.dumps(manifest, indent=2), flush=True)
 
     arms = [ARMS[a] for a in cfg.arms.split(",")]
-    questions = [q for q in QUESTIONS if q.id in cfg.questions.split(",")]
+    questions = [q for q in ALL_QUESTIONS if q.id in cfg.questions.split(",")]
     already = done_cells(cfg.results)
 
     # Interleave: arms round-robin inside each repeat and the question order rotates per

@@ -208,7 +208,34 @@ QUESTIONS: list[Question] = [
     ),
 ]
 
-BY_ID = {q.id: q for q in QUESTIONS}
+# --- post-hoc probes ----------------------------------------------------------
+# NOT part of the pre-registered battery. Added after the main matrix, to test an
+# explanation the results suggested rather than to measure the tool. Kept out of
+# QUESTIONS so a default run cannot silently fold them into the published figures.
+
+PROBES: list[Question] = [
+    Question(
+        id="q10b",
+        shape="malformed count, tabular phrasing",
+        favours="files",
+        corpus="malformed",
+        prompt=(
+            "How many `Service` concepts does this knowledge base contain? Count every "
+            "concept whose `type` is `Service`, including any whose frontmatter is "
+            "malformed.\n\n" + _FMT_NUMBER
+        ),
+        kind="number",
+        truth=lambda t: t["q10"]["answer"],
+    ),
+]
+
+# Q10 and Q10b carry the same information and the same correct answer (192). Q10 frames it
+# as files and text — "every file whose frontmatter block contains a `type: Service` line";
+# Q10b frames it as concepts and fields. Everything else is identical, so a difference in
+# which tool the agent reaches for is a difference made by phrasing alone.
+
+ALL_QUESTIONS = QUESTIONS + PROBES
+BY_ID = {q.id: q for q in ALL_QUESTIONS}
 
 
 def render(question: Question, truth: dict) -> str:

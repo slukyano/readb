@@ -70,9 +70,10 @@ were added specifically because a battery with no losing shape is not a measurem
 | Q11 | Fuzzy retrieval among four near-identical candidates | files |
 | Q12 | Five related questions in one session | neutral |
 
-Q10 is the sharpest of these: readb's permissive load **skips a malformed file silently**, so a
-count taken through readb alone omits the 12 broken records — readb reports 180 services where
-`grep` finds 192. The question asks for the count including them, in every arm's prompt.
+Q10 is the sharpest of these: readb's permissive load **drops a malformed file from the result**,
+so `SELECT count(*) FROM service` returns 180 where `grep` finds 192. It is not silent about it —
+one warning per skipped file goes to stderr, which finding 9 shows an agent reads and acts on. The
+question asks for the count including them, in every arm's prompt.
 
 ## Controls
 
@@ -258,12 +259,35 @@ not an artefact of being told what to do, and holds against the coached arm too 
 no readb command was issued, and those 12 are exactly the four file-favouring questions (Q7, Q9,
 Q10, Q11, 3/3 each). The tool choice was right every time: on those shapes readb offers nothing.
 
-**9. The malformed-file trap never sprang.** Q10 asks for a count that includes 12 files whose
-frontmatter does not parse — where readb reports 180 services and `grep` finds 192. Every arm
-answered 192, because the readb arms reached for `grep` instead. The documented silent-skip
-behaviour is a real hazard, but on this question an agent did not walk into it. Having readb
-available cost money anyway: Q10 is `readb-bare`'s worst question against `shell-coached`, at
-1.84×.
+**9. The malformed-file trap never sprang, and a follow-up probe explains why.** Q10 asks for a
+count that includes 12 files whose frontmatter does not parse — where `SELECT count(*) FROM
+service` returns 180 and `grep` finds 192. Every arm answered 192. In the main matrix the readb
+arms answered it by reaching for `grep`, never invoking readb at all, so the question left open
+whether an agent that *did* use readb would be misled.
+
+A post-hoc probe settled it (`q10b`, outside the pre-registered battery): the same question,
+same corpus, same arms, rephrased from file-and-text language into concept-and-field language —
+*"How many `Service` concepts does this knowledge base contain? Count every concept whose `type`
+is `Service`, including any whose frontmatter is malformed."* Phrasing alone flipped the tool
+choice: `readb-bare` invoked readb in **3 of 3** runs, against 0 of 3 on the original wording.
+
+It still answered 192, every time — because **readb tells the agent what it skipped**. The first
+command is `readb schema`, and readb writes one warning per unparseable file to stderr:
+
+```
+skipping services/svc-9001-edge-collector.md: malformed YAML frontmatter
+  (while parsing a flow sequence … tags: [cost, broken …)
+```
+
+The agent read those warnings, ran the query anyway, saw 180, cross-checked against
+`ls corpus/services | wc -l` → 192, confirmed all 12 skipped files declare `type: Service`, and
+answered 192 with the arithmetic shown. The permissive-load contract is silent in the *result set*
+but not in the *process output*, and that turns out to be the difference: an agent sees the
+warning at exactly the moment it matters.
+
+On the rephrased question readb is also the cheaper tool — `readb-bare` at **0.65×** the
+baseline's cost, against 0.87× on the original file-oriented wording. Which phrasing a user
+happens to choose moves the result more than the arms do.
 
 ## Size sweep
 
@@ -400,7 +424,21 @@ should have been a shape the model could not mistake for an answer.
     re-measurement also carries one asymmetry worth naming: reaching `uv` meant putting
     `/opt/homebrew/bin` on that arm's `PATH`, so the skill arm could see binaries the readb-free
     arms could not. Across all 36 runs the only one it invoked from there was `uvx`, 35 times.
-12. **`manifest-run.json` was reconstructed after the fact.** The harness of the time wrote one
+12. **The corpus no longer rebuilds byte-for-byte.** A post-hoc fix to the generator (the fuzzy
+    candidates for Q11 are now spread across the runbooks rather than planted at fixed indices,
+    so they no longer degrade on a small corpus) moved which four runbooks carry a `# Failover`
+    section. Rebuilding at seed 24 therefore produces a different checksum from the one
+    `manifest-run.json` records — the mechanism worked exactly as intended and caught the drift.
+    Everything Q10 depends on is unchanged and was re-verified: 192 files declaring
+    `type: Service`, 12 unparseable, readb reporting 180.
+13. **A published cost basis outlived its billing regime.** Recomputed cost reproduced the
+    runtime's own `total_cost_usd` to within 1% across all 216 recorded runs (median 0.992). Runs
+    made later, for the `q10b` probe, report at **0.676×** list price — a flat plan discount not
+    in effect during the measured batches. This is the reason cost here is recomputed from token
+    counts against a committed price table rather than quoted from the runtime: ratios within a
+    batch are unaffected, but absolute dollars from different batches are not comparable.
+
+14. **`manifest-run.json` was reconstructed after the fact.** The harness of the time wrote one
     `manifest.json` that later batches overwrote. The corpora it records are the same directories
     the batch read, hashed afterwards and unmodified since, but it is a reconstruction and says
     so. Later batches carry manifests written during the run.
