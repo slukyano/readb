@@ -26,7 +26,7 @@ tables, or `readb schema`, which is the one command that would resolve the mista
 
 The cost is measurable rather than theoretical: v1 established that an agent's cost tracks turns
 (`≈ $0.019/turn`), and every such miss spends one. Across the v2 matrix, readb-using arms recorded
-47 failed readb invocations, a share of them this shape.
+54 failed readb invocations, a share of them this shape.
 
 ## Notes (to refine)
 
