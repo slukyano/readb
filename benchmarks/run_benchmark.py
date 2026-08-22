@@ -646,6 +646,24 @@ def run_one(
     return record
 
 
+def assert_workroot_is_neutral(workroot: Path) -> None:
+    """The working root must not contain the tool's name, anywhere in its absolute path.
+
+    The agent's cwd is echoed into its system prompt, so a single `readb` in the path primes
+    every readb-free arm with the word it is supposed not to know — and the leak check then
+    flags every one of their runs. This was a comment in this file for a whole version, and
+    a comment does not stop a run: a session scratchpad named after the repository ate the
+    first twelve runs of the v2 matrix before it was caught.
+    """
+    resolved = str(workroot.resolve()).lower()
+    if "readb" in resolved:
+        raise SystemExit(
+            f"refusing to run: the working root {resolved} contains the tool's name, which "
+            f"is echoed into every arm's system prompt through its cwd. Pass a --workroot "
+            f"outside any path carrying it (the default, /tmp/kbbench, is one)."
+        )
+
+
 def preflight(cfg, corpora: dict, truths: dict) -> dict:
     """Verify the arms are what they claim before spending money on a matrix.
 
@@ -859,6 +877,9 @@ def main() -> None:
     cfg.transcripts.mkdir(parents=True, exist_ok=True)
     cfg.results.parent.mkdir(parents=True, exist_ok=True)
     cfg.workroot.mkdir(parents=True, exist_ok=True)
+    # Checked before the shims are built, and outside `preflight`, so `--skip-preflight`
+    # cannot skip past the one failure that silently invalidates a whole batch.
+    assert_workroot_is_neutral(cfg.workroot)
     cfg.tools_shim = shim(cfg.workroot, "tools", SHARED_TOOLS)
     cfg.uv_shim = shim(cfg.workroot, "uv", UV_TOOLS)
 

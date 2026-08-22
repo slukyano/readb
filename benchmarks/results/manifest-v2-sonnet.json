@@ -1,9 +1,9 @@
 {
-  "started_utc": "2026-08-22T05:09:04.473554+00:00",
-  "git_sha": "74dd8014379bba080d79632ebccec01e8449d710",
+  "started_utc": "2026-08-22T05:13:16.560112+00:00",
+  "git_sha": "655eb20ea37942eac85f9c1b9d251171815eea44",
   "claude_version": "2.1.239 (Claude Code)",
   "readb_version": "readb, version 0.2.0",
-  "readb_bin": "/private/tmp/claude-501/-Users-<USER>-workspaces-personal-readb/e173eadf-55ba-4fb6-a563-bea339b9daef/scratchpad/benchvenv/bin/readb",
+  "readb_bin": "/tmp/kbbench-v2/benchvenv/bin/readb",
   "python": "3.14.6 (main, Jun 23 2026, 15:46:31) [Clang 22.1.3 ]",
   "platform": "macOS-26.5.2-arm64-arm-64bit-Mach-O",
   "machine": "arm64",
@@ -24,10 +24,10 @@
   "arms": "baseline,shell-coached,readb-bare,readb-nudged,readb-skill",
   "questions": "q1,q2,q3,q4,q5,q6,q7,q8,q9,q10,q10b,q11,q12,q14,q15,q16,q17,q18,b1,b2,b3,b4,b5,b6,b7,b8",
   "corpus_dirs": {
-    "ops": "/private/tmp/claude-501/-Users-<USER>-workspaces-personal-readb/e173eadf-55ba-4fb6-a563-bea339b9daef/scratchpad/ops",
-    "ops-malformed": "/private/tmp/claude-501/-Users-<USER>-workspaces-personal-readb/e173eadf-55ba-4fb6-a563-bea339b9daef/scratchpad/ops-malformed",
-    "ops-tidy": "/private/tmp/claude-501/-Users-<USER>-workspaces-personal-readb/e173eadf-55ba-4fb6-a563-bea339b9daef/scratchpad/ops-tidy",
-    "backlog": "/private/tmp/claude-501/-Users-<USER>-workspaces-personal-readb/e173eadf-55ba-4fb6-a563-bea339b9daef/scratchpad/backlog"
+    "ops": "/tmp/kbbench-v2/ops",
+    "ops-malformed": "/tmp/kbbench-v2/ops-malformed",
+    "ops-tidy": "/tmp/kbbench-v2/ops-tidy",
+    "backlog": "/tmp/kbbench-v2/backlog"
   },
   "corpus_map": {},
   "corpus_generation": {
@@ -131,11 +131,11 @@
     "b8": "readb"
   },
   "arm_paths": {
-    "baseline": "/private/tmp/claude-501/-Users-<USER>-workspaces-personal-readb/e173eadf-55ba-4fb6-a563-bea339b9daef/scratchpad/wr/.tools-shim:/usr/bin:/bin:/usr/sbin:/sbin",
-    "shell-coached": "/private/tmp/claude-501/-Users-<USER>-workspaces-personal-readb/e173eadf-55ba-4fb6-a563-bea339b9daef/scratchpad/wr/.tools-shim:/usr/bin:/bin:/usr/sbin:/sbin",
-    "readb-bare": "/private/tmp/claude-501/-Users-<USER>-workspaces-personal-readb/e173eadf-55ba-4fb6-a563-bea339b9daef/scratchpad/benchvenv/bin:/private/tmp/claude-501/-Users-<USER>-workspaces-personal-readb/e173eadf-55ba-4fb6-a563-bea339b9daef/scratchpad/wr/.tools-shim:/usr/bin:/bin:/usr/sbin:/sbin",
-    "readb-nudged": "/private/tmp/claude-501/-Users-<USER>-workspaces-personal-readb/e173eadf-55ba-4fb6-a563-bea339b9daef/scratchpad/benchvenv/bin:/private/tmp/claude-501/-Users-<USER>-workspaces-personal-readb/e173eadf-55ba-4fb6-a563-bea339b9daef/scratchpad/wr/.tools-shim:/usr/bin:/bin:/usr/sbin:/sbin",
-    "readb-skill": "/private/tmp/claude-501/-Users-<USER>-workspaces-personal-readb/e173eadf-55ba-4fb6-a563-bea339b9daef/scratchpad/benchvenv/bin:/private/tmp/claude-501/-Users-<USER>-workspaces-personal-readb/e173eadf-55ba-4fb6-a563-bea339b9daef/scratchpad/wr/.uv-shim:/private/tmp/claude-501/-Users-<USER>-workspaces-personal-readb/e173eadf-55ba-4fb6-a563-bea339b9daef/scratchpad/wr/.tools-shim:/usr/bin:/bin:/usr/sbin:/sbin"
+    "baseline": "/tmp/kbbench-v2/wr/.tools-shim:/usr/bin:/bin:/usr/sbin:/sbin",
+    "shell-coached": "/tmp/kbbench-v2/wr/.tools-shim:/usr/bin:/bin:/usr/sbin:/sbin",
+    "readb-bare": "/tmp/kbbench-v2/benchvenv/bin:/tmp/kbbench-v2/wr/.tools-shim:/usr/bin:/bin:/usr/sbin:/sbin",
+    "readb-nudged": "/tmp/kbbench-v2/benchvenv/bin:/tmp/kbbench-v2/wr/.tools-shim:/usr/bin:/bin:/usr/sbin:/sbin",
+    "readb-skill": "/tmp/kbbench-v2/benchvenv/bin:/tmp/kbbench-v2/wr/.uv-shim:/tmp/kbbench-v2/wr/.tools-shim:/usr/bin:/bin:/usr/sbin:/sbin"
   },
   "floor_mode": false
 }

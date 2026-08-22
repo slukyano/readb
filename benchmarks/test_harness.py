@@ -767,3 +767,12 @@ def test_an_endpoint_reports_the_ratio_and_a_p_value():
     assert result["questions"] == 8
     assert result["effect"] == "0.60x"
     assert result["test"]["p"] == pytest.approx(2 / 2**8)
+
+
+def test_a_workroot_named_after_the_tool_is_refused(tmp_path):
+    """The agent's cwd reaches its system prompt, so the path itself can contaminate an arm."""
+    from run_benchmark import assert_workroot_is_neutral
+
+    assert_workroot_is_neutral(tmp_path / "kbbench")
+    with pytest.raises(SystemExit, match="contains the tool's name"):
+        assert_workroot_is_neutral(tmp_path / "personal-readb" / "scratch")
