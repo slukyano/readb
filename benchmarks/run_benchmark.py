@@ -57,38 +57,35 @@ PRICES = {
     "cache_write_1h": 6.00,
 }
 
-PREAMBLE_BASELINE = (
-    "You are working in a directory that holds a knowledge base. The standard shell "
-    "tools are available to you — you can read files, list directories, and search "
-    "their contents with grep.\n\n"
-)
+PREAMBLE_BASELINE = "You are working in a directory that holds a knowledge base.\n\n"
 
 PREAMBLE_READB = (
-    "You are working in a directory that holds a knowledge base. The standard shell "
-    "tools are available to you — you can read files, list directories, and search "
-    "their contents with grep. So is `readb`, a command that runs read-only SQL over a "
-    'directory of markdown files with YAML frontmatter: `readb query "<sql>" --bundle '
-    "corpus` runs a query, and `readb schema --bundle corpus` lists the tables and "
-    "columns it exposes.\n\n"
+    "You are working in a directory that holds a knowledge base. Also installed is "
+    "`readb`, a command that runs read-only SQL over a directory of markdown files with "
+    'YAML frontmatter: `readb query "<sql>" --bundle corpus` runs a query, and '
+    "`readb schema --bundle corpus` lists the tables and columns it exposes.\n\n"
 )
 
 # The honest competitor to readb is not an uncoached agent — it is a shell pipeline. Without
 # this arm, arm B minus arm A measures "given a worked recipe" against "given none", and
 # would be read as "readb against file tools".
 PREAMBLE_SHELL = (
-    "You are working in a directory that holds a knowledge base. The standard shell "
-    "tools are available to you — you can read files, list directories, and search "
-    "their contents with grep. For example, `grep -l '^tier: 1' corpus/services/*.md` "
-    "lists the files carrying a given frontmatter field, `grep -h '^status:' "
-    "corpus/services/*.md | sort | uniq -c` counts one field's values across a "
-    "directory, and `awk '/^---$/{n++; next} n==1' <file>` prints a single file's "
-    "frontmatter block.\n\n"
+    "You are working in a directory that holds a knowledge base. For example, "
+    "`rg -l '^tier: 1' corpus/services` lists the files carrying a given frontmatter "
+    "field, `rg -N '^status:' corpus/services | sort | uniq -c` counts one field's values "
+    "across a directory, and `yq '.tier' corpus/services/svc-0001.md` reads one field out "
+    "of a file's frontmatter.\n\n"
 )
 
+# Tool availability belongs in the SHARED intro, not in an arm's preamble: every arm has
+# the same tools on PATH, so every arm must be told so in the same words. Otherwise the
+# experiment measures which tools an arm was told about rather than which it had.
 TASK_INTRO = (
     "The directory `corpus/` holds a knowledge base: markdown files with YAML "
     "frontmatter, one concept per file, organised into subdirectories by kind. "
     "`corpus/index.md` is a listing of the knowledge base, not a concept.\n\n"
+    "Alongside the standard shell you have `rg` (ripgrep), `jq`, `yq` (a YAML "
+    "processor), `python3`, `perl` and `sqlite3`.\n\n"
 )
 
 # `--setting-sources ""` strips user, project and local settings — no personal CLAUDE.md,
@@ -110,22 +107,31 @@ class Arm:
     uv_on_path: bool = False
 
 
-# The shipped skill's first runnable example is `uvx readb …`. An arm that has readb but
-# not `uv` cannot execute the thing the skill documents, and measures the failure instead
-# of the skill — which is exactly what the first batch did.
-#
-# Only the skill arm needs it: `readb-bare`'s preamble shows the bare binary and never
-# mentions uvx. And it is granted through a shim directory holding uv and uvx alone —
-# putting the whole of Homebrew's bin on one arm's PATH would hand it rg, jq, gawk and
-# several hundred other tools the arms it is compared against do not have.
-def uv_shim(workroot: Path) -> str:
-    shim = workroot / ".uv-shim"
-    shim.mkdir(parents=True, exist_ok=True)
-    for name in ("uv", "uvx"):
-        source, link = shutil.which(name), shim / name
+# A PATH entry is built by symlinking named binaries into a directory, rather than adding
+# a whole package manager's bin — that would hand one arm several hundred tools the arms it
+# is compared against do not have.
+def shim(workroot: Path, label: str, names: tuple[str, ...]) -> str:
+    path = workroot / f".{label}-shim"
+    path.mkdir(parents=True, exist_ok=True)
+    for name in names:
+        source, link = shutil.which(name), path / name
         if source and not link.exists():
             link.symlink_to(source)
-    return str(shim)
+    return str(path)
+
+
+# Given to EVERY arm, identically. The first battery ran with only `/usr/bin` on PATH, so no
+# arm had ripgrep or a YAML processor and every arm was reduced to grep and awk — which
+# handicapped the file-reading arms specifically, since structured search returns parsed,
+# truncated output instead of piping raw text into the context. readb's competitor should be
+# the best tooling a shell can offer, not the worst.
+SHARED_TOOLS = ("rg", "jq", "yq", "python3", "perl", "sqlite3")
+
+# `uv` is the exception: it goes to the skill arm alone. The shipped skill's leading example
+# is `uvx readb …`, so that arm cannot execute its own documentation without it — but handing
+# `uvx` to a readb-free arm would let it fetch readb, which is the leak the PATH control
+# exists to prevent.
+UV_TOOLS = ("uv", "uvx")
 
 
 ARMS = {
@@ -274,7 +280,7 @@ def run_one(arm: Arm, question, repeat: int, cfg, truth: dict, corpus: Path) -> 
         "PATH": ":".join(
             ([str(cfg.readb_bin.parent)] if arm.readb_on_path else [])
             + ([cfg.uv_shim] if arm.uv_on_path else [])
-            + [BASE_PATH]
+            + [cfg.tools_shim, BASE_PATH]
         ),
     }
     for key in ("ANTHROPIC_API_KEY", "CLAUDE_CODE_OAUTH_TOKEN", "SHELL"):
@@ -439,7 +445,7 @@ def preflight(cfg) -> dict:
         path = ":".join(
             ([str(cfg.readb_bin.parent)] if arm.readb_on_path else [])
             + ([cfg.uv_shim] if arm.uv_on_path else [])
-            + [BASE_PATH]
+            + [cfg.tools_shim, BASE_PATH]
         )
         wanted = ([("readb", ["readb", "--version"])] if arm.readb_on_path else []) + (
             [("uv", ["uvx", "--version"])] if arm.uv_on_path else []
@@ -523,7 +529,8 @@ def main() -> None:
     cfg.transcripts.mkdir(parents=True, exist_ok=True)
     cfg.results.parent.mkdir(parents=True, exist_ok=True)
     cfg.workroot.mkdir(parents=True, exist_ok=True)
-    cfg.uv_shim = uv_shim(cfg.workroot)
+    cfg.tools_shim = shim(cfg.workroot, "tools", SHARED_TOOLS)
+    cfg.uv_shim = shim(cfg.workroot, "uv", UV_TOOLS)
 
     truths = {
         "clean": json.loads(cfg.truth_clean.read_text()),
@@ -566,7 +573,7 @@ def main() -> None:
             name: ":".join(
                 ([str(cfg.readb_bin.parent)] if arm.readb_on_path else [])
                 + ([cfg.uv_shim] if arm.uv_on_path else [])
-                + [BASE_PATH]
+                + [cfg.tools_shim, BASE_PATH]
             )
             for name, arm in ARMS.items()
             if name in cfg.arms.split(",")

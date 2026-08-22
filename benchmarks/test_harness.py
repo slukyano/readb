@@ -259,13 +259,33 @@ def test_median_of_nothing_is_nan_not_a_crash():
     assert analyze.fmt(float("nan"), 2) == "—"
 
 
-def test_uv_shim_grants_uv_and_nothing_else(tmp_path):
-    """The skill arm needs uv; it must not thereby inherit a whole package manager's bin."""
-    from run_benchmark import uv_shim
+def test_shim_grants_exactly_what_it_is_asked_for(tmp_path):
+    """A shim must not become a back door onto a whole package manager's bin."""
+    from run_benchmark import SHARED_TOOLS, UV_TOOLS, shim
 
-    path = pathlib.Path(uv_shim(tmp_path))
-    assert path.parent == tmp_path
-    assert set(p.name for p in path.iterdir()) <= {"uv", "uvx"}
+    uv = pathlib.Path(shim(tmp_path, "uv", UV_TOOLS))
+    assert uv.parent == tmp_path
+    assert {p.name for p in uv.iterdir()} <= set(UV_TOOLS)
+
+    tools = pathlib.Path(shim(tmp_path, "tools", SHARED_TOOLS))
+    assert {p.name for p in tools.iterdir()} <= set(SHARED_TOOLS)
+    # The readb-free arms must never be able to fetch readb through a package manager.
+    assert not (set(SHARED_TOOLS) & set(UV_TOOLS))
+
+
+def test_every_arm_is_told_about_the_tools_every_arm_has(tmp_path):
+    """Availability without awareness would measure what an arm was told, not what it had."""
+    from run_benchmark import ARMS, SHARED_TOOLS, TASK_INTRO
+
+    for tool in ("rg", "jq", "yq"):
+        assert tool in TASK_INTRO, f"{tool} is on every PATH but named to no arm"
+    # ...and no arm's own preamble may name a shared tool, or the arms differ by more
+    # than their treatment.
+    for name, arm in ARMS.items():
+        if name == "shell-coached":
+            continue  # its whole treatment is a worked recipe using them
+        for tool in SHARED_TOOLS:
+            assert tool not in arm.preamble, f"{name} preamble names {tool}"
 
 
 def test_only_the_skill_arm_carries_uv():
