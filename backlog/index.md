@@ -8,7 +8,7 @@ okf_version: "0.1"
 
 # Sprints
 
-* [Sprint 005 — Benchmark v2: realistic workloads and a second model](sprints/sprint-005.md) - Designing.
+* [Sprint 005 — Benchmark v2: realistic workloads and a second model](sprints/sprint-005.md) - Done.
 * [Sprint 004 — Measure the efficiency claim](sprints/sprint-004.md) - Done.
 * [Sprint 003 — Post-0.1.0 adoption: usage skill, prior art, release automation](sprints/sprint-003.md) - Done.
 * [Sprint 002 — Bundle init, packaging & correctness follow-ups](sprints/sprint-002.md) - Done.
@@ -23,11 +23,16 @@ okf_version: "0.1"
 * [Research frontmatter schema checking](tasks/017-frontmatter-schema-checking.md) - opt-in declare/check (`readb check`); load stays permissive.
 * [Research cross-bundle querying](tasks/021-cross-bundle-querying.md) - registry bundles as DuckDB schemas; joins across bundles.
 * [Submit the readb plugin to the community marketplace](tasks/027-plugin-marketplace-submission.md) - discovery only: `gh skill install` already works; the hint protocol needs an official listing.
+* [An unknown table should name the bundle's tables](tasks/032-unknown-table-error.md) - DuckDB's catalog error is passed through verbatim, suggesting a DuckDB internal table.
+* [The shipped skill is invoked on fewer than half the runs where it is available](tasks/033-skill-discovery-rate.md) - discovery, not content; measured by benchmark v2.
 * [Evaluate rewriting readb in Rust](tasks/028-evaluate-rust-rewrite.md) - binary distribution and startup vs. the Python API, YAML semantics, and rebuild cost; sequenced behind the benchmark.
-* [Benchmark v2 — realistic workloads, a harder battery, and a second model](tasks/031-benchmark-v2.md) - task-tracker-shaped corpus, 26 pre-registered questions, five arms, Sonnet and Haiku.
-* [The shipped skill's leading example assumes uv is installed](tasks/030-skill-uvx-assumption.md) - `uvx readb` fails where readb is installed but uv is not; found by the benchmark.
 
 # Done
+
+Sprint 005:
+
+* [Benchmark v2 — realistic workloads, a harder battery, and a second model](archive/031-benchmark-v2.md) - 783 runs, two models, four corpora, 26 pre-registered questions: no endpoint reached significance, and readb matches a coached shell agent while both beat an uncoached one.
+* [The shipped skill's leading example assumes uv is installed](archive/030-skill-uvx-assumption.md) - the skill now leads with the bare binary and names the no-install path in prose.
 
 Sprint 004:
 

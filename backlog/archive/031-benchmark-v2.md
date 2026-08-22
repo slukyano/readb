@@ -2,13 +2,13 @@
 type: Task
 title: Benchmark v2 — realistic workloads, a harder battery, and a second model
 description: Extend the agent-efficiency benchmark to a task-tracker-shaped corpus, 26 questions across pre-registered strata, a routing-nudge arm, and Sonnet plus Haiku.
-status: Designed
+status: Done
 priority: medium
 tags:
 - research
 - benchmarks
 created: 2026-08-22
-timestamp: '2026-08-22T00:00:00Z'
+timestamp: '2026-08-22T08:00:00Z'
 ---
 
 [`024-measure-agent-efficiency`](../archive/024-measure-agent-efficiency.md) (sprint-004) measured

@@ -25,6 +25,7 @@ import hashlib
 import json
 import os
 import platform
+import re
 import shutil
 import subprocess
 import sys
@@ -47,15 +48,49 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 BASE_PATH = "/usr/bin:/bin:/usr/sbin:/sbin"
 CLAUDE_BIN = shutil.which("claude") or "claude"
 
-# USD per million tokens. Committed with the results so the published cost can be
-# recomputed in six months, when the live price list will have moved on.
+# USD per million tokens, per model. Committed with the results so the published cost can
+# be recomputed in six months, when the live price list will have moved on.
+#
+# Two notes on the basis, both of which the write-up must carry:
+#
+# - v1 priced Sonnet at $3/$15. That was the announced post-introductory rate; the
+#   introductory $2/$10 has since become the standard price, so v2's absolute dollar
+#   figures are NOT comparable to v1's. Every published ratio is a contrast between two
+#   arms on the same model, where a uniform scale cancels, so no ratio changes.
+# - Cache rates are the published multipliers on each model's base input rate: 1.25x for a
+#   5-minute write, 2x for a 1-hour write, 0.1x for a read.
 PRICES = {
-    "input": 3.00,
-    "output": 15.00,
-    "cache_read": 0.30,
-    "cache_write_5m": 3.75,
-    "cache_write_1h": 6.00,
+    "claude-sonnet-5": {
+        "input": 2.00,
+        "output": 10.00,
+        "cache_read": 0.20,
+        "cache_write_5m": 2.50,
+        "cache_write_1h": 4.00,
+    },
+    "claude-haiku-4-5": {
+        "input": 1.00,
+        "output": 5.00,
+        "cache_read": 0.10,
+        "cache_write_5m": 1.25,
+        "cache_write_1h": 2.00,
+    },
 }
+
+
+def prices_for(model: str) -> dict:
+    """The price table for a model, or a loud failure.
+
+    Falling back to another model's prices would publish a cost figure that is wrong by a
+    factor of two or three with nothing in the output to show it.
+    """
+    try:
+        return PRICES[model]
+    except KeyError:
+        raise SystemExit(
+            f"no price table for model {model!r} — add one to PRICES before running it, "
+            f"since a benchmark that cannot price a run cannot report its cost"
+        ) from None
+
 
 PREAMBLE_BASELINE = "You are working in a directory that holds a knowledge base.\n\n"
 
@@ -69,37 +104,121 @@ PREAMBLE_READB = (
 # The honest competitor to readb is not an uncoached agent — it is a shell pipeline. Without
 # this arm, arm B minus arm A measures "given a worked recipe" against "given none", and
 # would be read as "readb against file tools".
+#
 # The coached recipe is data, not prose, so the exact commands an arm is shown can be
 # executed against a real corpus before any measured run. Coaching a command the arm cannot
 # run is what retracted 36 runs once already — and `yq '.tier' <file>` is such a command: it
 # prints the value and then fails, because it reads the markdown body as a second YAML
 # document. `--front-matter=extract` is the form that works.
-SHELL_RECIPE = (
-    ("lists the files carrying a given frontmatter field", "rg -l '^tier: 1' corpus/services"),
+#
+# v2's corpora are written in mixed styles, so a naive `rg '^status: ga'` silently misses
+# every file that quoted the value. The coached patterns therefore tolerate quoting and
+# spacing, and the preflight checks one of them against ground truth rather than merely
+# checking that it exits zero: a recipe that runs and under-counts is a straw man, and a
+# straw man in the competitor arm is worth more to readb's numbers than any real effect.
+_COUNT_VALUES = '| sed -E "s/.*:[[:space:]]*//; s/^[\'\\"]|[\'\\"]$//g" | sort | uniq -c'
+
+# v1's recipe taught three scalar, single-directory operations. E1's whole scope is
+# join-shaped questions, and three backlog questions turn on list-valued fields, so a
+# recipe that cannot relate two kinds of document or read a list is not the honest
+# competitor it claims to be — it is a straw man, and a straw man in the competitor arm is
+# worth more to readb's published ratio than any real effect could be. Commands 4 and 5
+# close that: one emits a joinable row per file, the other rolls up a list field.
+#
+# Both are written as per-file loops on purpose: `yq --front-matter=extract` over a glob
+# fails part-way through these corpora, because it reads each markdown body as further YAML
+# documents. The preflight runs every command shown and would catch it.
+OPS_RECIPE = (
+    (
+        "lists the files carrying a given frontmatter field, quoted or not",
+        'rg -l "^tier:[[:space:]]*1" corpus/services',
+    ),
     (
         "counts one field's values across a directory",
-        "rg -N '^status:' corpus/services | sort | uniq -c",
+        'rg -N "^status:" corpus/services ' + _COUNT_VALUES,
     ),
     (
         "reads one field out of a single file's frontmatter",
         "yq --front-matter=extract '.tier' corpus/services/{service}.md",
     ),
+    (
+        "emits one tab-separated row per concept, which `join`, `awk` or `sort` can relate "
+        "to rows from another directory",
+        'for f in corpus/services/*.md; do printf "%s\\t" "$(basename "$f" .md)"; '
+        "yq --front-matter=extract -o=tsv '[.team, .tier, .status]' \"$f\"; done",
+    ),
+    (
+        "rolls up a list-valued field across a directory",
+        "for f in corpus/incidents/*.md; do yq --front-matter=extract '.services[]' "
+        '"$f"; done | sort | uniq -c',
+    ),
 )
+
+BACKLOG_RECIPE = (
+    (
+        "lists the files carrying a given frontmatter field, quoted or not",
+        'rg -l "^status:[[:space:]]*[\'\\"]?Draft" corpus/tasks',
+    ),
+    (
+        "counts one field's values across a directory",
+        'rg -N "^priority:" corpus/tasks corpus/archive ' + _COUNT_VALUES,
+    ),
+    (
+        "reads one field out of a single file's frontmatter",
+        "yq --front-matter=extract '.status' corpus/tasks/{task}.md",
+    ),
+    (
+        "emits one tab-separated row per concept, which `join`, `awk` or `sort` can relate "
+        "to rows from another directory",
+        'for f in corpus/tasks/*.md corpus/archive/*.md; do printf "%s\\t" '
+        '"$(basename "$f" .md)"; yq --front-matter=extract -o=tsv \'[.status, .priority]\' '
+        '"$f"; done',
+    ),
+    (
+        "rolls up a list-valued field across a directory",
+        "for f in corpus/tasks/*.md corpus/archive/*.md; do yq --front-matter=extract "
+        "'.tags[]' \"$f\"; done | sort | uniq -c",
+    ),
+)
+
+# One recipe per corpus *family*: coaching an arm with paths that do not exist in the
+# bundle in front of it is the same defect as coaching a command it cannot run.
+RECIPES = {
+    "ops": OPS_RECIPE,
+    "ops-malformed": OPS_RECIPE,
+    "ops-tidy": OPS_RECIPE,
+    "backlog": BACKLOG_RECIPE,
+}
 
 
 def recipe_placeholders(truth: dict) -> dict:
-    """Real names from the corpus, so a coached command is runnable as shown."""
-    return {"service": truth["q3"]["answer"][0]}
+    """Real names from the corpus, so a coached command is runnable as shown.
+
+    Drawn from `recipe_example`, which the generator picks from outside every answer set
+    and asserts. Taking the name from an answer — as v1 did — hands the coached arm part of
+    an answer in its own preamble.
+    """
+    example = truth.get("recipe_example")
+    if not example:
+        raise SystemExit(
+            "this corpus's truth has no `recipe_example`; regenerate it, since the coached "
+            "preamble would otherwise have to quote a name out of an answer set"
+        )
+    return dict(example)
 
 
 def shell_preamble(recipe: tuple[tuple[str, str], ...], placeholders: dict) -> str:
-    examples = ", ".join(
-        f"`{command.format(**placeholders)}` {gloss}" for gloss, command in recipe[:-1]
+    """The coached arm's treatment, rendered from the executable command list.
+
+    A list rather than a sentence: five commands strung together with commas is a paragraph
+    an agent has to parse before it can use any of them, and the coaching is the treatment.
+    """
+    lines = "\n".join(
+        f"- `{command.format(**placeholders)}`\n  {gloss}" for gloss, command in recipe
     )
-    gloss, command = recipe[-1]
     return (
-        "You are working in a directory that holds a knowledge base. For example, "
-        f"{examples}, and `{command.format(**placeholders)}` {gloss}.\n\n"
+        "You are working in a directory that holds a knowledge base. Worked examples "
+        f"against it:\n\n{lines}\n\n"
     )
 
 
@@ -153,17 +272,40 @@ def shim(workroot: Path, label: str, names: tuple[str, ...]) -> str:
 # the best tooling a shell can offer, not the worst.
 SHARED_TOOLS = ("rg", "jq", "yq", "python3", "perl", "sqlite3")
 
-# `uv` is the exception: it goes to the skill arm alone. The shipped skill's leading example
-# is `uvx readb …`, so that arm cannot execute its own documentation without it — but handing
-# `uvx` to a readb-free arm would let it fetch readb, which is the leak the PATH control
-# exists to prevent.
+# `uv` is the exception: it goes to the skill arm alone, and now as insurance rather than as a
+# requirement. The skill's leading example used to be `uvx readb …`, so that arm could not
+# execute its own documentation without it; the example now invokes the bare binary, so `uv` is
+# unnecessary — but leaving it removes a way for the arm to fail on something other than what is
+# being measured, and the arm already has readb, so `uv` grants it nothing. Handing `uvx` to a
+# readb-free arm would let it fetch readb, which is the leak the PATH control exists to prevent.
 UV_TOOLS = ("uv", "uvx")
 
+
+# --- the nudge -----------------------------------------------------------------
+# FROZEN. Written once, before the first measured run, and not edited afterwards.
+#
+# Routing guidance is a fifth ARM rather than an edit to `readb-bare`, for two reasons.
+# Folding it into the base arm would silently redefine what v1 measured, so the two
+# batteries would stop being comparable. And editing prompt text until the agent picks the
+# tool the experimenter prefers is tuning the benchmark until it flatters the tool — the
+# un-nudged arm is always run and always reported, and the nudge's worth is the contrast
+# between them, declared in advance.
+#
+# RETRACTION RULE: if this sentence changes after any measured run, every `readb-nudged`
+# record produced before the change is flagged `retracted` and re-measured. If the nudge
+# proves valuable, that is an argument for changing the shipped skill — a separate task,
+# measured separately, never a change to this experiment.
+NUDGE = (
+    "When a question is about many documents at once — counting them, filtering them, "
+    "grouping them, or relating one kind of document to another — a single `readb query` "
+    "is usually cheaper than reading or searching the files.\n\n"
+)
 
 ARMS = {
     "baseline": Arm("baseline", PREAMBLE_BASELINE, False, ISOLATION, False),
     "shell-coached": Arm("shell-coached", "", False, ISOLATION, False),
     "readb-bare": Arm("readb-bare", PREAMBLE_READB, True, ISOLATION, False),
+    "readb-nudged": Arm("readb-nudged", PREAMBLE_READB + NUDGE, True, ISOLATION, False),
     "readb-skill": Arm(
         "readb-skill",
         PREAMBLE_BASELINE,
@@ -201,10 +343,16 @@ def scrub(text: str) -> str:
 # --- transcript analysis ------------------------------------------------------
 
 
-def parse_stream(lines: list[str]) -> tuple[dict, list[dict]]:
-    """Split a stream-json transcript into its final result and its tool calls."""
+def parse_stream(lines: list[str]) -> tuple[dict, list[dict], list[dict]]:
+    """Split a stream-json transcript into its final result, its tool calls, and their results.
+
+    v1 read only the calls. The results are where the retry rate lives — a failed command
+    and its recovery are invisible in the call list, which is why v1 could report a clean
+    sheet on a batch that was in fact paying for exit-127 recoveries.
+    """
     result: dict = {}
     tools: list[dict] = []
+    results: list[dict] = []
     for line in lines:
         line = line.strip()
         if not line:
@@ -217,13 +365,114 @@ def parse_stream(lines: list[str]) -> tuple[dict, list[dict]]:
             result = event
         message = event.get("message") or {}
         for block in message.get("content", []) or []:
-            if isinstance(block, dict) and block.get("type") == "tool_use":
-                tools.append({"name": block.get("name"), "input": block.get("input") or {}})
-    return result, tools
+            if not isinstance(block, dict):
+                continue
+            if block.get("type") == "tool_use":
+                tools.append(
+                    {
+                        "id": block.get("id"),
+                        "name": block.get("name"),
+                        "input": block.get("input") or {},
+                    }
+                )
+            elif block.get("type") == "tool_result":
+                results.append(
+                    {
+                        "id": block.get("tool_use_id"),
+                        "is_error": bool(block.get("is_error")),
+                        "text": _result_text(block.get("content")),
+                    }
+                )
+    return result, tools, results
 
 
-def integrity(arm: Arm, tools: list[dict], result: dict, transcript: str) -> dict:
+def _result_text(content) -> str:
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        return " ".join(str(part.get("text", "")) for part in content if isinstance(part, dict))
+    return ""
+
+
+# Binaries that count as *searching* the corpus rather than reading one file of it. Fixed
+# before the runs: tool choice is reported as a result, never used to adjust a prompt.
+SEARCH_BINARIES = (
+    "rg",
+    "grep",
+    "awk",
+    "sed",
+    "yq",
+    "jq",
+    "python3",
+    "perl",
+    "sqlite3",
+    "find",
+    "ls",
+    "wc",
+    "head",
+    "tail",
+    "cat",
+)
+_SEARCH_RE = re.compile(r"\b(" + "|".join(SEARCH_BINARIES) + r")\b")
+_MD_PATH = re.compile(r"\S+\.md\b")
+_GLOB = re.compile(r"[*?\[]")
+
+
+def _bash_kind(command: str) -> str | None:
+    """What one shell command did to the corpus: read one document, or search many.
+
+    The target decides, not the binary. `sed -n '1,20p' corpus/x.md` reads one file even
+    though `sed` is a search tool, and `cat corpus/*.md | grep foo` searches many even
+    though `cat` is not. Classifying by binary alone made `read` unreachable from Bash —
+    and three questions declare `read` as their expert tool, so no arm could ever match
+    them.
+    """
+    if "readb" in command:
+        return "readb"
+    paths = _MD_PATH.findall(command)
+    if len(paths) == 1 and not _GLOB.search(command) and "|" not in command:
+        return "read"
+    if _SEARCH_RE.search(command):
+        return "shell"
+    return "read" if paths else None
+
+
+def classify_tool_choice(tools: list[dict]) -> str:
+    """One label for what the agent actually reached for.
+
+    `readb` wins outright — an agent that ran it chose it, however else it also poked
+    around. Otherwise the label goes to whichever of searching and reading it did more of,
+    with ties going to searching, since a search is the cheaper habit and calling a tie a
+    read would flatter the file-reading arms.
+    """
+    if not tools:
+        return "none"
+    kinds = [_bash_kind(str(t["input"].get("command", ""))) for t in tools if t["name"] == "Bash"]
+    if "readb" in kinds:
+        return "readb"
+    search = kinds.count("shell") + sum(1 for t in tools if t["name"] in ("Grep", "Glob"))
+    reads = kinds.count("read") + sum(1 for t in tools if t["name"] == "Read")
+    if not search and not reads:
+        return "other"
+    return "shell" if search >= reads else "read"
+
+
+# readb prints one of these per file it skips. A run that saw one and still answered as if
+# nothing had been skipped is a different finding from a run that never saw the warning:
+# the first says the warning did not work, the second says the hazard is silent.
+SKIP_WARNING_MARKERS = ("malformed YAML frontmatter", "skipping ")
+
+
+def integrity(
+    arm: Arm,
+    tools: list[dict],
+    result: dict,
+    transcript: str,
+    tool_results: list[dict] | None = None,
+) -> dict:
     """Facts about a run that decide whether its numbers may be used at all."""
+    tool_results = tool_results or []
+    by_id = {t.get("id"): t for t in tools}
     commands = " ".join(str(t["input"].get("command", "")) for t in tools if t["name"] == "Bash")
     readb_used = "readb" in commands
     skill_used = any(t["name"] in ("Skill", "SlashCommand") for t in tools)
@@ -231,7 +480,23 @@ def integrity(arm: Arm, tools: list[dict], result: dict, transcript: str) -> dic
         t["name"] in ("Skill", "SlashCommand") and "readb" in json.dumps(t["input"]).lower()
         for t in tools
     )
+
+    def command_of(entry: dict) -> str:
+        call = by_id.get(entry.get("id")) or {}
+        return str((call.get("input") or {}).get("command", ""))
+
+    failed = [entry for entry in tool_results if entry["is_error"]]
     return {
+        # The retry rate the model comparison needs. A failed command and the turn spent
+        # recovering from it are what separate a weaker model from a stronger one here.
+        "failed_tool_results": len(failed),
+        "failed_readb_calls": sum(1 for entry in failed if "readb" in command_of(entry)),
+        # Trap diagnostics: an un-warned wrong answer and a warning that went unread are
+        # different failures, and only the transcript can tell them apart.
+        "saw_skip_warning": any(
+            marker in entry["text"] for entry in tool_results for marker in SKIP_WARNING_MARKERS
+        ),
+        "tool_choice": classify_tool_choice(tools),
         "tool_calls": len(tools),
         "tool_names": sorted({t["name"] for t in tools if t.get("name")}),
         "readb_invocations": commands.count("readb"),
@@ -252,7 +517,7 @@ def integrity(arm: Arm, tools: list[dict], result: dict, transcript: str) -> dic
     }
 
 
-def costs(usage: dict) -> dict:
+def costs(usage: dict, prices: dict) -> dict:
     """Two costs: as billed, and cache-invariant.
 
     As-billed depends on the machine's cache state and on prices that move. The
@@ -271,13 +536,13 @@ def costs(usage: dict) -> dict:
         w5m = usage.get("cache_creation_input_tokens") or 0
 
     billed = (
-        inp * PRICES["input"]
-        + out * PRICES["output"]
-        + read * PRICES["cache_read"]
-        + w1h * PRICES["cache_write_1h"]
-        + w5m * PRICES["cache_write_5m"]
+        inp * prices["input"]
+        + out * prices["output"]
+        + read * prices["cache_read"]
+        + w1h * prices["cache_write_1h"]
+        + w5m * prices["cache_write_5m"]
     ) / 1e6
-    neutral = ((inp + read + w1h + w5m) * PRICES["input"] + out * PRICES["output"]) / 1e6
+    neutral = ((inp + read + w1h + w5m) * prices["input"] + out * prices["output"]) / 1e6
     return {
         "cost_billed_usd": round(billed, 6),
         "cost_cache_neutral_usd": round(neutral, 6),
@@ -291,7 +556,9 @@ def costs(usage: dict) -> dict:
 # --- one run ------------------------------------------------------------------
 
 
-def run_one(arm: Arm, question, repeat: int, cfg, truth: dict, corpus: Path, model: str) -> dict:
+def run_one(
+    arm: Arm, question, repeat: int, cfg, truth: dict, corpus: Path, model: str, corpus_name: str
+) -> dict:
     # The working directory name must not contain the tool's name: the cwd is echoed
     # into the system prompt, and "readb" sitting there would prime the baseline arm.
     workdir = cfg.workroot / f"kb-{uuid.uuid4().hex[:12]}"
@@ -315,7 +582,7 @@ def run_one(arm: Arm, question, repeat: int, cfg, truth: dict, corpus: Path, mod
 
     # An empty preamble means the arm's treatment is the worked recipe, rendered from the
     # executable command list against this corpus's own names.
-    preamble = arm.preamble or shell_preamble(SHELL_RECIPE, recipe_placeholders(truth))
+    preamble = arm.preamble or shell_preamble(RECIPES[corpus_name], recipe_placeholders(truth))
     prompt = FLOOR_PROMPT if cfg.floor else preamble + TASK_INTRO + render(question, truth)
     cmd = [
         CLAUDE_BIN,
@@ -362,7 +629,7 @@ def run_one(arm: Arm, question, repeat: int, cfg, truth: dict, corpus: Path, mod
     elapsed = time.time() - started
 
     lines = stdout.splitlines()
-    result, tools = parse_stream(lines)
+    result, tools, tool_results = parse_stream(lines)
 
     # Namespaced by batch: a re-measurement of one arm must not overwrite the evidence for
     # the batch it replaces. The first arm-C batch lost its transcripts this way.
@@ -385,11 +652,11 @@ def run_one(arm: Arm, question, repeat: int, cfg, truth: dict, corpus: Path, mod
     raw_answer = extract_answer(result_text)
     correct, partial, parsed = score(question, raw_answer, truth)
     usage = result.get("usage", {}) or {}
-    checks = integrity(arm, tools, result, stdout)
+    checks = integrity(arm, tools, result, stdout, tool_results)
 
-    # An answer produced without a single tool call was not derived from the corpus.
-    if not checks["supported"]:
-        correct, partial = False, 0.0
+    # v1 forced such a run to score zero. The pre-registration drops that check — zero
+    # failures were structurally guaranteed, so it measured nothing — and `supported` is
+    # kept as a recorded diagnostic, reported in the integrity table, not as a scoring rule.
 
     record = {
         "arm": arm.name,
@@ -397,7 +664,10 @@ def run_one(arm: Arm, question, repeat: int, cfg, truth: dict, corpus: Path, mod
         "shape": question.shape,
         "favours": question.favours,
         "repeat": repeat,
-        "corpus": question.corpus,
+        # The corpus actually used, and the one the question declares. They differ only in
+        # the messy/tidy sweep, where the same question runs against both renderings.
+        "corpus": corpus_name,
+        "corpus_declared": question.corpus,
         "model": model,
         # modelUsage also carries the runtime's small side-calls on another model; the
         # dated id worth recording is the one that did the work.
@@ -409,6 +679,13 @@ def run_one(arm: Arm, question, repeat: int, cfg, truth: dict, corpus: Path, mod
         "effort": cfg.effort,
         "started_utc": datetime.fromtimestamp(started, UTC).isoformat(),
         "correct": correct,
+        # Format compliance, reported apart from accuracy: a model that found the right
+        # answer and wrote it in the wrong shape has a formatting problem, not a knowledge
+        # one, and folding the two together would quietly deflate a weaker model's score.
+        "answer_parsed": raw_answer is not None,
+        "expert_tool": question.expert_tool,
+        "stratum": question.stratum,
+        "tool_match": None,  # filled below, once the transcript has been classified
         "partial_credit": round(partial, 4),
         "parsed_answer": parsed,
         "raw_answer": raw_answer,
@@ -417,7 +694,7 @@ def run_one(arm: Arm, question, repeat: int, cfg, truth: dict, corpus: Path, mod
         "api_duration_ms": result.get("duration_api_ms"),
         "num_turns": result.get("num_turns"),
         "cost_reported_usd": result.get("total_cost_usd"),
-        **costs(usage),
+        **costs(usage, prices_for(model)),
         "usage_raw": usage,
         "is_error": result.get("is_error"),
         "api_error_status": result.get("api_error_status"),
@@ -428,11 +705,30 @@ def run_one(arm: Arm, question, repeat: int, cfg, truth: dict, corpus: Path, mod
         "result_text": result_text[-3000:],
         **checks,
     }
+    record["tool_match"] = record["tool_choice"] == question.expert_tool
     shutil.rmtree(workdir, ignore_errors=True)
     return record
 
 
-def preflight(cfg) -> dict:
+def assert_workroot_is_neutral(workroot: Path) -> None:
+    """The working root must not contain the tool's name, anywhere in its absolute path.
+
+    The agent's cwd is echoed into its system prompt, so a single `readb` in the path primes
+    every readb-free arm with the word it is supposed not to know — and the leak check then
+    flags every one of their runs. This was a comment in this file for a whole version, and
+    a comment does not stop a run: a session scratchpad named after the repository ate the
+    first twelve runs of the v2 matrix before it was caught.
+    """
+    resolved = str(workroot.resolve()).lower()
+    if "readb" in resolved:
+        raise SystemExit(
+            f"refusing to run: the working root {resolved} contains the tool's name, which "
+            f"is echoed into every arm's system prompt through its cwd. Pass a --workroot "
+            f"outside any path carrying it (the default, /tmp/kbbench, is one)."
+        )
+
+
+def preflight(cfg, corpora: dict, truths: dict) -> dict:
     """Verify the arms are what they claim before spending money on a matrix.
 
     Arm C exists to measure a skill; if the plugin does not load, every number it
@@ -440,7 +736,11 @@ def preflight(cfg) -> dict:
     """
     probe = "List the names of every skill available to you, comma separated. If none, reply NONE."
     seen = {}
-    for name in ("baseline", "readb-skill"):
+    wanted_arms = cfg.arms.split(",")
+    # Only for a batch that actually runs the skill arm: the Haiku and sweep blocks exclude
+    # it, and probing it there spends two API calls and can abort on an arm never used.
+    skill_pair = ("baseline", "readb-skill") if "readb-skill" in wanted_arms else ()
+    for name in skill_pair:
         arm = ARMS[name]
         out = subprocess.run(
             [
@@ -461,10 +761,11 @@ def preflight(cfg) -> dict:
         )
         text = json.loads(out.stdout).get("result", "") if out.stdout.strip() else ""
         seen[name] = "readb" in text.lower()
-    if seen.get("baseline"):
-        raise SystemExit("preflight failed: the baseline arm can see a readb skill")
-    if not seen.get("readb-skill"):
-        raise SystemExit("preflight failed: arm readb-skill did not load the readb skill")
+    if skill_pair:
+        if seen.get("baseline"):
+            raise SystemExit("preflight failed: the baseline arm can see a readb skill")
+        if not seen.get("readb-skill"):
+            raise SystemExit("preflight failed: arm readb-skill did not load the readb skill")
 
     # Skill visibility was never the thing that broke. What broke was an arm that could not
     # run the command its own documentation leads with, so probe each arm's constructed PATH
@@ -481,16 +782,130 @@ def preflight(cfg) -> dict:
             [("uv", ["uvx", "--version"])] if arm.uv_on_path else []
         )
         for binary, argv in wanted:
-            probe = subprocess.run(
+            check = subprocess.run(
                 argv, env={"PATH": path, "HOME": os.environ["HOME"]}, capture_output=True
             )
-            if probe.returncode != 0:
+            if check.returncode != 0:
                 raise SystemExit(
                     f"preflight failed: arm {name} cannot execute {binary} on its PATH "
                     f"({path}) — this is the defect that retracted 36 runs once already"
                 )
         seen[f"{name}:binaries"] = [b for b, _ in wanted] or ["none required"]
+
+    if "shell-coached" in cfg.arms.split(","):
+        seen["recipes"] = recipe_preflight(cfg, corpora, truths)
     return seen
+
+
+def assert_shared_tools_exist(tools_shim: str) -> None:
+    """Every tool `TASK_INTRO` promises must be on the shim it promises it from.
+
+    `shim` skips a binary the host does not have, silently. Every arm would then be told,
+    in identical words, that it has a tool it does not — and the shell arms, the only ones
+    that would reach for it, would burn turns on exit 127. That is precisely the failure
+    that retracted 36 runs of v1.
+    """
+    missing = [name for name in SHARED_TOOLS if not (Path(tools_shim) / name).exists()]
+    if missing:
+        raise SystemExit(
+            f"refusing to run: {', '.join(missing)} are named to every arm by TASK_INTRO "
+            f"but are not on this machine, so every arm would be promised a tool it lacks"
+        )
+
+
+def recipe_preflight(cfg, corpora: dict, truths: dict) -> dict:
+    """Run every coached command against the corpus the arm will actually see.
+
+    Two failures are checked, not one. A command that cannot run is the defect that
+    retracted 36 runs. A command that runs and quietly returns *less* than the truth is
+    worse: it makes the competitor arm a straw man, and a straw man in the competitor arm
+    is worth more to readb's published ratio than any real effect could be.
+    """
+    env = {"PATH": f"{cfg.tools_shim}:{BASE_PATH}", "HOME": os.environ["HOME"]}
+    checked = {}
+    for name, directory in corpora.items():
+        recipe = RECIPES.get(name)
+        if recipe is None:
+            raise SystemExit(f"preflight failed: no coached recipe for corpus {name!r}")
+        # The arm sees the bundle mounted at `corpus/`, so the commands are run from a
+        # parent directory holding exactly that name.
+        stage = Path(cfg.workroot) / f".recipe-{name}"
+        shutil.rmtree(stage, ignore_errors=True)
+        stage.mkdir(parents=True)
+        (stage / "corpus").symlink_to(directory.resolve(), target_is_directory=True)
+        placeholders = recipe_placeholders(truths[name])
+        # A corpus seeded with unparseable files makes a YAML-aware command fail on each of
+        # them, and the loop's exit code is its last iteration's. That is an honest property
+        # of the corpus, not a broken recipe — and the errors reaching the agent's stderr
+        # are part of what the hazard questions are about. Output is still required.
+        tolerates_failure = bool((truths[name].get("_meta") or {}).get("malformed"))
+        for _, template in recipe:
+            command = template.format(**placeholders)
+            done = subprocess.run(
+                command, shell=True, cwd=stage, env=env, capture_output=True, text=True
+            )
+            failed = done.returncode != 0 and not tolerates_failure
+            if failed or not done.stdout.strip():
+                raise SystemExit(
+                    f"preflight failed: coached command for {name!r} produced nothing — "
+                    f"{command}\n{done.stderr[:400]}"
+                )
+        notes = []
+        # The listing command is checked against a known count, not merely a zero exit.
+        expected = _recipe_expectation(name, truths[name])
+        if expected is not None:
+            command = recipe[0][1].format(**placeholders)
+            done = subprocess.run(
+                command, shell=True, cwd=stage, env=env, capture_output=True, text=True
+            )
+            found = len([line for line in done.stdout.splitlines() if line.strip()])
+            if found != expected:
+                raise SystemExit(
+                    f"preflight failed: the coached listing for {name!r} finds {found} "
+                    f"files where the ground truth has {expected} — the recipe under-matches "
+                    f"this corpus, which would make the competitor arm a straw man\n{command}"
+                )
+            notes.append(f"listing finds {found}, matches ground truth")
+
+        # And the list-field rollup, where a corpus has a rollup in its truth. A recipe that
+        # silently drops list entries would leave three backlog questions uncoachable.
+        rollup = _rollup_expectation(name, truths[name])
+        if rollup is not None:
+            command = recipe[4][1].format(**placeholders)
+            done = subprocess.run(
+                command, shell=True, cwd=stage, env=env, capture_output=True, text=True
+            )
+            counted = {}
+            for line in done.stdout.splitlines():
+                parts = line.split()
+                if len(parts) == 2 and parts[0].isdigit():
+                    counted[parts[1].strip("\"'")] = int(parts[0])
+            if counted != rollup:
+                raise SystemExit(
+                    f"preflight failed: the coached list rollup for {name!r} disagrees with "
+                    f"the ground truth\n{command}\ngot {counted}\nwant {rollup}"
+                )
+            notes.append(f"rollup of {len(counted)} values matches ground truth")
+
+        checked[name] = "; ".join(notes) or "runs, no ground truth to check against"
+        shutil.rmtree(stage, ignore_errors=True)
+    return checked
+
+
+def _recipe_expectation(name: str, truth: dict) -> int | None:
+    """How many files the first coached command must find, where that is knowable."""
+    if name in ("ops", "ops-tidy") and "q15" in truth:
+        return len(truth["q15"]["answer"])  # every tier-1 service
+    if name == "backlog" and "counts" in truth:
+        return truth["counts"]["Draft"]  # every Draft task lives in `tasks/`
+    return None
+
+
+def _rollup_expectation(name: str, truth: dict) -> dict | None:
+    """What the coached list-field rollup must produce, where the truth records it."""
+    if name == "backlog" and "b8" in truth:
+        return dict(truth["b8"]["answer"])
+    return None
 
 
 def sha256_tree(root: Path) -> str:
@@ -509,11 +924,23 @@ def git_sha() -> str:
     return out.stdout.strip() or "unknown"
 
 
-def done_cells(results: Path) -> set[tuple[str, str, str, int]]:
+def done_cells(results: Path) -> set[tuple[str, str, str, str, int]]:
+    """Cells already recorded, so a batch can be resumed.
+
+    The corpus is part of the key. Without it, the messy/tidy sweep's second half is
+    mistaken for the first and silently skipped — the same (arm, question, model, repeat)
+    against a different rendering is a different cell, which is the whole point of a sweep.
+    """
     if not results.exists():
         return set()
     return {
-        (rec["arm"], rec["question"], rec.get("model", ""), rec["repeat"])
+        (
+            rec["arm"],
+            rec["question"],
+            rec.get("model", ""),
+            rec.get("corpus", ""),
+            rec["repeat"],
+        )
         for rec in (json.loads(line) for line in results.read_text().splitlines() if line.strip())
         if not rec.get("retracted")
     }
@@ -521,10 +948,28 @@ def done_cells(results: Path) -> set[tuple[str, str, str, int]]:
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--corpus-clean", required=True, type=Path)
-    ap.add_argument("--corpus-malformed", required=True, type=Path)
-    ap.add_argument("--truth-clean", required=True, type=Path)
-    ap.add_argument("--truth-malformed", required=True, type=Path)
+    ap.add_argument(
+        "--corpus",
+        action="append",
+        required=True,
+        metavar="NAME=DIR,TRUTH",
+        help=(
+            "register one corpus, repeatable. v1 hard-coded two; v2 has four, and a "
+            "registry keeps adding a fifth from touching the harness."
+        ),
+    )
+    ap.add_argument(
+        "--corpus-map",
+        action="append",
+        default=[],
+        dest="corpus_map_specs",
+        metavar="FROM=TO",
+        help=(
+            "redirect every question declaring corpus FROM to corpus TO. This is how the "
+            "messy/tidy sweep runs the same pre-registered questions against both "
+            "renderings without a second copy of the battery."
+        ),
+    )
     ap.add_argument("--readb-bin", required=True, type=Path)
     ap.add_argument("--results", required=True, type=Path)
     # The working root must sit outside any path containing the tool's name: the agent's
@@ -563,18 +1008,41 @@ def main() -> None:
     cfg.transcripts.mkdir(parents=True, exist_ok=True)
     cfg.results.parent.mkdir(parents=True, exist_ok=True)
     cfg.workroot.mkdir(parents=True, exist_ok=True)
+    # Checked before the shims are built, and outside `preflight`, so `--skip-preflight`
+    # cannot skip past the one failure that silently invalidates a whole batch.
+    assert_workroot_is_neutral(cfg.workroot)
     cfg.tools_shim = shim(cfg.workroot, "tools", SHARED_TOOLS)
     cfg.uv_shim = shim(cfg.workroot, "uv", UV_TOOLS)
+    # Outside preflight, so `--skip-preflight` cannot skip past it.
+    assert_shared_tools_exist(cfg.tools_shim)
 
-    truths = {
-        "clean": json.loads(cfg.truth_clean.read_text()),
-        "malformed": json.loads(cfg.truth_malformed.read_text()),
-    }
-    corpora = {"clean": cfg.corpus_clean, "malformed": cfg.corpus_malformed}
+    corpora, truths = {}, {}
+    for spec in cfg.corpus:
+        name, _, rest = spec.partition("=")
+        directory, _, truth_path = rest.partition(",")
+        if not (name and directory and truth_path):
+            raise SystemExit(f"--corpus wants NAME=DIR,TRUTH, got {spec!r}")
+        corpora[name] = Path(directory)
+        truths[name] = json.loads(Path(truth_path).read_text())
+
+    cfg.corpus_map = {}
+    for spec in cfg.corpus_map_specs:
+        source, _, target = spec.partition("=")
+        if not (source and target):
+            raise SystemExit(f"--corpus-map wants FROM=TO, got {spec!r}")
+        cfg.corpus_map[source] = target
+
+    questions_wanted = [q for q in ALL_QUESTIONS if q.id in cfg.questions.split(",")]
+    for question in questions_wanted:
+        resolved = cfg.corpus_map.get(question.corpus, question.corpus)
+        if resolved not in corpora:
+            raise SystemExit(
+                f"question {question.id} needs corpus {resolved!r}, which no --corpus registered"
+            )
 
     if not cfg.skip_preflight:
         print("preflight: checking arm isolation...", flush=True)
-        print(f"preflight ok: {preflight(cfg)}", flush=True)
+        print(f"preflight ok: {preflight(cfg, corpora, truths)}", flush=True)
 
     manifest = {
         "started_utc": datetime.now(UTC).isoformat(),
@@ -593,14 +1061,21 @@ def main() -> None:
         "effort": cfg.effort,
         "autocompact": cfg.autocompact,
         "per_run_budget_usd": cfg.budget,
-        "prices_usd_per_mtok": PRICES,
+        # Through `prices_for`, so an unpriced model fails here with a readable message
+        # rather than part-way through a matrix that has already cost money.
+        "prices_usd_per_mtok": {m: prices_for(m) for m in cfg.models.split(",")},
         "repeats": cfg.repeats,
         "arms": cfg.arms,
         "questions": cfg.questions,
         "corpus_dirs": {k: str(v) for k, v in corpora.items()},
+        "corpus_map": cfg.corpus_map,
         "corpus_generation": {k: truths[k].get("_meta") for k in truths},
         "corpus_sha256": {k: sha256_tree(v) for k, v in corpora.items()},
         "corpus_concepts": {k: sum(1 for _ in v.rglob("*.md")) - 1 for k, v in corpora.items()},
+        # Frozen before the first measured run; a change after one retracts the arm.
+        "nudge": NUDGE,
+        "strata": {q.id: q.stratum for q in questions_wanted},
+        "expert_tools": {q.id: q.expert_tool for q in questions_wanted},
         # The variable that invalidated the first arm-C batch: the shipped skill's leading
         # example is `uvx readb`, and the arm had no uv.
         "arm_paths": {
@@ -622,7 +1097,7 @@ def main() -> None:
     print(json.dumps(manifest, indent=2), flush=True)
 
     arms = [ARMS[a] for a in cfg.arms.split(",")]
-    questions = [q for q in ALL_QUESTIONS if q.id in cfg.questions.split(",")]
+    questions = questions_wanted
     already = done_cells(cfg.results)
 
     # Interleave: arms round-robin inside each repeat and the question order rotates per
@@ -632,16 +1107,26 @@ def main() -> None:
     for repeat in range(1, cfg.repeats + 1):
         offset = (repeat - 1) % len(questions)
         for question in questions[offset:] + questions[:offset]:
+            corpus_name = cfg.corpus_map.get(question.corpus, question.corpus)
             for model in models:
                 for arm in arms:
-                    if (arm.name, question.id, model, repeat) not in already:
+                    cell = (arm.name, question.id, model, corpus_name, repeat)
+                    if cell not in already:
                         plan.append((arm, question, repeat, model))
 
     print(f"{len(plan)} runs to go ({len(already)} already recorded)", flush=True)
     spent = 0.0
     for i, (arm, question, repeat, model) in enumerate(plan, 1):
+        corpus_name = cfg.corpus_map.get(question.corpus, question.corpus)
         record = run_one(
-            arm, question, repeat, cfg, truths[question.corpus], corpora[question.corpus], model
+            arm,
+            question,
+            repeat,
+            cfg,
+            truths[corpus_name],
+            corpora[corpus_name],
+            model,
+            corpus_name,
         )
         spent += record.get("cost_reported_usd") or 0.0
         with cfg.results.open("a") as fh:

@@ -5,6 +5,14 @@ All notable changes to readb are documented here, following
 
 ## [Unreleased]
 
+### Fixed
+
+- The shipped usage skill's leading example now invokes `readb` directly. It opened with
+  `uvx readb query ...`, so the first runnable line an agent read failed with `command not found`
+  on any machine where readb was installed without `uv` — by pip, pipx, Homebrew, a distribution
+  package, or a plain venv. `uvx`, `uv tool install` and `pip install` are still named, as the
+  recovery for a machine where readb is absent.
+
 ## [0.2.0] - 2026-08-09
 
 ### Fixed

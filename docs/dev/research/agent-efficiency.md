@@ -483,7 +483,17 @@ should have been a shape the model could not mistake for an answer.
     counts against a committed price table rather than quoted from the runtime: ratios within a
     batch are unaffected, but absolute dollars from different batches are not comparable.
 
-15. **`manifest-run.json` was reconstructed after the fact.** The harness of the time wrote one
+15. **The coached arm's preamble named one of Q3's own answers.** *Found on 2026-08-22, during
+    v2's design, and recorded here as a correction to this document.* The `shell-coached`
+    treatment quotes one real concept so its commands are runnable as shown, and the harness took
+    that name from `truth["q3"]["answer"][0]` — a member of the very set Q3 asks the agent to
+    produce. Every `shell-coached` Q3 run therefore read one of its own answers in its preamble.
+    The contamination favours the **competitor**, so this document's readb-versus-coached figures
+    are conservative rather than inflated; but that arm's Q3 numbers are not comparable to the
+    other arms', and no exclusion rule caught it. v2 draws the example from outside every answer
+    set and asserts it.
+
+16. **`manifest-run.json` was reconstructed after the fact.** The harness of the time wrote one
     `manifest.json` that later batches overwrote. The corpora it records are the same directories
     the batch read, hashed afterwards and unmodified since, but it is a reconstruction and says
     so. Later batches carry manifests written during the run.
