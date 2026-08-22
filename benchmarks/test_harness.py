@@ -666,6 +666,7 @@ def _rec(arm, question, cost, **extra):
         "output_tokens": 100,
         "num_turns": 2,
         "cumulative_prompt_tokens": 10_000,
+        "readb_invocations": 0,
     }
     rec.update(extra)
     return rec
@@ -798,3 +799,36 @@ def test_resume_keys_on_the_corpus_so_a_sweep_is_not_half_skipped(tmp_path):
     cells = done_cells(results)
     assert ("readb-bare", "q2", "claude-sonnet-5", "ops", 1) in cells
     assert ("readb-bare", "q2", "claude-sonnet-5", "ops-tidy", 1) not in cells
+
+
+def test_the_floor_is_the_median_of_its_repeats(tmp_path, capsys):
+    """v1's floor was a single run, so taking the last record was harmless. v2's is three."""
+    results = tmp_path / "r.jsonl"
+    floor = tmp_path / "f.jsonl"
+    rows = []
+    for question in ("q1", "q2", "q3", "q4", "q5"):
+        rows.append(_rec("baseline", question, 1.0))
+        rows.append(_rec("readb-bare", question, 0.6))
+    results.write_text("".join(json.dumps(r) + "\n" for r in rows))
+    # A wild last repeat must not become the floor.
+    floor.write_text(
+        "".join(
+            json.dumps(_rec(arm, "q1", cost)) + "\n"
+            for arm in ("baseline", "readb-bare")
+            for cost in (0.1, 0.1, 9.9)
+        )
+    )
+    sys.argv = [
+        "analyze",
+        "--results",
+        str(results),
+        "--floor",
+        str(floor),
+        "--skip-endpoints",
+    ]
+    analyze.main()
+    out = capsys.readouterr().out
+    assert "Overhead-subtracted" in out
+    # median floor 0.1: (0.6-0.1)/(1.0-0.1) = 0.56. The last-record floor of 9.9 would have
+    # made both sides negative and printed a dash instead.
+    assert "0.56x" in out

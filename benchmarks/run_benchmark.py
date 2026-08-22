@@ -940,7 +940,9 @@ def main() -> None:
         "effort": cfg.effort,
         "autocompact": cfg.autocompact,
         "per_run_budget_usd": cfg.budget,
-        "prices_usd_per_mtok": {m: PRICES[m] for m in cfg.models.split(",")},
+        # Through `prices_for`, so an unpriced model fails here with a readable message
+        # rather than part-way through a matrix that has already cost money.
+        "prices_usd_per_mtok": {m: prices_for(m) for m in cfg.models.split(",")},
         "repeats": cfg.repeats,
         "arms": cfg.arms,
         "questions": cfg.questions,

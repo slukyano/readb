@@ -566,7 +566,19 @@ def main() -> None:
         # Subtracting one floor per run treats the fixed overhead as belonging to neither arm.
         # It is a choice, not a correction: a ratio below 1 always moves further from 1 when a
         # constant is removed from both sides. Published beside the raw figure, never instead.
-        floors = {(r.get("model"), r["arm"]): r for r in load(args.floor)}
+        # The median across a floor's repeats, not whichever record happened to be last.
+        # v1's floor was n=1, so a dict comprehension was harmless; v2's is three per cell.
+        floor_rows = defaultdict(list)
+        for row in load(args.floor):
+            if not invalid(row):
+                floor_rows[(row.get("model"), row["arm"])].append(row)
+        floors = {
+            key: {
+                metric: med([r[metric] for r in rows if r.get(metric) is not None])
+                for metric in ("cost_billed_usd", "cumulative_prompt_tokens")
+            }
+            for key, rows in floor_rows.items()
+        }
         print("\n## Overhead-subtracted cost ratios — a choice, not a correction\n")
         print("| model | arm | one floor per run | one prompt prefix per turn |")
         print("|---|---|---|---|")
