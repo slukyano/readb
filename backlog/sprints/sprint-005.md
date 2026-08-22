@@ -5,10 +5,10 @@ description: Build and run the v2 agent-efficiency benchmark — a task-tracker-
 tags:
 - research
 - benchmarks
-timestamp: '2026-08-22T00:00:00Z'
+timestamp: '2026-08-22T12:30:00Z'
 branch: sprint/005
 created: '2026-08-22'
-status: Designing
+status: Implementing
 tasks:
 - 031-benchmark-v2
 - 030-skill-uvx-assumption
@@ -50,27 +50,30 @@ Two design commitments carried into this sprint, both from the review rounds tha
 
 ## Task checklist
 
-- [ ] 031-benchmark-v2 — corpora, battery, harness changes, 783 runs, stratified analysis, and a
-      second `Research` concept
 - [ ] 030-skill-uvx-assumption — the skill's leading example must work where readb is installed
       and `uv` is not
+- [ ] 031-benchmark-v2 — corpora, battery, harness changes, 783 runs, stratified analysis, and a
+      second `Research` concept
+
+`030` is ordered first: it lands before the first measured v2 run, so v2 measures the corrected
+skill rather than the artifact whose `uv` assumption retracted an arm of v1.
 
 ## Implementation checklist
 
-1. [ ] `generate_corpus.py` — messy/tidy styling, the new plants and assertions, the
+1. [ ] `030` — the skill's leading example, plus the two regression tests that keep it bare
+2. [ ] `generate_corpus.py` — messy/tidy styling, the new plants and assertions, the
        malformed-team flip
-2. [ ] The backlog corpus generator — invented product, tasks/archive/sprints, mechanical ground
+3. [ ] The backlog corpus generator — invented product, tasks/archive/sprints, mechanical ground
        truth for the body questions
-3. [ ] `battery.py` — `record` and `mapping_str` kinds, the `none` convention, `expert_tool`,
+4. [ ] `battery.py` — `record` and `mapping_str` kinds, the `none` convention, `expert_tool`,
        q6 reworded, q14–q18 and b1–b8
-4. [ ] `run_benchmark.py` — the `readb-nudged` arm, per-corpus recipes, a corpus registry,
+5. [ ] `run_benchmark.py` — the `readb-nudged` arm, per-corpus recipes, a corpus registry,
        per-model price tables, recipe preflight, tool-choice and failure recording
-5. [ ] `analyze.py` — strata, the three endpoints with exact tests, tool-match matrices, the
+6. [ ] `analyze.py` — strata, the three endpoints with exact tests, tool-match matrices, the
        nudge contrast, per-model sections
-6. [ ] Tests for all of it, and **pre-registration committed before the first measured run**
-7. [ ] Runs — Sonnet and Haiku blocks, floors, messiness sweep
-8. [ ] Analysis, independent review, and `docs/dev/research/agent-efficiency-v2.md`
-9. [ ] `030` — fix the skill's invocation ordering across all three surfaces that carry it
+7. [ ] Tests for all of it, and **pre-registration committed before the first measured run**
+8. [ ] Runs — Sonnet and Haiku blocks, floors, messiness sweep
+9. [ ] Analysis, independent review, and `docs/dev/research/agent-efficiency-v2.md`
 10. [ ] Gates
 
 ## Open questions
@@ -81,3 +84,7 @@ _(none yet)_
 
 - 2026-08-22 — sprint scoped and opened after sprint-004 merged; design for `031` carried in from
   the independent design pass and recorded in the task body.
+- 2026-08-22 — `030` designed on the branch: a three-surface audit found the defect in the skill
+  alone, the fix inverts the leading example and states the recovery in prose, two mechanical
+  tests keep the executable surface bare, and the task is ordered ahead of `031`. Design batch
+  approved; both tasks `Designed`, sprint `Implementing`, design merge to `main`.
