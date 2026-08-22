@@ -79,12 +79,22 @@ a load pass that is itself three times slower than it should be proves nothing.
 - **`036-load-pandas-import-probe` was added to scope mid-design**, found while measuring the load
   pass for `028`. It is the only high-priority task in the backlog and it gates `034`'s measurement.
 
+## Design phase
+
+- [x] `028` — decided on measurement; proposes [ADR 0005](../../docs/dev/adr/0005-stay-on-python.md)
+- [x] `036` — the guard, its stated thread-safety limitation, and a counting regression test
+- [x] `034` — all-or-nothing consent-gated cache; proposes [ADR 0006](../../docs/dev/adr/0006-cache-consent-and-key.md)
+- [x] `033` — the frozen description text and the rule it is held to
+- [x] `032` — the message, raised where the schema is known
+
 ## Open questions
 
 _(none yet)_
 
 ## Session log
 
+* **2026-08-22** — Design phase: all five designs written, ADRs 0005 and 0006 proposed. Load-pass
+  and cache-prototype measurements taken on the branch (a cache hit is 4 ms at every bundle size).
 * **2026-08-22** — `036` added to scope during 028's design measurements (approved in session);
   `037` drafted for the dogfooding gap that hand-editing this file exposed.
 * **2026-08-22** — Scope approved: four tasks, branch `sprint/006`. `034` drafted during the
