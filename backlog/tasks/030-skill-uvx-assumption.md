@@ -2,14 +2,14 @@
 type: Task
 title: The shipped skill's leading example assumes uv is installed
 description: skills/readb/SKILL.md opens with `uvx readb …`, which fails on a machine where readb is installed but uv is not.
-status: Draft
+status: Designed
 priority: medium
 tags:
 - skill
 - docs
 - agents
 created: 2026-08-10
-timestamp: '2026-08-22T12:00:00Z'
+timestamp: '2026-08-22T12:30:00Z'
 ---
 
 Found by the agent-efficiency benchmark (`024`, sprint-004), where it invalidated a whole arm

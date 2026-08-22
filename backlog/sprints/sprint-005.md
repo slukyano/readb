@@ -5,10 +5,10 @@ description: Build and run the v2 agent-efficiency benchmark — a task-tracker-
 tags:
 - research
 - benchmarks
-timestamp: '2026-08-22T12:00:00Z'
+timestamp: '2026-08-22T12:30:00Z'
 branch: sprint/005
 created: '2026-08-22'
-status: Designing
+status: Implementing
 tasks:
 - 031-benchmark-v2
 - 030-skill-uvx-assumption
@@ -87,4 +87,4 @@ _(none yet)_
 - 2026-08-22 — `030` designed on the branch: a three-surface audit found the defect in the skill
   alone, the fix inverts the leading example and states the recovery in prose, two mechanical
   tests keep the executable surface bare, and the task is ordered ahead of `031`. Design batch
-  presented for approval.
+  approved; both tasks `Designed`, sprint `Implementing`, design merge to `main`.
