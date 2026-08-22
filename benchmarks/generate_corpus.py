@@ -6,6 +6,18 @@ Python — never by querying readb, which would make the benchmark's correctness
 circular.
 
     python benchmarks/generate_corpus.py --out /tmp/corpus --concepts 600 --seed 24
+
+**Messiness** (`--messy`, the default for v2) varies how the frontmatter is *written*
+without changing what it means: quoted scalars, inline flow sequences beside block ones,
+shuffled key order, an occasional unknown extra key, a stray double space after a colon.
+v1's corpus was written by one code path in one style, which flattered a shell pipeline —
+`rg '^tier: 1'` finds every match only because every file was rendered identically. Real
+bundles are written by several hands and several tools.
+
+Deliberately excluded from messiness: quoting numbers and dates, and drifting key names.
+Both change what a document *means* — `tier: "1"` is a string and `created: "2024-01-01"`
+is not a date — so ground truth would become an interpretation rather than a fact.
+`--tidy` renders in v1's single style and is the sweep's control.
 """
 
 from __future__ import annotations
@@ -13,6 +25,7 @@ from __future__ import annotations
 import argparse
 import json
 import random
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -79,6 +92,11 @@ SERVICE_QUALIFIERS = [
 
 # The Q7 needle. Generation asserts it occurs in exactly one concept body.
 NEEDLE_PHRASE = "the circuit breaker tripped during a partial region drain"
+
+# Q14 needs a fact that lives in the *body* and can only be used together with a
+# frontmatter filter. Every incident body carries one `Root cause:` line; the value is
+# recorded at generation time, so the answer stays mechanical and no judge is needed.
+ROOT_CAUSES = ["config", "capacity", "dependency", "deploy"]
 
 BODY_SENTENCES = [
     "Traffic is admitted through the regional load balancer before any authorization check runs.",
@@ -147,7 +165,66 @@ def _yaml_value(value) -> str:
     return str(value)
 
 
-def _frontmatter(fm: dict) -> str:
+# A scalar safe to wrap in quotes: quoting it changes nothing about what the document
+# means. Numbers, booleans and dates are excluded — `tier: "1"` is a string where `tier: 1`
+# is an integer, and `created: "2024-01-01"` is a string where the bare form is a date. A
+# corpus that mixed those would make its own ground truth an interpretation.
+_QUOTABLE = re.compile(r"^[A-Za-z][A-Za-z0-9 _.\-]*$")
+# Unknown keys a producer might carry that no question asks about. Values are chosen so
+# nothing here can be mistaken for an answer to anything in the battery.
+_EXTRA_KEYS = (
+    ("source", "import"),
+    ("schema_version", 2),
+    ("archived", False),
+    ("checked", True),
+)
+
+
+def _is_date(value: str) -> bool:
+    return len(value) == 10 and value[4] == "-" and value[7] == "-" and value[:4].isdigit()
+
+
+def _messy_frontmatter(fm: dict, rng: random.Random) -> str:
+    """Render the same mapping in a style a different hand might have used.
+
+    Every transform here is a rendering choice that YAML resolves to the identical value.
+    """
+    items = list(fm.items())
+    rng.shuffle(items)
+    # `type` is the bundle's routing key, and Q10 — carried over from v1 verbatim — asks
+    # for every file "whose frontmatter block contains a `type: Service` line". Quoting or
+    # padding that one line would quietly change what a pre-registered question means, so
+    # it keeps its canonical rendering while its position still moves with the rest.
+    if rng.random() < 0.15:
+        items.insert(rng.randrange(len(items) + 1), _EXTRA_KEYS[rng.randrange(len(_EXTRA_KEYS))])
+
+    lines = ["---"]
+    for key, value in items:
+        canonical = key == "type"
+        gap = "  " if (not canonical and rng.random() < 0.08) else " "
+        if isinstance(value, list):
+            if rng.random() < 0.35:
+                lines.append(f"{key}:{gap}[{', '.join(str(item) for item in value)}]")
+            else:
+                lines.append(f"{key}:")
+                indent = "  " if rng.random() < 0.3 else ""
+                lines.extend(f"{indent}- {item}" for item in value)
+            continue
+        rendered = _yaml_value(value)
+        quotable = (
+            isinstance(value, str) and bool(_QUOTABLE.fullmatch(value)) and not _is_date(value)
+        )
+        if quotable and not canonical and rng.random() < 0.25:
+            rendered = f'"{rendered}"' if rng.random() < 0.7 else f"'{rendered}'"
+        lines.append(f"{key}:{gap}{rendered}")
+    lines.append("---")
+    return "\n".join(lines) + "\n"
+
+
+def _frontmatter(fm: dict, rng: random.Random | None = None) -> str:
+    """Tidy rendering, or messy when a styling generator is supplied."""
+    if rng is not None:
+        return _messy_frontmatter(fm, rng)
     lines = ["---"]
     for key, value in fm.items():
         if isinstance(value, list):
@@ -255,6 +332,7 @@ def generate(concepts: int, seed: int) -> tuple[list[Concept], dict]:
             "duration_minutes": rng.choice([15, 30, 45, 60, 90, 120, 180, 240, 360]),
             "date": _date(rng, 2025, 2026),
             "postmortem": rng.random() < 0.6,
+            "root_cause": rng.choice(ROOT_CAUSES),
         }
         incidents.append(record)
         out.append(
@@ -271,7 +349,10 @@ def generate(concepts: int, seed: int) -> tuple[list[Concept], dict]:
                     "date": record["date"],
                     "postmortem": record["postmortem"],
                 },
-                body=_body(rng, ["Impact", "Timeline"], needle=(i == needle_index)),
+                body=(
+                    _body(rng, ["Impact", "Timeline"], needle=(i == needle_index))
+                    + f"\n# Analysis\n\nRoot cause: {record['root_cause']}\n"
+                ),
                 record=record,
             )
         )
@@ -372,7 +453,42 @@ language: {language}
 """
 
 
-def malformed_services(count: int, seed: int) -> list[tuple[str, str]]:
+def _team_counts(services: list[dict]) -> list[tuple[str, int]]:
+    counts: dict[str, int] = {}
+    for s in services:
+        counts[s["team"]] = counts.get(s["team"], 0) + 1
+    return sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))
+
+
+def rig_malformed_teams(count: int, services: list[dict]) -> list[str]:
+    """Choose the malformed files' teams so that including them changes the answer.
+
+    v1's malformed question warned the agent that malformed files existed, so it measured
+    whether an agent follows an instruction. The un-warned version can only measure
+    anything if the two answers differ — otherwise a tool that silently skips the
+    unparseable files still lands on the right team and the trap catches nobody.
+
+    The runner-up team is given just enough malformed files to overtake the leader; the
+    rest go to the *least* owned teams, where they cannot disturb the new ordering.
+    """
+    ranked = _team_counts(services)
+    if len(ranked) < 2:
+        raise ValueError("need at least two teams to rig a flip")
+    (leader, lead_count), (runner_up, runner_count) = ranked[0], ranked[1]
+    need = lead_count - runner_count + 1
+    if need > count:
+        raise ValueError(
+            f"cannot flip the top team with {count} malformed files: the leader "
+            f"{leader!r} is {need - 1} ahead of {runner_up!r}"
+        )
+    teams = [runner_up] * need
+    tail = [team for team, _ in reversed(ranked) if team not in (leader, runner_up)]
+    for i in range(count - need):
+        teams.append(tail[i % len(tail)] if tail else runner_up)
+    return teams
+
+
+def malformed_services(count: int, seed: int, teams: list[str]) -> list[tuple[str, str]]:
     """Service files whose frontmatter declares its type but does not parse as YAML.
 
     The unclosed flow sequence is the fault. readb's permissive load skips such a file
@@ -385,7 +501,7 @@ def malformed_services(count: int, seed: int) -> list[tuple[str, str]]:
         name = f"svc-9{i + 1:03d}-{rng.choice(SERVICE_QUALIFIERS)}-{rng.choice(SERVICE_NOUNS)}"
         text = MALFORMED_TEMPLATE.format(
             title=name.split("-", 2)[2].replace("-", " ").title(),
-            team=rng.choice(TEAMS),
+            team=teams[i],
             tier=rng.choice(TIERS),
             tag=rng.choice(TAG_POOL),
             status=rng.choice(SERVICE_STATUSES),
@@ -453,6 +569,21 @@ def ground_truth(
         and svc["tier"] == 1
     )
 
+    # Q14 — a body fact used together with a frontmatter filter. Neither half answers it.
+    q14 = sorted(
+        inc["name"]
+        for inc in incidents
+        if inc["severity"] == "sev1" and inc["root_cause"] == "capacity"
+    )
+
+    # Q15 — an output-heavy enumeration. The answer is dozens of names, so whatever a
+    # turn-efficient tool saves upstream is diluted by the cost of writing them all out.
+    q15 = sorted(s["name"] for s in services if s["tier"] == 1)
+
+    # Q16 — a filter with no matches. Each predicate alone must match something, or the
+    # question degenerates into spotting a value that does not exist in the corpus.
+    q16 = _empty_triple(services)
+
     return {
         "counts": {
             "Service": len(services),
@@ -473,7 +604,38 @@ def ground_truth(
         "q6": {"team": top_team[0], "count": top_team[1]},
         "q7": {"phrase": NEEDLE_PHRASE},  # concept name filled in by the writer
         "q8": {"sev1_services": sev1_services, "answer": q8},
+        "q14": {"severity": "sev1", "root_cause": "capacity", "answer": q14},
+        "q15": {"tier": 1, "answer": q15},
+        "q16": q16,
+        # Q17 presupposes a field no `Incident` carries. The only true answer is that
+        # there is none, which the battery's `none` convention expresses.
+        "q17": {"field": "owner", "answer": []},
     }
+
+
+def _empty_triple(services: list[dict]) -> dict:
+    """The first (team, tier, status) combination no service satisfies.
+
+    Deterministic, and asserted non-degenerate: each of the three predicates matches
+    something on its own, so the empty result comes from the combination rather than from
+    a value that simply does not occur.
+    """
+    for team in sorted(TEAMS):
+        for tier in sorted(TIERS):
+            for status in sorted(SERVICE_STATUSES):
+                if any(
+                    s["team"] == team and s["tier"] == tier and s["status"] == status
+                    for s in services
+                ):
+                    continue
+                if not (
+                    any(s["team"] == team for s in services)
+                    and any(s["tier"] == tier for s in services)
+                    and any(s["status"] == status for s in services)
+                ):
+                    continue
+                return {"team": team, "tier": tier, "status": status, "answer": []}
+    raise ValueError("no empty (team, tier, status) combination exists in this corpus")
 
 
 # The index deliberately carries no `type:` key. With one, an arm reading files directly
@@ -501,12 +663,17 @@ def write(
     truth: dict,
     malformed: int = 0,
     seed: int = 24,
+    messy: bool = False,
 ) -> None:
     """Write the bundle to `out_dir` and the answers to `truth_path`.
 
     The ground truth is written OUTSIDE the bundle on purpose: an agent under test can
     read anything inside the corpus, and a file of answers sitting in it would be a
     leak, not a benchmark.
+
+    `messy` varies only how each file is *rendered*. The records — and therefore every
+    answer — are identical either way, which is what makes the messy/tidy pair a
+    controlled sweep rather than two different corpora.
     """
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / "index.md").write_text(INDEX)
@@ -515,7 +682,10 @@ def write(
     for concept in concepts:
         sub = out_dir / concept.subdir
         sub.mkdir(exist_ok=True)
-        text = _frontmatter(concept.frontmatter) + "\n" + concept.body
+        # Seeded per file, so a file's style does not depend on how many files precede it
+        # and the messy and tidy corpora stay comparable file by file.
+        style = random.Random(f"{seed}:style:{concept.name}") if messy else None
+        text = _frontmatter(concept.frontmatter, style) + "\n" + concept.body
         (sub / f"{concept.name}.md").write_text(text)
         if NEEDLE_PHRASE in text:
             needle_holders.append(concept.name)
@@ -532,9 +702,29 @@ def write(
 
     if malformed:
         services_dir = out_dir / "services"
-        for name, text in malformed_services(malformed, seed):
+        services = [c.record for c in concepts if c.subdir == "services"]
+        teams = rig_malformed_teams(malformed, services)
+        for name, text in malformed_services(malformed, seed, teams):
             (services_dir / f"{name}.md").write_text(text)
         truth["q10"] = {"answer": truth["counts"]["Service"] + malformed, "malformed": malformed}
+
+        # Q18 — the un-warned trap. `answer` counts every file declaring `type: Service`;
+        # `naive_answer` is what a tool that silently skips the unparseable ones returns.
+        # The generator asserts they name different teams: without that, the question is
+        # indistinguishable from Q6 and measures nothing.
+        top_all = _team_counts(services + [{"team": team} for team in teams])[0]
+        top_parsed = _team_counts(services)[0]
+        if top_all[0] == top_parsed[0]:
+            raise AssertionError(
+                "the malformed files do not change which team owns the most services, "
+                "so the un-warned trap traps nothing"
+            )
+        truth["q18"] = {
+            "team": top_all[0],
+            "count": top_all[1],
+            "naive_team": top_parsed[0],
+            "naive_count": top_parsed[1],
+        }
 
     _assert_no_leak_in_index(out_dir, truth)
     _cross_check(out_dir, truth, malformed)
@@ -547,6 +737,7 @@ def write(
         "seed": seed,
         "concepts": len(concepts),
         "malformed": malformed,
+        "messy": messy,
         "needle_phrase": NEEDLE_PHRASE,
     }
     truth_path.write_text(json.dumps(truth, indent=2, sort_keys=True) + "\n")
@@ -634,6 +825,53 @@ def _cross_check(out_dir: Path, truth: dict, malformed: int) -> None:
     if q3 != truth["q3"]["answer"]:
         raise AssertionError("cross-check disagrees on q3")
 
+    q15 = sorted(r["__name"] for r in parsed if r.get("type") == "Service" and r.get("tier") == 1)
+    if q15 != truth["q15"]["answer"]:
+        raise AssertionError("cross-check disagrees on q15")
+
+    empty = truth["q16"]
+    q16 = [
+        r["__name"]
+        for r in parsed
+        if r.get("type") == "Service"
+        and r.get("team") == empty["team"]
+        and r.get("tier") == empty["tier"]
+        and r.get("status") == empty["status"]
+    ]
+    if q16:
+        raise AssertionError(f"the zero-result question is not empty: {q16}")
+
+    if any("owner" in r for r in parsed if r.get("type") == "Incident"):
+        raise AssertionError("q17 presupposes an `owner` field that must not exist")
+
+    # Q14's fact lives in the body, so it is re-derived from the written text rather than
+    # from the frontmatter the loop above parsed.
+    sev1 = re.compile(r"^severity:\s*[\"']?sev1[\"']?\s*$", re.MULTILINE)
+    q14 = sorted(
+        path.stem
+        for path in sorted((out_dir / "incidents").glob("*.md"))
+        if sev1.search(path.read_text()) and "Root cause: capacity" in path.read_text()
+    )
+    if q14 != truth["q14"]["answer"]:
+        raise AssertionError(
+            f"cross-check disagrees on q14: {len(q14)} vs {len(truth['q14']['answer'])}"
+        )
+
+    if malformed:
+        by_team: dict[str, int] = {}
+        for path in sorted((out_dir / "services").glob("*.md")):
+            text = path.read_text()
+            _, _, rest = text.partition("---\n")
+            block, _, _ = rest.partition("\n---")
+            for line in block.splitlines():
+                key, _, value = line.partition(":")
+                if key.strip() == "team":
+                    team = value.strip().strip("\"'")
+                    by_team[team] = by_team.get(team, 0) + 1
+        top = sorted(by_team.items(), key=lambda kv: (-kv[1], kv[0]))[0]
+        if [top[0], top[1]] != [truth["q18"]["team"], truth["q18"]["count"]]:
+            raise AssertionError(f"cross-check disagrees on q18: {top} != {truth['q18']}")
+
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
@@ -649,12 +887,27 @@ def main() -> None:
         default=0,
         help="extra service files whose frontmatter declares its type but does not parse",
     )
+    ap.add_argument(
+        "--tidy",
+        dest="messy",
+        action="store_false",
+        help="render every file in one uniform style (v1's corpus; the sweep's control)",
+    )
+    ap.set_defaults(messy=True)
     args = ap.parse_args()
 
     truth_path = args.truth or args.out.parent / f"{args.out.name}_ground_truth.json"
     concepts, truth = generate(args.concepts, args.seed)
-    write(args.out, truth_path, concepts, truth, malformed=args.malformed, seed=args.seed)
-    print(f"{len(concepts)} concepts -> {args.out}")
+    write(
+        args.out,
+        truth_path,
+        concepts,
+        truth,
+        malformed=args.malformed,
+        seed=args.seed,
+        messy=args.messy,
+    )
+    print(f"{len(concepts)} concepts -> {args.out} ({'messy' if args.messy else 'tidy'})")
     print(json.dumps(truth["counts"], sort_keys=True))
 
 
