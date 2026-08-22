@@ -96,7 +96,7 @@ three-predicate multi-hop) and reverses on a single-field group-by (1.15×). A s
 to the gap widening with the bundle: 0.70× at 150 concepts, 0.60× at 600, 0.43× at 2000. The
 shipped skill lands at parity (1.01×), though it does make the agent terser (output 0.70×).
 
-**What it cost.** 232 headless agent runs across five committed batches, $25.05.
+**What it cost.** 216 recorded runs across five committed batches, $25.05.
 
 **How much of the sprint was spent being wrong.** Four adversarial review rounds plus an
 independent diff review, and each one found something that would have been published as fact:
