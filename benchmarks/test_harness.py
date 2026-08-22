@@ -776,3 +776,25 @@ def test_a_workroot_named_after_the_tool_is_refused(tmp_path):
     assert_workroot_is_neutral(tmp_path / "kbbench")
     with pytest.raises(SystemExit, match="contains the tool's name"):
         assert_workroot_is_neutral(tmp_path / "personal-readb" / "scratch")
+
+
+def test_resume_keys_on_the_corpus_so_a_sweep_is_not_half_skipped(tmp_path):
+    """The same question against a different rendering is a different cell."""
+    from run_benchmark import done_cells
+
+    results = tmp_path / "r.jsonl"
+    results.write_text(
+        json.dumps(
+            {
+                "arm": "readb-bare",
+                "question": "q2",
+                "model": "claude-sonnet-5",
+                "corpus": "ops",
+                "repeat": 1,
+            }
+        )
+        + "\n"
+    )
+    cells = done_cells(results)
+    assert ("readb-bare", "q2", "claude-sonnet-5", "ops", 1) in cells
+    assert ("readb-bare", "q2", "claude-sonnet-5", "ops-tidy", 1) not in cells

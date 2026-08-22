@@ -100,14 +100,18 @@ python benchmarks/run_benchmark.py $C --results benchmarks/results/v2-floor.json
     --models claude-haiku-4-5 --repeats 3 --questions q1 --floor \
     --arms baseline,shell-coached,readb-bare,readb-nudged
 
-# 4. Messy against tidy — the same questions, both renderings (54 runs)
+# 4. Messy against tidy — the same questions, both renderings (54 runs), one file:
+#    resume keys on the corpus, so the second half is not mistaken for the first
 python benchmarks/run_benchmark.py $C --results benchmarks/results/v2-sweep.jsonl \
     --models claude-sonnet-5 --repeats 3 --questions q2,q3,q15 \
     --arms baseline,shell-coached,readb-bare
-python benchmarks/run_benchmark.py $C --results benchmarks/results/v2-sweep-tidy.jsonl \
+python benchmarks/run_benchmark.py $C --results benchmarks/results/v2-sweep.jsonl \
     --models claude-sonnet-5 --repeats 3 --questions q2,q3,q15 \
     --arms baseline,shell-coached,readb-bare --corpus-map ops=ops-tidy
 ```
+
+The working root must not sit under a path containing `readb`: the agent's cwd reaches its system
+prompt, so the path alone would prime every readb-free arm. The harness refuses to start otherwise.
 
 A preflight runs first and refuses to start unless each arm loaded the skills it should have, can
 execute the binaries it needs on its own `PATH`, and every coached command runs against the real
@@ -116,11 +120,17 @@ corpus and finds what the ground truth says is there.
 Analysis. The pre-registered endpoints print first; everything after them is descriptive.
 
 ```sh
+cat benchmarks/results/v2-sonnet.jsonl benchmarks/results/v2-haiku.jsonl \
+    > benchmarks/results/v2-all.jsonl
 python benchmarks/analyze.py --results benchmarks/results/v2-all.jsonl \
     --floor benchmarks/results/v2-floor.jsonl
 python benchmarks/analyze.py --results benchmarks/results/v2-all.jsonl \
     --baseline-arm shell-coached
+python benchmarks/analyze.py --results benchmarks/results/v2-sweep.jsonl --skip-endpoints
 ```
+
+The sweep is analysed on its own: its three questions also appear in the main matrix, and folding
+them together would weight those three twice.
 
 A batch that is not the main matrix — a sweep, a re-measurement — passes `--skip-endpoints`, since
 the endpoints are defined over the main matrix and would otherwise print a test of a subset. A

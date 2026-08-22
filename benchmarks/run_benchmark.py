@@ -805,11 +805,23 @@ def git_sha() -> str:
     return out.stdout.strip() or "unknown"
 
 
-def done_cells(results: Path) -> set[tuple[str, str, str, int]]:
+def done_cells(results: Path) -> set[tuple[str, str, str, str, int]]:
+    """Cells already recorded, so a batch can be resumed.
+
+    The corpus is part of the key. Without it, the messy/tidy sweep's second half is
+    mistaken for the first and silently skipped — the same (arm, question, model, repeat)
+    against a different rendering is a different cell, which is the whole point of a sweep.
+    """
     if not results.exists():
         return set()
     return {
-        (rec["arm"], rec["question"], rec.get("model", ""), rec["repeat"])
+        (
+            rec["arm"],
+            rec["question"],
+            rec.get("model", ""),
+            rec.get("corpus", ""),
+            rec["repeat"],
+        )
         for rec in (json.loads(line) for line in results.read_text().splitlines() if line.strip())
         if not rec.get("retracted")
     }
@@ -972,9 +984,11 @@ def main() -> None:
     for repeat in range(1, cfg.repeats + 1):
         offset = (repeat - 1) % len(questions)
         for question in questions[offset:] + questions[:offset]:
+            corpus_name = cfg.corpus_map.get(question.corpus, question.corpus)
             for model in models:
                 for arm in arms:
-                    if (arm.name, question.id, model, repeat) not in already:
+                    cell = (arm.name, question.id, model, corpus_name, repeat)
+                    if cell not in already:
                         plan.append((arm, question, repeat, model))
 
     print(f"{len(plan)} runs to go ({len(already)} already recorded)", flush=True)
