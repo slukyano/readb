@@ -5,7 +5,7 @@ description: Build and run the v2 agent-efficiency benchmark — a task-tracker-
 tags:
 - research
 - benchmarks
-timestamp: '2026-08-22T12:30:00Z'
+timestamp: '2026-08-22T05:30:00Z'
 branch: sprint/005
 created: '2026-08-22'
 status: Implementing
@@ -61,17 +61,17 @@ skill rather than the artifact whose `uv` assumption retracted an arm of v1.
 ## Implementation checklist
 
 1. [x] `030` — the skill's leading example, plus the two regression tests that keep it bare
-2. [ ] `generate_corpus.py` — messy/tidy styling, the new plants and assertions, the
+2. [x] `generate_corpus.py` — messy/tidy styling, the new plants and assertions, the
        malformed-team flip
-3. [ ] The backlog corpus generator — invented product, tasks/archive/sprints, mechanical ground
+3. [x] The backlog corpus generator — invented product, tasks/archive/sprints, mechanical ground
        truth for the body questions
-4. [ ] `battery.py` — `record` and `mapping_str` kinds, the `none` convention, `expert_tool`,
+4. [x] `battery.py` — `record` and `mapping_str` kinds, the `none` convention, `expert_tool`,
        q6 reworded, q14–q18 and b1–b8
-5. [ ] `run_benchmark.py` — the `readb-nudged` arm, per-corpus recipes, a corpus registry,
+5. [x] `run_benchmark.py` — the `readb-nudged` arm, per-corpus recipes, a corpus registry,
        per-model price tables, recipe preflight, tool-choice and failure recording
-6. [ ] `analyze.py` — strata, the three endpoints with exact tests, tool-match matrices, the
+6. [x] `analyze.py` — strata, the three endpoints with exact tests, tool-match matrices, the
        nudge contrast, per-model sections
-7. [ ] Tests for all of it, and **pre-registration committed before the first measured run**
+7. [x] Tests for all of it, and **pre-registration committed before the first measured run**
 8. [ ] Runs — Sonnet and Haiku blocks, floors, messiness sweep
 9. [ ] Analysis, independent review, and `docs/dev/research/agent-efficiency-v2.md`
 10. [ ] Gates
@@ -90,3 +90,8 @@ _(none yet)_
   approved; both tasks `Designed`, sprint `Implementing`, design merge to `main`.
 - 2026-08-22 — `030` implemented and verified hands-on against a readb-without-`uv` PATH: the old
   leading line exits 127 there, the new one returns rows. Implementation of `031` begins.
+- 2026-08-22 — `031` built: messy/tidy ops corpora with the rigged malformed flip, the new
+  task-tracker corpus on an invented product, the 26-question battery across five strata, the
+  five-arm harness with a corpus registry and per-model prices, the analyzer's three
+  Holm-corrected endpoints on a pure-stdlib exact test, and 71 harness tests. Pre-registration
+  committed before the first measured run. The 783-run matrix is under way.
