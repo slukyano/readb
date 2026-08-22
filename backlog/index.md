@@ -8,6 +8,7 @@ okf_version: "0.1"
 
 # Sprints
 
+* [Sprint 005 — Benchmark v2: realistic workloads and a second model](sprints/sprint-005.md) - Designing.
 * [Sprint 004 — Measure the efficiency claim](sprints/sprint-004.md) - Done.
 * [Sprint 003 — Post-0.1.0 adoption: usage skill, prior art, release automation](sprints/sprint-003.md) - Done.
 * [Sprint 002 — Bundle init, packaging & correctness follow-ups](sprints/sprint-002.md) - Done.
@@ -23,6 +24,7 @@ okf_version: "0.1"
 * [Research cross-bundle querying](tasks/021-cross-bundle-querying.md) - registry bundles as DuckDB schemas; joins across bundles.
 * [Submit the readb plugin to the community marketplace](tasks/027-plugin-marketplace-submission.md) - discovery only: `gh skill install` already works; the hint protocol needs an official listing.
 * [Evaluate rewriting readb in Rust](tasks/028-evaluate-rust-rewrite.md) - binary distribution and startup vs. the Python API, YAML semantics, and rebuild cost; sequenced behind the benchmark.
+* [Benchmark v2 — realistic workloads, a harder battery, and a second model](tasks/031-benchmark-v2.md) - task-tracker-shaped corpus, 26 pre-registered questions, five arms, Sonnet and Haiku.
 * [The shipped skill's leading example assumes uv is installed](tasks/030-skill-uvx-assumption.md) - `uvx readb` fails where readb is installed but uv is not; found by the benchmark.
 
 # Done

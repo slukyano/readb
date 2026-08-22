@@ -1,5 +1,14 @@
 # Task Bundle Log
 
+## 2026-08-22
+* **Sprint 004 merged; sprint 005 scoped**: The efficiency measurement landed on `main` — harness,
+  raw-data policy, and [the write-up](../docs/dev/research/agent-efficiency.md). Sprint 005 takes
+  [benchmark v2](tasks/031-benchmark-v2.md) as its spine: a task-tracker-shaped corpus, 26
+  pre-registered questions across declared strata, a routing-nudge arm kept separate from the base
+  readb arm on purpose, and Haiku alongside Sonnet so accuracy finally has variance to show.
+  [030](tasks/030-skill-uvx-assumption.md) rides along, being a defect in a shipped surface that
+  the benchmark itself found.
+
 ## 2026-08-10
 * **Sprint 004 closed**: [Measure readb's efficiency gains](archive/024-measure-agent-efficiency.md)
   `Draft -> Done`; sprint `Implementing -> Done`. readb's efficiency claim is measured for the
