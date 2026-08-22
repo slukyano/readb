@@ -1,6 +1,20 @@
 # Task Bundle Log
 
 ## 2026-08-22
+* **Sprint 005 closed**: [benchmark v2](archive/031-benchmark-v2.md) and
+  [the skill's uv assumption](archive/030-skill-uvx-assumption.md) `Designed -> Done`; sprint
+  `Implementing -> Done`. v2 ran 783 pre-registered runs across two models and four corpora for
+  $50.92, excluded none, and returned a negative on what it set out to test: no endpoint reached
+  significance, and readb is indistinguishable from a competently coached shell agent. Against an
+  *uncoached* agent both are 0.72-0.75x the cost and 12-15 accuracy points better — the gain is
+  structure, not SQL. Two review rounds shaped it: the first found a coached preamble quoting one
+  of its own answers (a defect v1 shares, now its limitation 15) and 77 runs were deleted so the
+  pre-registration would still precede the first surviving run; the second found a hazard table
+  cell contradicted by the analysis committed beside it, whose correction inverted the finding to
+  "the hazard separates models, not tools". Write-up:
+  [agent-efficiency-v2.md](../docs/dev/research/agent-efficiency-v2.md), pre-registered in
+  [agent-efficiency-v2-preregistration.md](../docs/dev/research/agent-efficiency-v2-preregistration.md).
+  Filed: [032](tasks/032-unknown-table-error.md), [033](tasks/033-skill-discovery-rate.md).
 * **Sprint 004 merged; sprint 005 scoped**: The efficiency measurement landed on `main` — harness,
   raw-data policy, and [the write-up](../docs/dev/research/agent-efficiency.md). Sprint 005 takes
   [benchmark v2](tasks/031-benchmark-v2.md) as its spine: a task-tracker-shaped corpus, 26
