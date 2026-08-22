@@ -202,7 +202,7 @@ contributes almost nothing to the saving. readb does not save an agent from read
 it saves the agent from *writing* shell pipelines.
 
 **4. Wall clock does not improve** (1.03×, interval spanning 0.70–1.20). readb loads and discards
-the whole bundle on every invocation — 0.93 s for 600 concepts on this machine against roughly
+the whole bundle on every invocation — 0.80–0.89 s for 600 concepts on this machine against roughly
 10 ms for a grep — and that overhead cancels the turns it saves.
 
 **5. The effect is concentrated in join-shaped questions.** Per-question billed cost ratio,
