@@ -1,0 +1,55 @@
+{
+  "started_utc": "2026-08-22T02:59:42.008472+00:00",
+  "git_sha": "0477fd62fbe8a74b975c13de275504fd589aa034",
+  "claude_version": "2.1.239 (Claude Code)",
+  "readb_version": "readb, version 0.2.0",
+  "readb_bin": "/private/tmp/claude-501/-Users-<USER>-workspaces-personal-readb/80fb7b4d-0629-4235-99cf-6b1fb850d167/scratchpad/benchvenv/bin/readb",
+  "python": "3.14.2 (main, Dec 17 2025, 20:54:49) [Clang 21.1.4 ]",
+  "platform": "macOS-26.5.2-arm64-arm-64bit-Mach-O",
+  "machine": "arm64",
+  "model": "claude-sonnet-5",
+  "effort": "medium",
+  "autocompact": 1000000,
+  "per_run_budget_usd": 3.0,
+  "prices_usd_per_mtok": {
+    "input": 3.0,
+    "output": 15.0,
+    "cache_read": 0.3,
+    "cache_write_5m": 3.75,
+    "cache_write_1h": 6.0
+  },
+  "repeats": 3,
+  "arms": "baseline,readb-bare",
+  "questions": "q10b",
+  "corpus_dirs": {
+    "clean": "/private/tmp/claude-501/-Users-<USER>-workspaces-personal-readb/80fb7b4d-0629-4235-99cf-6b1fb850d167/scratchpad/kb_malformed",
+    "malformed": "/private/tmp/claude-501/-Users-<USER>-workspaces-personal-readb/80fb7b4d-0629-4235-99cf-6b1fb850d167/scratchpad/kb_malformed"
+  },
+  "corpus_generation": {
+    "clean": {
+      "concepts": 600,
+      "malformed": 12,
+      "needle_phrase": "the circuit breaker tripped during a partial region drain",
+      "seed": 24
+    },
+    "malformed": {
+      "concepts": 600,
+      "malformed": 12,
+      "needle_phrase": "the circuit breaker tripped during a partial region drain",
+      "seed": 24
+    }
+  },
+  "corpus_sha256": {
+    "clean": "0676623f060c5e85a90f34068cad1cc616ffc17ebb52fffc73d597c15307a1dd",
+    "malformed": "0676623f060c5e85a90f34068cad1cc616ffc17ebb52fffc73d597c15307a1dd"
+  },
+  "corpus_concepts": {
+    "clean": 612,
+    "malformed": 612
+  },
+  "arm_paths": {
+    "baseline": "/usr/bin:/bin:/usr/sbin:/sbin",
+    "readb-bare": "/private/tmp/claude-501/-Users-<USER>-workspaces-personal-readb/80fb7b4d-0629-4235-99cf-6b1fb850d167/scratchpad/benchvenv/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+  },
+  "floor_mode": false
+}

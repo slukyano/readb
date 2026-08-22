@@ -8,6 +8,7 @@ okf_version: "0.1"
 
 # Sprints
 
+* [Sprint 004 — Measure the efficiency claim](sprints/sprint-004.md) - Done.
 * [Sprint 003 — Post-0.1.0 adoption: usage skill, prior art, release automation](sprints/sprint-003.md) - Done.
 * [Sprint 002 — Bundle init, packaging & correctness follow-ups](sprints/sprint-002.md) - Done.
 * [Sprint 001 — CLI ergonomics, dogfooding gaps, name & license](sprints/sprint-001.md) - Done.
@@ -22,9 +23,13 @@ okf_version: "0.1"
 * [Research cross-bundle querying](tasks/021-cross-bundle-querying.md) - registry bundles as DuckDB schemas; joins across bundles.
 * [Submit the readb plugin to the community marketplace](tasks/027-plugin-marketplace-submission.md) - discovery only: `gh skill install` already works; the hint protocol needs an official listing.
 * [Evaluate rewriting readb in Rust](tasks/028-evaluate-rust-rewrite.md) - binary distribution and startup vs. the Python API, YAML semantics, and rebuild cost; sequenced behind the benchmark.
-* [Measure readb's efficiency gains for agents](tasks/024-measure-agent-efficiency.md) - A/B benchmark, unguided vs. readb; wall-clock and token usage on large bundles.
+* [The shipped skill's leading example assumes uv is installed](tasks/030-skill-uvx-assumption.md) - `uvx readb` fails where readb is installed but uv is not; found by the benchmark.
 
 # Done
+
+Sprint 004:
+
+* [Measure readb's efficiency gains for agents](archive/024-measure-agent-efficiency.md) - measured: 13% cheaper in money, no accuracy or wall-clock effect, concentrated in join-shaped questions; the skill at parity.
 
 Sprint 003:
 

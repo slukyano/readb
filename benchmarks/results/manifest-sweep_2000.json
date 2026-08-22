@@ -1,0 +1,51 @@
+{
+  "RECONSTRUCTED": "Written after the batch. The harness of the time wrote one manifest.json per results directory, which later batches overwrote; corpora are the same directories the batch read, hashed afterwards and unmodified since.",
+  "claude_version": "2.1.226 (Claude Code)",
+  "readb_version": "readb, version 0.2.0",
+  "readb_bin": "/private/tmp/claude-501/-Users-<USER>-workspaces-personal-readb/80fb7b4d-0629-4235-99cf-6b1fb850d167/scratchpad/benchvenv/bin/readb",
+  "python": "3.14.2 (main, Dec 17 2025, 20:54:49) [Clang 21.1.4 ]",
+  "platform": "macOS-26.5.2-arm64-arm-64bit-Mach-O",
+  "machine": "arm64",
+  "model": "claude-sonnet-5",
+  "effort": "medium",
+  "autocompact": 1000000,
+  "prices_usd_per_mtok": {
+    "input": 3.0,
+    "output": 15.0,
+    "cache_read": 0.3,
+    "cache_write_5m": 3.75,
+    "cache_write_1h": 6.0
+  },
+  "batch": "sweep_2000.jsonl \u2014 size sweep at 2000 concepts",
+  "arms": "baseline,readb-bare",
+  "repeats": 2,
+  "questions": "q3,q4,q8,q12",
+  "per_run_budget_usd": 3.0,
+  "corpus_dirs": {
+    "clean": "/private/tmp/claude-501/-Users-<USER>-workspaces-personal-readb/80fb7b4d-0629-4235-99cf-6b1fb850d167/scratchpad/kb_2000",
+    "malformed": "/private/tmp/claude-501/-Users-<USER>-workspaces-personal-readb/80fb7b4d-0629-4235-99cf-6b1fb850d167/scratchpad/kb_2000"
+  },
+  "arm_paths": {
+    "baseline": "/usr/bin:/bin:/usr/sbin:/sbin",
+    "readb-bare": "/private/tmp/claude-501/-Users-<USER>-workspaces-personal-readb/80fb7b4d-0629-4235-99cf-6b1fb850d167/scratchpad/benchvenv/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+  },
+  "note": "uv was not on any arm's PATH in this batch; no arm invoked it.",
+  "started_utc": "2026-08-10T08:50:30.054288+00:00",
+  "finished_utc": "2026-08-10T08:57:30.145857+00:00",
+  "runs": 16,
+  "model_dated": [
+    "claude-sonnet-5"
+  ],
+  "corpus_sha256": {
+    "clean": "fbdb25c236b0799949d5db8bde59a3e899f356e0fdd2a8f8e5070441f4591aa5",
+    "malformed": "fbdb25c236b0799949d5db8bde59a3e899f356e0fdd2a8f8e5070441f4591aa5"
+  },
+  "corpus_concepts": {
+    "clean": 2000,
+    "malformed": 2000
+  },
+  "corpus_generation": {
+    "clean": null,
+    "malformed": null
+  }
+}
