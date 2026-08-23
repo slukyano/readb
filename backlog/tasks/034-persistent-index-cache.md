@@ -84,7 +84,7 @@ Design-branch measurements, duckdb 1.5.4 / CPython 3.14.6 / macOS arm64, medians
 | Full load from source, after `036-load-pandas-import-probe` | 384 ms | 1266 ms | 3873 ms |
 | **Open the cache and query it** | **4.2 ms** | **4.0 ms** | **4.0 ms** |
 | **Apply a one-file edit** (open, delete rows, re-parse, insert) | — | — | **6.9 ms** |
-| Detect change (`os.scandir` walk) | 1.1 ms | 3.1 ms | 11.1 ms |
+| Detect change (`os.scandir` walk) | 1.0 ms | 3.3 ms | 10.7 ms |
 | Copy the cache file, which is what makes an update atomic | — | — | 4.7 ms |
 | Materialize a fresh cache | 42 ms | 68 ms | 161 ms |
 | Cache file size, at `BLOCK_SIZE 16384` | 2.9 MB | — | 22.4 MB |
@@ -94,7 +94,9 @@ Both hit paths are flat in bundle size. A cold miss costs a full load plus the m
 ### The three paths
 
 **Hit.** Walk the bundle with `os.scandir`, collecting each file's bundle-relative path, its own
-`st_size` and its `st_mtime_ns` — no directory is ever sized. Hash that manifest with the readb and
+`st_size` and its `st_mtime_ns` — no directory is ever sized. Every file is stat-ed, at a measured
+1.7–2.1 µs each (1.0 ms at 600 files, 10.7 ms at 6000, 41.6 ms at 20000): the same work `git status`
+does, and a strict subset of the open-and-read every uncached load performs on the same files. Hash that manifest with the readb and
 duckdb versions; the result is carried in the cache's filename, so recognizing a hit opens nothing.
 Open the file read-only and return. No markdown file is read at all.
 

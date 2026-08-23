@@ -27,15 +27,15 @@ two are separable, and the evidence below treats them separately.
 Measured on the sprint-006 design branch (duckdb 1.5.4, CPython 3.14.6, macOS arm64, medians),
 against a 6000-concept bundle unless stated:
 
-| Detecting change | 600 | 2000 | 6000 |
-| --- | --- | --- | --- |
-| `os.scandir` walk collecting size + mtime | 1.1 ms | 3.1 ms | 11.1 ms |
-| `pathlib.rglob` + `stat()` (the naive version) | 1.7 ms | 5.2 ms | 17.7 ms |
-| `git status --porcelain` (clean tree) | — | — | 11.9 ms |
-| `git status --porcelain --ignored` | — | — | 12.3 ms |
-| `git rev-parse HEAD` | — | — | 4.0 ms |
-| `git ls-files` | — | — | 6.1 ms |
-| Read + content-hash **every** file | 8.2 ms | — | 106.5 ms |
+| Detecting change | 600 | 2000 | 6000 | 20000 |
+| --- | --- | --- | --- | --- |
+| `os.scandir` walk collecting size + mtime | 1.0 ms | 3.3 ms | 10.7 ms | 41.6 ms |
+| `pathlib.rglob` + `stat()` (the naive version) | 1.7 ms | 5.2 ms | 17.7 ms | — |
+| `git status --porcelain` (clean tree) | — | — | 11.9 ms | — |
+| `git status --porcelain --ignored` | — | — | 12.3 ms | — |
+| `git rev-parse HEAD` | — | — | 4.0 ms | — |
+| `git ls-files` | — | — | 6.1 ms | — |
+| Read (not parse) every file | 8.2 ms | — | ~100 ms | — |
 
 | Rebuilding | 6000 concepts |
 | --- | --- |
@@ -64,6 +64,14 @@ The manifest is built by an `os.scandir` walk that mirrors the loader's own walk
 file its bundle-relative POSIX path, **that file's own `st_size`**, and its `st_mtime_ns`. No
 directory is ever sized — a directory's size is not defined cheaply on any filesystem, and nothing
 here needs it.
+
+**Every file is stat-ed on every load, and that is the cheapest part of what a load already does.**
+There is no way to learn that a file changed without asking the filesystem, short of a daemon
+watching events — git does not have one either, which is why `git status` also stats every file and
+lands within a millisecond of the walk. The measured rate is 1.7–2.1 µs per file, linear from 600 to
+20000 files. Against the load it replaces the walk is 0.3% (10.7 ms against 3873 ms at 6000
+concepts), and against just *reading* those files without parsing them it is about a tenth. The
+walk is a strict subset of the work every uncached invocation does today.
 
 A file whose size and mtime match its manifest entry is unchanged. **A file whose stat differs is
 re-parsed, without first checking whether its bytes actually changed.** Re-parsing one file costs
@@ -145,6 +153,13 @@ permissiveness the load path already promises for malformed markdown.
   6000-concept cache is 22.4 MB against 22.0 MB, and its hit path is 3.96 ms against 4.89 ms. Small
   bundles are the common case, so the small-bundle cost is the one worth cutting.
 - Cache size is one file per bundle: about 1.5 MB for a few dozen concepts, 22 MB at 6000.
+- **The stat walk is the hit path's floor, and it is not the binding constraint.** At 6000 concepts a
+  cache hit costs about 80 ms end-to-end, of which roughly 70 ms is Python process startup and 11 ms
+  is the walk. Even at 20000 files the walk is 42 ms against a full load of some 13 seconds. Two
+  caveats belong on the record: the rate assumes a warm inode cache, and a network filesystem makes
+  per-file stat expensive — though there the cache wins by more, since a load opens and reads every
+  file the walk merely stats. If a bundle ever grows large enough for the walk to dominate, the
+  answer is a watcher, which this ADR and [ADR 0005](0005-stay-on-python.md) both decline today.
 
 # Alternatives considered
 
