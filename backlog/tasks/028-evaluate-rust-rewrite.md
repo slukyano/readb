@@ -64,7 +64,8 @@ prototype would price the rewrite's *upside* precisely, and the upside is not wh
 what the measurements below establish is that the upside lands somewhere the benchmark has already
 shown does not matter. The deliverable is
 [ADR 0005](../../docs/dev/adr/0005-stay-on-python.md), proposed in the design phase rather than
-during implementation, because `034`'s implementation is conditional on its answer.
+during implementation, because `034-persistent-index-cache`'s implementation is conditional on its
+answer.
 
 **Public-surface delta: none.** No CLI command, flag, output format, Python API name, on-disk path,
 config key or packaged artifact changes. The task produces one ADR and this section.
@@ -84,9 +85,9 @@ Per-invocation floor, independent of bundle size:
 | `import duckdb` alone | 60 |
 
 End-to-end `readb query`, by bundle size, before and after the fix in
-[036](036-load-pandas-import-probe.md):
+[036-load-pandas-import-probe](036-load-pandas-import-probe.md):
 
-| Concepts | As shipped | With `036` | Cache hit (measured, `034` prototype) |
+| Concepts | As shipped | With `036-load-pandas-import-probe` | Cache hit (measured, `034-persistent-index-cache` prototype) |
 | --- | --- | --- | --- |
 | 34 (`backlog/`) | 150 ms | 114 ms | ~80 ms |
 | 600 | 938 ms | 456 ms | ~80 ms |
@@ -104,10 +105,11 @@ The two candidate drivers named when the task was raised were **binary distribut
 **per-invocation latency**. Only the second is a performance argument, and it dissolves:
 
 1. **The load pass is not slow because Python is slow.** Two thirds of it is a failed import
-   (`036`) — a defect, not a language property. Removing it is a 2.9× speed-up at every size
-   measured, for a one-screen change.
+   (`036-load-pandas-import-probe`) — a defect, not a language property. Removing it is a 2.9×
+   speed-up at every size measured, for a one-screen change.
 2. **What remains of the load pass is what a cache removes**, and the cache is measured at 4 ms
-   regardless of bundle size. After `036` and `034`, a repeat invocation costs about 80 ms.
+   regardless of bundle size. After `036-load-pandas-import-probe` and `034-persistent-index-cache`,
+   a repeat invocation costs about 80 ms.
 3. **Of that 80 ms, roughly 70 ms is process startup** — the interpreter plus click plus
    `import duckdb`. That is the only part a Rust rewrite would still attack, and it would win
    perhaps 60 ms per invocation.
@@ -124,6 +126,7 @@ of production Python across 9 modules, pinned by 190 tests.
 
 ### Consequence for the rest of the sprint
 
-`028` answering "stay on Python" is what licenses `034` to be implemented in this sprint rather
-than merely designed. If the ADR were rejected, `034` would stay `Designed` and the sprint would
-deliver the decision, `036`, `033` and `032`.
+`028-evaluate-rust-rewrite` answering "stay on Python" is what licenses `034-persistent-index-cache`
+to be implemented in this sprint rather than merely designed. If the ADR were rejected,
+`034-persistent-index-cache` would stay `Designed` and the sprint would deliver the decision,
+`036-load-pandas-import-probe`, `033-skill-discovery-rate` and `032-unknown-table-error`.

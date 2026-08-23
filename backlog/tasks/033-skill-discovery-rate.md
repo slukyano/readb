@@ -11,8 +11,8 @@ tags:
 created: 2026-08-22
 ---
 
-Found by the v2 agent-efficiency benchmark (`031`, sprint-005), which interleaved the skill arm
-into the main batch for the first time — v1 ran it alone and could not compare it fairly.
+Found by the v2 agent-efficiency benchmark (`031-benchmark-v2`, sprint-005), which interleaved the
+skill arm into the main batch for the first time — v1 ran it alone and could not compare it fairly.
 
 With the plugin loaded and readb on `PATH`, across 78 Sonnet runs:
 
@@ -39,9 +39,9 @@ skill installed reaches for it about half the time.
   the same way this was.
 - Any change here is a change to a shipped public surface and should be **measured after the
   fact**, not tuned until the benchmark improves — the same discipline the routing nudge was held
-  to in `031`.
-- The routing nudge tested in `031` is *not* the answer: it moved readb usage up but moved no cost
-  ratio, and roughly doubled failed readb calls. That result is recorded in
+  to in `031-benchmark-v2`.
+- The routing nudge tested in `031-benchmark-v2` is *not* the answer: it moved readb usage up but
+  moved no cost ratio, and roughly doubled failed readb calls. That result is recorded in
   [`docs/dev/research/agent-efficiency-v2.md`](../../docs/dev/research/agent-efficiency-v2.md).
 
 ## Design
@@ -84,10 +84,10 @@ listing shows:
 ### The rule this task is held to
 
 **The text above is frozen when it lands.** It is not adjusted again before
-[035](035-benchmark-v3-cached.md) measures it, and it is not tuned afterwards until the benchmark
-improves — that would measure the tuning. If v3 says discovery did not move, the result is
-published and the hypothesis above is wrong. This is the same discipline `readb-nudged` was held
-to in v2, and the reason 033 ships a *change* rather than a *fix*.
+[035-benchmark-v3-cached](035-benchmark-v3-cached.md) measures it, and it is not tuned afterwards
+until the benchmark improves — that would measure the tuning. If v3 says discovery did not move, the
+result is published and the hypothesis above is wrong. This is the same discipline `readb-nudged`
+was held to in v2, and the reason 033 ships a *change* rather than a *fix*.
 
 ### Public-surface delta
 

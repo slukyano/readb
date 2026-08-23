@@ -11,8 +11,8 @@ tags:
 created: 2026-08-22
 ---
 
-Found by the v2 agent-efficiency benchmark (`031`, sprint-005). An agent guessed a table name
-without running `readb schema` first and got DuckDB's error passed through unchanged:
+Found by the v2 agent-efficiency benchmark (`031-benchmark-v2`, sprint-005). An agent guessed a
+table name without running `readb schema` first and got DuckDB's error passed through unchanged:
 
 ```
 $ readb query "select status, count(*) from concepts where type='Service' group by status" --bundle corpus

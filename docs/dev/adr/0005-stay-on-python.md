@@ -1,7 +1,7 @@
 ---
 type: ADR
 title: 'readb stays a Python package; per-invocation cost is addressed by fixing the load pass and caching it, not by a rewrite'
-status: Proposed
+status: Accepted
 created: 2026-08-22
 sprint: sprint-006
 timestamp: '2026-08-22T00:00:00Z'
@@ -31,7 +31,7 @@ billed in tokens.
 **Where readb's own time goes.** Measured on the sprint-006 design branch (duckdb 1.5.4, CPython
 3.14.6, macOS arm64, installed console script, median of 5–7 runs):
 
-| Concepts | As shipped | With the `036` fix | On a cache hit |
+| Concepts | As shipped | With the `036-load-pandas-import-probe` fix | On a cache hit |
 | --- | --- | --- | --- |
 | 34 | 150 ms | 114 ms | ~80 ms |
 | 600 | 938 ms | 456 ms | ~80 ms |
@@ -71,10 +71,35 @@ practice "what PyYAML accepts"; Rust's YAML ecosystem is thinner (`serde_yaml` u
 `saphyr`/`yaml-rust2` the live options, checked 2026-08-07), and losslessness under malformed
 input is the behaviour this project has promised hardest.
 
-**What would reopen this.** A measured use case where the process floor is paid often enough to
-matter — an interactive or looping caller making thousands of invocations, where 60 ms each is a
-real number — or a distribution requirement that `uvx` and `gh skill` cannot serve. Absent one of
-those, the question is answered and does not need re-litigating.
+# The trade, stated in full
+
+The decision is recorded with both sides intact, because it is a decision that will be revisited
+and the next reader deserves the argument rather than the conclusion.
+
+| What a Rust core would buy | What it would cost |
+| --- | --- |
+| A single static binary — no Python runtime, no `uv` or `pip` prerequisite; install by downloading a file, or via Homebrew or cargo. | The shipped Python API. `readb.open(path) -> Database` is in `0.1.0` on PyPI; a rewrite drops it or takes on PyO3 plus `maturin`/`cibuildwheel` matrix builds — more release machinery than the pure-Python artifact needs. |
+| A process floor around 5–20 ms instead of ~70 ms, saving roughly 60 ms per invocation. | Redefined load semantics. The permissive-load contract is in practice "what PyYAML accepts"; `serde_yaml` is unmaintained and `saphyr`/`yaml-rust2` are the live options (checked 2026-08-07), so which files load would change silently — the one behaviour this project has promised hardest. |
+| A faster load pass on large bundles — parsing and inserting, not engine time, dominate a cold load. | The rebuild: 1,717 lines of production Python across 9 modules, pinned by 190 tests including the design brief's 12 acceptance criteria. Weeks, not months, but it freezes feature work right after the tool went public. |
+| One artifact per platform rather than a dependency tree; no interpreter-version matrix. | Two toolchains for contributors, or one that is no longer Python. Every future contributor pays that, not just the rewrite. |
+| DuckDB itself is not a blocker: `duckdb-rs` is actively maintained (948★, last push 2026-08-04, checked 2026-08-07). | The measured upside lands below the noise floor of the only workload readb has been benchmarked against — see the numbers above. |
+
+The asymmetry that decides it: every benefit is real but small or replaceable, and every cost is
+paid once and permanently. Nothing on the left is worth 60 ms per invocation *today*, and the two
+items that could become worth it are named below.
+
+**What would reopen this.** Two things, either alone:
+
+1. **A native install story that `uvx` and `gh skill install` cannot serve** — a distribution
+   channel (Homebrew, a plain downloadable binary, an environment with no Python at all) that
+   matters to real users and cannot be satisfied from a Python package. This is the stronger of
+   the two, and it does not require the performance argument at all.
+2. **A reason to shave the ~70 ms floor** — a measured caller that pays it often enough for 60 ms
+   to add up: an interactive loop, a shell integration, a harness making thousands of invocations.
+   Today's evidence says an agent is not that caller.
+
+Neither is speculative-only: both are concrete enough to recognize on sight. Absent one of them,
+the question is answered and does not need re-litigating.
 
 # Consequences
 
@@ -95,9 +120,10 @@ rebuilt to recover 60 ms per invocation that the cost model says is worth nothin
 the shipped Python API and the permissive-load contract.
 
 **PyO3 hybrid — keep the package, move the load pass to Rust.** Rejected on the same evidence and
-one extra count: it targets the load pass specifically, and after `036` and `034` the load pass is
-either 4 ms (hit) or a cost paid once (miss). It would add a compiled-wheel matrix to a project
-whose release story currently fits in one pure-Python artifact.
+one extra count: it targets the load pass specifically, and after `036-load-pandas-import-probe` and
+`034-persistent-index-cache` the load pass is either 4 ms (hit) or a cost paid once (miss). It would
+add a compiled-wheel matrix to a project whose release story currently fits in one pure-Python
+artifact.
 
 **Build a Rust prototype before deciding.** Rejected: a prototype prices the upside precisely, and
 the upside is not what is in doubt. The measurements above locate it below the noise floor of the

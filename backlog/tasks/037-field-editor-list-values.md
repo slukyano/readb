@@ -11,7 +11,8 @@ tags:
 created: 2026-08-22
 ---
 
-Hit while adding `036` to sprint-006's scope, which is an ordinary workflow operation:
+Hit while adding `036-load-pandas-import-probe` to sprint-006's scope, which is an ordinary workflow
+operation:
 
 ```
 $ readb set --bundle ./backlog sprint-006 tasks='[...]'
@@ -19,9 +20,10 @@ Error: tasks: multi-line value (list, block scalar, or nested mapping); readb se
 values only — unset the key first
 ```
 
-The refusal itself is correct and deliberate ([026](../archive/026-field-editor-multiline-corruption.md)
-made `set` refuse a multi-line key rather than discard half of it). The gap is that **there is no
-other command that can do the edit**, and the suggested workaround is worse than the error: `unset`
+The refusal itself is correct and deliberate
+([026-field-editor-multiline-corruption](../archive/026-field-editor-multiline-corruption.md) made
+`set` refuse a multi-line key rather than discard half of it). The gap is that **there is no other
+command that can do the edit**, and the suggested workaround is worse than the error: `unset`
 removes the whole list, after which `set` can only write a scalar back. A required field would be
 gone in between.
 
@@ -39,5 +41,5 @@ This blocks dogfooding. Every sprint that changes scope, and every task that gai
   sequences both have to round-trip in their own style, since bundles are written by other tools.
 - The error message should point at whatever the answer is, instead of at a workaround that loses
   data — that part is worth fixing even if the feature waits.
-- Overlaps [016](016-field-editor-type-inference.md): writing a list means deciding how a list
-  element is typed, which is the same question `set n=42` raises.
+- Overlaps [016-field-editor-type-inference](016-field-editor-type-inference.md): writing a list
+  means deciding how a list element is typed, which is the same question `set n=42` raises.

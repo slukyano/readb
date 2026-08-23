@@ -34,8 +34,9 @@ one battery question that asks five questions in a session is the single place r
 clock, because five queries mean five full bundle loads. A multi-query agent session is the normal
 case, not the edge case.
 
-It is also the lever [028](028-evaluate-rust-rewrite.md) weighs a rewrite against: repeat-invocation
-cost is dominated by re-loading, which is a caching problem rather than a language problem.
+It is also the lever [028-evaluate-rust-rewrite](028-evaluate-rust-rewrite.md) weighs a rewrite
+against: repeat-invocation cost is dominated by re-loading, which is a caching problem rather than a
+language problem.
 
 ## The intended design, as recorded
 
@@ -61,106 +62,131 @@ and the only residual win would be amortizing process startup.
   handling ships with it (`load_bundle` already skips `.readb/` during the walk).
 - Whether any command surface is needed at all (`readb index`/`--no-cache`/`--rebuild`), or whether
   the cache should be entirely invisible except in timings.
-- Interaction with [021](021-cross-bundle-querying.md): one cache per bundle, attached per schema.
+- Interaction with [021-cross-bundle-querying](021-cross-bundle-querying.md): one cache per bundle,
+  attached per schema.
 - The acceptance measure is the v1 table above re-measured, plus the multi-query session case.
 
 ## Design
 
-The cache is **all-or-nothing and consent-gated**: a bundle whose files have not changed since the
-last load is served from a materialized DuckDB file in about 4 ms; any change at all rebuilds the
-whole thing; and nothing is ever written unless the user has already created a `.readb/` registry
-with `readb init`. The read-only promise is restated rather than bent, in
-[ADR 0006](../../docs/dev/adr/0006-cache-consent-and-key.md).
+The cache is **consent-gated, incrementally updated, and immutable on disk**: nothing is written
+unless a `.readb/` registry already exists; a bundle whose files have not changed is served in about
+4 ms; a bundle where one file changed is brought up to date in about 7 ms rather than rebuilt; and
+every update lands atomically by rename. The read-only promise is restated rather than bent, in
+[ADR 0006](../../docs/dev/adr/0006-cache-consent-and-key.md), which also records why git is not used
+to detect change.
 
 ### Measured basis
 
-Taken on the design branch, same conditions as [028](028-evaluate-rust-rewrite.md)'s table:
+Design-branch measurements, duckdb 1.5.4 / CPython 3.14.6 / macOS arm64, medians:
 
 | | 600 concepts | 2000 | 6000 |
 | --- | --- | --- | --- |
-| Materialize the loaded database to a file | 42 ms | 68 ms | 163 ms |
+| Full load from source, after `036-load-pandas-import-probe` | 384 ms | 1266 ms | 3873 ms |
+| **Open the cache and query it** | **4.2 ms** | **4.0 ms** | **4.0 ms** |
+| **Apply a one-file edit** (open, delete rows, re-parse, insert) | — | — | **6.9 ms** |
+| Detect change (`os.scandir` walk) | 1.1 ms | 3.1 ms | 11.1 ms |
+| Copy the cache file, which is what makes an update atomic | — | — | 4.7 ms |
+| Materialize a fresh cache | 42 ms | 68 ms | 163 ms |
 | Cache file size | 4.7 MB | 10.0 MB | 20.5 MB |
-| **Reopen + query (the hit path)** | **4.2 ms** | **4.0 ms** | **4.0 ms** |
-| Stat-only walk (the staleness check) | 2.1 ms | 6.4 ms | 20.3 ms |
-| Full load, after `036` | 384 ms | 1266 ms | 3873 ms |
 
-A hit is flat in bundle size; a miss costs the full load plus the materialize column. Both are
-measured, not projected.
+Both hit paths are flat in bundle size. A cold miss costs a full load plus the materialize row.
 
-### Behaviour
+### The three paths
 
-**The key.** A manifest is built by walking the bundle exactly as the loader walks it (the same
-skip rules, `.readb/` included), recording for every file its bundle-relative POSIX path, size and
-`st_mtime_ns`. The manifest is hashed together with the readb version, the duckdb version and the
-bundle's resolved absolute path. That hash is the cache identity — no git, no content hashing: the
-walk must stay cheap, and mtime granularity on any filesystem readb runs on is nanoseconds.
+**Hit.** Walk the bundle with `os.scandir`, collecting each file's bundle-relative path, its own
+`st_size` and its `st_mtime_ns` — no directory is ever sized. Hash that manifest with the readb and
+duckdb versions; the result is carried in the cache's filename, so recognizing a hit opens nothing.
+Open the file read-only and return. No markdown file is read at all.
 
-**The file.** `<registry root>/.readb/cache/<bundle-slug>-<manifest-hash>.duckdb`. The hash is *in
-the filename*, so the existence of the file is the hit and there is no sidecar to keep in sync. A
-write goes to a temp file in the same directory and lands with `os.replace`, which is atomic; two
-readb processes racing on the same bundle both end up correct, and the loser's work is discarded.
-After a successful write, other files with the same `<bundle-slug>-` prefix are removed, so a
-bundle costs one cache file rather than one per revision.
+**Incremental.** When the manifest differs, open the cached database and read the per-file metadata
+it carries. Files whose stat changed are **hashed before being believed** (0.0016 ms each), so a
+touched-but-unmodified file is not re-parsed. What remains is a change set: for each deleted or
+modified concept, `DELETE ... WHERE __path = ?` from its type table and from `__DOCUMENTS`; for each
+added or modified one, parse the file and insert. Per-(table, column) **type evidence** — a count of
+concepts contributing each lattice type — is decremented and incremented alongside, so the unified
+column type is recomputed exactly rather than guessed.
 
-**The hit path.** Build the manifest, compute the hash, and if the file exists, open it and return.
-Nothing else is read; no markdown file is opened at all.
+The update is applied to a **copy** of the cache file and landed with `os.replace`. Readers in other
+processes keep reading the old inode until the rename; a crash mid-update leaves the previous cache
+intact; there is no write lock to contend on.
 
-**The miss path.** Load as today, materialize with `COPY FROM DATABASE`, rename into place, return
-the in-memory connection. The caller never waits on a second load.
+**Full rebuild.** The incremental path is attempted only when the change is provably local. Any of
+these falls back to loading from source:
 
-**Never stale, never fatal.** Any failure on the hit path — the file will not open, its stored
-readb version does not match, DuckDB reports corruption — is treated as a miss and rebuilt, logged
-at debug level. Any failure on the write path (read-only filesystem, no space, a permissions
-problem) is logged and swallowed: a cache that cannot be written must never fail a query. The
-permissive-load contract extends to the cache.
+- a column's unified type would change under the lattice;
+- a producer key appears for a type, or disappears from it entirely;
+- a type appears or disappears;
+- the normalized-table-name collision map changes (`_route_concepts` resolves collisions, and a new
+  type can change what an existing table is called);
+- the `index.md` / `log.md` set changes;
+- the readb or duckdb version changes;
+- the cache will not open, fails its integrity check, or carries metadata this version does not
+  understand.
 
-**Invalidation is free.** `readb set`/`unset` rewrite a file, which changes its `st_mtime_ns`,
-which changes the manifest hash. No explicit invalidation hook is needed, and a test pins that a
-`set` between two queries is observed by the second.
+The list is the correctness argument, so it is written down here and pinned by the property test
+below rather than left implicit.
 
-**Schema restoration.** DuckDB's catalog gives back the tables and column types on reopen, but not
-the normalized-table-name to original-`type:`-string mapping that `readb schema` prints. That
-mapping is stored as JSON in a `__readb_meta` table created on **both** paths, so a cached load and
-a fresh load are byte-for-byte the same database. It is excluded from `readb schema` output, which
-keeps that public surface unchanged.
+### The invariant
+
+**A cache-hit database answers every query, and prints every `readb schema`, exactly as a freshly
+loaded one does.** Not byte-identical: the cache carries `__readb_*` metadata tables that a cacheless
+load has no reason to build, and they are excluded from `readb schema` output, which keeps that
+public surface unchanged.
+
+A cache hit opens the file read-only. Temp tables still work (verified); persistent DDL fails, which
+readb's read-only contract forbids anyway, and it is what stops a caller's stray `CREATE TABLE` from
+being persisted into the cache.
+
+### Implementation order
+
+1. Detection, metadata and the **hit path**, with every miss falling back to a full rebuild. This is
+   small, and on its own it delivers the whole win for a bundle that is only being read.
+2. The **incremental path** on top, guarded by the fallback list, gated by the property test.
+
+If stage 2 could not be made sound, stage 1 would still ship — but the maintainer's case
+(edit-then-query on a large bundle) is stage 2's, so shipping only stage 1 is a failure to be
+reported, not a quiet outcome.
 
 ### Public-surface delta
 
 | Surface | Change |
 | --- | --- |
 | `readb query`, `readb schema` | New `--no-cache` flag: load from source, neither read nor write the cache. |
-| `readb cache status [--bundle B]` | New. Prints whether a cache exists for the bundle, its path, size and age, or why caching is off. |
-| `readb cache clear [--bundle B]` | New. Deletes the bundle's cache files (all bundles in the registry when `--bundle` is omitted). |
-| `.readb/config.toml` | New optional key `cache = false` disables caching for the whole registry. Absent means enabled. |
-| On disk | New directory `<registry root>/.readb/cache/`, holding one `*.duckdb` file per cached bundle. |
-| `readb init` | Adds `cache/` to the `.gitignore` it maintains under `.readb/`. |
-| Python API | Unchanged. `readb.open(path)` uses the cache under the same rules; `readb.open(path, cache=False)` opts out. |
+| `readb cache status [--bundle B]` | New. Whether a cache exists for the bundle, its path, size and age — or why caching is off. |
+| `readb cache clear [--bundle B]` | New. Deletes the bundle's cache file (every bundle in the registry when `--bundle` is omitted). |
+| `.readb/config.toml` | New optional key `cache = false`, disabling the cache registry-wide. Absent means enabled. |
+| On disk | New `<registry root>/.readb/cache/`, holding one `*.duckdb` file per cached bundle. |
+| Python API | `readb.open(path, cache=False)` opts out; otherwise unchanged. |
+| `readb init` | **Unchanged.** readb does not write or edit `.gitignore`; the README says `.readb/cache/` is disposable. |
 | Output formats, exit codes, `readb get`/`set`/`unset` | Unchanged. |
 
 ### Tests
 
-- Hit and miss are asserted **by observation, not by timing**: a fixture bundle is loaded twice
-  with a spy on the parser — the second load parses zero files.
-- A `set` between two loads is observed by the second (mtime invalidation).
-- Adding, deleting and renaming a file each force a miss; touching nothing forces a hit.
-- No registry root → no cache file is created anywhere, and the query still answers. This is the
-  test that pins the consent rule.
+- **The property test**: apply a random sequence of edits to a fixture bundle — add, delete, modify,
+  rename, change a value's type, introduce a new key, remove the last user of a key, add a new type —
+  and after each step assert that the cached database's schema and full contents equal a fresh
+  load's. This is what makes the fallback list falsifiable.
+- Hit and miss are asserted **by observation, not timing**: a spy on the parser shows zero files
+  parsed on a hit, and exactly the changed files parsed on an incremental update.
+- A `readb set` between two queries is observed by the second (mtime invalidation, no cache hook).
+- Touching a file without changing its bytes does not re-parse it (the hash-on-suspicion path).
+- No registry root → no file is created anywhere, and the query still answers. This pins the consent
+  rule.
 - `cache = false`, `--no-cache` and `cache=False` each suppress both read and write.
-- A corrupt cache file (truncated bytes) yields a correct answer and a rebuilt cache.
-- An unwritable `.readb/cache/` yields a correct answer, no traceback, and no crash.
-- A cached load and a fresh load produce identical `readb schema` output and identical query
-  results over the same bundle.
-- Cache files for older revisions of the same bundle are removed on write.
+- A corrupt cache file yields a correct answer and a rebuilt cache; an unwritable `.readb/cache/`
+  yields a correct answer, no traceback, and no crash.
+- A rename that keeps content identical is handled as a delete plus an add, not a stale row.
+- Concurrency: a second process reading while an update lands gets one coherent database, never a
+  half-written one.
 
 ### Deliberately not in this task
 
-- **No incremental re-parse.** The design brief imagined diffing against a git hash and re-parsing
-  only changed files. It is not built: the column-type lattice unifies across every concept of a
-  type, so one changed file can change a column's type and force the table to be rebuilt anyway.
-  All-or-nothing captures the measured case — repeated queries against an unchanged bundle — and
-  keeps the correctness argument short.
-- **No daemon, no watcher.** The design brief's reasoning holds: at 4 ms per open, the only
-  residual win is amortizing process startup, and [ADR 0005](../../docs/dev/adr/0005-stay-on-python.md)
-  prices that at nothing.
-- **No cross-bundle sharing.** One cache per bundle; [021](021-cross-bundle-querying.md) attaches
+- **No git integration.** ADR 0006 records the measurements: `git status` is no faster than the
+  `scandir` walk, and it introduces blind spots (ignored files, untracked files, multiple
+  repositories, no repository at all) whose failure mode is a stale answer.
+- **No daemon, no watcher.** At 4 ms per open the only residual win is amortizing process startup,
+  which [ADR 0005](../../docs/dev/adr/0005-stay-on-python.md) prices at nothing.
+- **No cross-bundle sharing.** One cache per bundle; `021-cross-bundle-querying` would attach
   per-bundle caches per schema if it is ever built.
+- **No `--verify` mode** that content-hashes every file (106 ms at 6000 files). Worth having the day
+  someone reports a stale answer; not worth paying for by default.

@@ -11,8 +11,8 @@ tags:
 created: 2026-08-22
 ---
 
-Found while measuring the load pass for [028](028-evaluate-rust-rewrite.md), on the sprint-006
-design branch. Measured with duckdb 1.5.4 and CPython 3.14.6 on macOS arm64.
+Found while measuring the load pass for [028-evaluate-rust-rewrite](028-evaluate-rust-rewrite.md),
+on the sprint-006 design branch. Measured with duckdb 1.5.4 and CPython 3.14.6 on macOS arm64.
 
 ## What happens
 
@@ -57,10 +57,12 @@ This hits `uvx readb` hardest, since an isolated tool environment never has pand
   behaviour is worth reporting upstream.
 - Whichever fix lands, the regression test should assert the *count* of `pandas` lookups during a
   load (an import hook counts them deterministically), not a wall-clock threshold.
-- This is the baseline [034](034-persistent-index-cache.md) must be measured against: a cache
-  that beats a load pass which is itself 3× slower than it should be proves very little.
+- This is the baseline [034-persistent-index-cache](034-persistent-index-cache.md) must be measured
+  against: a cache that beats a load pass which is itself 3× slower than it should be proves very
+  little.
 - Benchmark v1 and v2 wall-clock figures for the readb arms were measured with this cost included.
-  Nothing token-billed changes, but [035](035-benchmark-v3-cached.md) should say so.
+  Nothing token-billed changes, but [035-benchmark-v3-cached](035-benchmark-v3-cached.md) should say
+  so.
 
 ## Design
 
