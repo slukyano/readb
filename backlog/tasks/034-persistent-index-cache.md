@@ -87,7 +87,6 @@ Design-branch measurements, duckdb 1.5.4 / CPython 3.14.6 / macOS arm64, medians
 | Detect change (`os.scandir` walk) | 1.1 ms | 3.1 ms | 11.1 ms |
 | Copy the cache file, which is what makes an update atomic | — | — | 4.7 ms |
 | Materialize a fresh cache | 42 ms | 68 ms | 161 ms |
-| Compare one suspect file against the `__raw` in the cache | — | — | 0.79 ms |
 | Cache file size, at `BLOCK_SIZE 16384` | 2.9 MB | — | 22.4 MB |
 
 Both hit paths are flat in bundle size. A cold miss costs a full load plus the materialize row.
@@ -100,11 +99,10 @@ duckdb versions; the result is carried in the cache's filename, so recognizing a
 Open the file read-only and return. No markdown file is read at all.
 
 **Incremental.** When the manifest differs, open the cached database and read the per-file metadata
-it carries — path, size and `st_mtime_ns`, and nothing else. Files whose stat changed are **compared
-before being believed**, against the complete file text the cache already holds in `__raw`: 0.79 ms
-for one suspect, 3.4 ms for twenty, exact rather than probabilistic, and no stored digest to keep
-(a hash column would have cost 256 KB per 6000 files — affordable, but redundant beside a copy of
-the text). A suspect with no `__raw` — a file that failed to parse and was skipped — is re-read. What remains is a change set: for each deleted or
+it carries — path, size and `st_mtime_ns`, and nothing else. **A file whose stat moved is re-parsed
+outright**, with no attempt to check first whether its bytes really changed: re-parsing one file
+costs about 1 ms, and confirming that it did not need re-parsing would cost most of that anyway.
+Nothing is stored to support such a check — no digests, no retained text for comparison. What remains is a change set: for each deleted or
 modified concept, `DELETE ... WHERE __path = ?` from its type table and from `__DOCUMENTS`; for each
 added or modified one, parse the file and insert. Per-(table, column) **type evidence** — a count of
 concepts contributing each lattice type — is decremented and incremented alongside, so the unified
@@ -114,8 +112,14 @@ The update is applied to a **copy** of the cache file and landed with `os.replac
 processes keep reading the old inode until the rename; a crash mid-update leaves the previous cache
 intact; there is no write lock to contend on.
 
-**Full rebuild.** The incremental path is attempted only when the change is provably local. Any of
-these falls back to loading from source:
+**Full rebuild.** The incremental path is attempted only when the change is provably local *and*
+small. Any of these falls back to loading from source:
+
+- the change set exceeds a quarter of the bundle (floor 500 files) — thousands of individual deletes
+  and inserts are slower than a bulk load, and this is also what bounds the cost of a **mass mtime
+  change**: a formatter that rewrites every file with identical bytes, a `cp -R` or `rsync` without
+  `-t`, an unzip, a sync client, or a `git checkout` away and back. readb rebuilds, which costs
+  exactly what every load costs today;
 
 - a column's unified type would change under the lattice;
 - a producer key appears for a type, or disappears from it entirely;
@@ -181,7 +185,9 @@ reported, not a quiet outcome.
 - Hit and miss are asserted **by observation, not timing**: a spy on the parser shows zero files
   parsed on a hit, and exactly the changed files parsed on an incremental update.
 - A `readb set` between two queries is observed by the second (mtime invalidation, no cache hook).
-- Touching a file without changing its bytes does not re-parse it (the hash-on-suspicion path).
+- Touching a file without changing its bytes re-parses it and produces an identical database — the
+  deliberate trade, pinned so it is a decision rather than a surprise.
+- A change set over the threshold takes the full-rebuild path, and the result equals a fresh load.
 - No registry root → no file is created anywhere, and the query still answers. This pins the consent
   rule.
 - `cache = false`, `--no-cache` and `cache=False` each suppress both read and write.

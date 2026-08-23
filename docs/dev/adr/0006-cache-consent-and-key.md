@@ -36,8 +36,6 @@ against a 6000-concept bundle unless stated:
 | `git rev-parse HEAD` | — | — | 4.0 ms |
 | `git ls-files` | — | — | 6.1 ms |
 | Read + content-hash **every** file | 8.2 ms | — | 106.5 ms |
-| Compare **one** suspect file against the `__raw` already in the cache | — | — | 0.79 ms |
-| Compare **twenty** suspects the same way | — | — | 3.4 ms |
 
 | Rebuilding | 6000 concepts |
 | --- | --- |
@@ -60,30 +58,38 @@ in the bundle, and never any file at all outside a `.readb/` directory the user 
 **readb never edits `.gitignore`,** or any other file belonging to the user's tooling. What to ignore
 is the user's business; the documentation says `.readb/cache/` is disposable and the rest is theirs.
 
-**2. Detection: a per-file stat manifest, confirmed against the text the cache already holds. No
-git, and no stored hashes.**
+**2. Detection: a per-file stat manifest. Nothing is hashed and nothing is compared. No git.**
 
 The manifest is built by an `os.scandir` walk that mirrors the loader's own walk, recording for each
 file its bundle-relative POSIX path, **that file's own `st_size`**, and its `st_mtime_ns`. No
 directory is ever sized — a directory's size is not defined cheaply on any filesystem, and nothing
 here needs it.
 
-A file whose size and mtime match its manifest entry is unchanged. A file whose stat differs is
-**compared before being believed** — and the comparison needs no stored digest, because the cache
-already contains every concept's complete file text in the `__raw` virtual column. Reading the
-suspect and comparing it to its `__raw` costs 0.79 ms for one file and 3.4 ms for twenty, and it is
-*exact* rather than probabilistic. A suspect with no `__raw` in the cache — a file that failed to
-parse and was skipped — is simply re-read. Files present in one set and not the other are additions
-and deletions.
+A file whose size and mtime match its manifest entry is unchanged. **A file whose stat differs is
+re-parsed, without first checking whether its bytes actually changed.** Re-parsing one file costs
+about 1 ms; establishing that it did not need re-parsing would cost most of that anyway, so the
+check does not pay for itself on the change sets that dominate — one file, or a handful.
 
-Storing a hash per file would have been affordable rather than wrong (16 bytes each, 256 KB per 6000
-files, about 1% of the cache), but it is unnecessary weight next to a copy of the text itself.
+Nothing is stored to support such a check: no per-file digest, no comparison against retained text.
+Files present in one set and not the other are additions and deletions.
 
 The manifest is hashed together with the readb version and the duckdb version to form the cache
 identity, which is carried in the cache's filename so a hit can be recognized without opening
 anything.
 
-**3. Granularity: incremental.** A change set of added, deleted and modified files is applied to the
+**3. A large change set falls back to a full rebuild.** Applying thousands of individual deletes and
+inserts is slower than loading the bundle from scratch, so above a threshold (a quarter of the
+bundle, floor 500 files) the incremental path is abandoned before it starts. This also bounds what a
+**mass mtime change** can cost.
+
+Mass mtime changes are real and routine: a formatter rewriting every file with identical bytes, a
+`cp -R` or an `rsync` without `-t`, an unzip or a restore from backup, a file-sync client, a
+`git checkout` to another branch and back, a `git stash pop`. In every one of those cases readb sees
+the whole bundle as changed and rebuilds it — which costs exactly what a load costs today, and
+produces a correct answer. That is the deliberate trade: the design does not spend anything to make
+the rare case fast, and its worst case is the status quo.
+
+**4. Granularity: incremental.** A change set of added, deleted and modified files is applied to the
 cached database — delete the affected concepts' rows by `__path`, re-parse only the files that
 actually changed, insert their rows — rather than rebuilding from source. A one-file edit in a
 6000-concept bundle costs 6.9 ms against 3873 ms, and the write-then-query loop
@@ -103,14 +109,14 @@ query, and prints every `readb schema`, exactly as a freshly loaded one does.** 
 be byte-identical, because the cache carries its own metadata tables that a cacheless load has no
 reason to build.
 
-**4. The cache file is immutable; updates are copy-apply-rename.** An update copies the current cache
+**5. The cache file is immutable; updates are copy-apply-rename.** An update copies the current cache
 (4.7 ms at 20 MB), applies the delta to the copy, and lands it with `os.replace`, which is atomic.
 Readers never see a half-written database, concurrent readb processes never contend on a write lock,
 and a crash mid-update leaves the previous cache intact. A cache hit opens the file **read-only**,
 which also means a caller cannot accidentally persist a `CREATE TABLE` into it; temp tables still
 work, and DuckDB permits many simultaneous readers.
 
-**5. Failure is never fatal.** An unreadable, corrupt or version-mismatched cache is a miss. An
+**6. Failure is never fatal.** An unreadable, corrupt or version-mismatched cache is a miss. An
 unwritable cache directory is a logged no-op. A query answers correctly in every case — the same
 permissiveness the load path already promises for malformed markdown.
 
@@ -130,6 +136,8 @@ permissiveness the load path already promises for malformed markdown.
 - mtime is trusted for the *unchanged* verdict. A filesystem with coarse timestamps, or a tool that
   restores mtimes while changing content, could serve a stale answer. Git has the same blind spot
   for the same reason. `--no-cache` and `readb cache clear` are the escape hatches.
+- mtime is also trusted for the *changed* verdict, which costs work rather than correctness: a
+  touched-but-identical file is re-parsed, and a whole bundle of them is rebuilt.
 - **Cache files are created with `BLOCK_SIZE 16384` rather than DuckDB's default.** DuckDB's file
   format has a large fixed overhead — a 9-concept bundle materializes to 3.6 MB and the project's
   own 34-concept backlog to 4.9 MB at the default block size, because every column claims at least
@@ -168,9 +176,16 @@ Rejected: editing one file in a 6000-concept bundle would cost 3873 ms, and edit
 readb's own daily workflow. Simplicity is not worth making the common case the slow one.
 
 **Content-hash every file on every load.** Correct under every filesystem and needs no mtime trust.
-Rejected as the default at 106 ms per invocation on a large bundle — an eightfold increase in the
-hit path's cost to close a gap git does not close either. It remains the natural implementation of a
+Rejected as the default at 106 ms per invocation on a large bundle — an eightfold increase in the hit
+path's cost to close a gap git does not close either. It remains the natural implementation of a
 future `--verify` flag.
+
+**Confirm each suspect file before re-parsing it** — by stored digest, or by comparing against the
+`__raw` text the cache already holds (0.79 ms for one file, 3.4 ms for twenty). Rejected: it buys
+nothing on a one-file change, where re-parsing costs about 1 ms outright, and on a mass mtime change
+the size threshold above sends the load to a full rebuild anyway. It would also have tied change
+detection to `__raw` being *stored*, which
+`038-derive-text-columns` may stop doing.
 
 **Mutate the cache file in place instead of copy-apply-rename.** Saves a 4.7 ms copy and costs
 single-writer locking, contention between concurrent readb processes, and a corrupt cache if a write
