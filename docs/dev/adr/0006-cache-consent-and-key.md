@@ -36,14 +36,15 @@ against a 6000-concept bundle unless stated:
 | `git rev-parse HEAD` | — | — | 4.0 ms |
 | `git ls-files` | — | — | 6.1 ms |
 | Read + content-hash **every** file | 8.2 ms | — | 106.5 ms |
-| Content-hash **one** file | — | — | 0.0016 ms |
+| Compare **one** suspect file against the `__raw` already in the cache | — | — | 0.79 ms |
+| Compare **twenty** suspects the same way | — | — | 3.4 ms |
 
 | Rebuilding | 6000 concepts |
 | --- | --- |
 | Full load from source, after the `036-load-pandas-import-probe` fix | 3873 ms |
 | Open the cache and query it (no change) | 4.0 ms |
 | Apply a one-file edit: open, delete that file's rows, re-parse, insert | 6.9 ms |
-| Copy the 20.5 MB cache file (what makes an update atomic) | 4.7 ms |
+| Copy the cache file (what makes an update atomic) | 4.7 ms |
 
 # Decision
 
@@ -59,17 +60,24 @@ in the bundle, and never any file at all outside a `.readb/` directory the user 
 **readb never edits `.gitignore`,** or any other file belonging to the user's tooling. What to ignore
 is the user's business; the documentation says `.readb/cache/` is disposable and the rest is theirs.
 
-**2. Detection: a per-file stat manifest, confirmed by content hash on suspicion. No git.**
+**2. Detection: a per-file stat manifest, confirmed against the text the cache already holds. No
+git, and no stored hashes.**
 
 The manifest is built by an `os.scandir` walk that mirrors the loader's own walk, recording for each
 file its bundle-relative POSIX path, **that file's own `st_size`**, and its `st_mtime_ns`. No
 directory is ever sized — a directory's size is not defined cheaply on any filesystem, and nothing
-here needs it. Alongside the manifest the cache stores a content hash per file (blake2b, 16 bytes).
+here needs it.
 
 A file whose size and mtime match its manifest entry is unchanged. A file whose stat differs is
-**hashed before being believed**: at 0.0016 ms per file, confirming a suspect costs nothing, and it
-means a touched-but-unmodified file does not trigger a rebuild. Files present in one set and not the
-other are additions and deletions.
+**compared before being believed** — and the comparison needs no stored digest, because the cache
+already contains every concept's complete file text in the `__raw` virtual column. Reading the
+suspect and comparing it to its `__raw` costs 0.79 ms for one file and 3.4 ms for twenty, and it is
+*exact* rather than probabilistic. A suspect with no `__raw` in the cache — a file that failed to
+parse and was skipped — is simply re-read. Files present in one set and not the other are additions
+and deletions.
+
+Storing a hash per file would have been affordable rather than wrong (16 bytes each, 256 KB per 6000
+files, about 1% of the cache), but it is unnecessary weight next to a copy of the text itself.
 
 The manifest is hashed together with the readb version and the duckdb version to form the cache
 identity, which is carried in the cache's filename so a hit can be recognized without opening
@@ -96,7 +104,7 @@ be byte-identical, because the cache carries its own metadata tables that a cach
 reason to build.
 
 **4. The cache file is immutable; updates are copy-apply-rename.** An update copies the current cache
-(4.7 ms for 20.5 MB), applies the delta to the copy, and lands it with `os.replace`, which is atomic.
+(4.7 ms at 20 MB), applies the delta to the copy, and lands it with `os.replace`, which is atomic.
 Readers never see a half-written database, concurrent readb processes never contend on a write lock,
 and a crash mid-update leaves the previous cache intact. A cache hit opens the file **read-only**,
 which also means a caller cannot accidentally persist a `CREATE TABLE` into it; temp tables still
@@ -122,7 +130,13 @@ permissiveness the load path already promises for malformed markdown.
 - mtime is trusted for the *unchanged* verdict. A filesystem with coarse timestamps, or a tool that
   restores mtimes while changing content, could serve a stale answer. Git has the same blind spot
   for the same reason. `--no-cache` and `readb cache clear` are the escape hatches.
-- Cache size is one file per bundle: 4.7 MB at 600 concepts, 20.5 MB at 6000.
+- **Cache files are created with `BLOCK_SIZE 16384` rather than DuckDB's default.** DuckDB's file
+  format has a large fixed overhead — a 9-concept bundle materializes to 3.6 MB and the project's
+  own 34-concept backlog to 4.9 MB at the default block size, because every column claims at least
+  one block. At 16 KB blocks the backlog's cache is 1.5 MB, and nothing regresses at scale: a
+  6000-concept cache is 22.4 MB against 22.0 MB, and its hit path is 3.96 ms against 4.89 ms. Small
+  bundles are the common case, so the small-bundle cost is the one worth cutting.
+- Cache size is one file per bundle: about 1.5 MB for a few dozen concepts, 22 MB at 6000.
 
 # Alternatives considered
 

@@ -86,8 +86,9 @@ Design-branch measurements, duckdb 1.5.4 / CPython 3.14.6 / macOS arm64, medians
 | **Apply a one-file edit** (open, delete rows, re-parse, insert) | — | — | **6.9 ms** |
 | Detect change (`os.scandir` walk) | 1.1 ms | 3.1 ms | 11.1 ms |
 | Copy the cache file, which is what makes an update atomic | — | — | 4.7 ms |
-| Materialize a fresh cache | 42 ms | 68 ms | 163 ms |
-| Cache file size | 4.7 MB | 10.0 MB | 20.5 MB |
+| Materialize a fresh cache | 42 ms | 68 ms | 161 ms |
+| Compare one suspect file against the `__raw` in the cache | — | — | 0.79 ms |
+| Cache file size, at `BLOCK_SIZE 16384` | 2.9 MB | — | 22.4 MB |
 
 Both hit paths are flat in bundle size. A cold miss costs a full load plus the materialize row.
 
@@ -99,8 +100,11 @@ duckdb versions; the result is carried in the cache's filename, so recognizing a
 Open the file read-only and return. No markdown file is read at all.
 
 **Incremental.** When the manifest differs, open the cached database and read the per-file metadata
-it carries. Files whose stat changed are **hashed before being believed** (0.0016 ms each), so a
-touched-but-unmodified file is not re-parsed. What remains is a change set: for each deleted or
+it carries — path, size and `st_mtime_ns`, and nothing else. Files whose stat changed are **compared
+before being believed**, against the complete file text the cache already holds in `__raw`: 0.79 ms
+for one suspect, 3.4 ms for twenty, exact rather than probabilistic, and no stored digest to keep
+(a hash column would have cost 256 KB per 6000 files — affordable, but redundant beside a copy of
+the text). A suspect with no `__raw` — a file that failed to parse and was skipped — is re-read. What remains is a change set: for each deleted or
 modified concept, `DELETE ... WHERE __path = ?` from its type table and from `__DOCUMENTS`; for each
 added or modified one, parse the file and insert. Per-(table, column) **type evidence** — a count of
 concepts contributing each lattice type — is decremented and incremented alongside, so the unified
@@ -125,6 +129,14 @@ these falls back to loading from source:
 
 The list is the correctness argument, so it is written down here and pinned by the property test
 below rather than left implicit.
+
+### Size on disk
+
+Cache files are created with **`BLOCK_SIZE 16384`**, not DuckDB's default. The default format's
+fixed overhead dominates small bundles — the project's own 34-concept backlog materializes to 4.9 MB
+and a 9-concept bundle to 3.6 MB, because every column claims at least one block. At 16 KB blocks the
+backlog's cache is **1.5 MB**, with no regression at scale (6000 concepts: 22.4 MB against 22.0 MB,
+hit path 3.96 ms against 4.89 ms). One file per bundle, deleted and replaced on every update.
 
 ### The invariant
 
