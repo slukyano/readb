@@ -43,9 +43,20 @@ fifteen scalar pairs, thirteen change:
 
 | | Today | After |
 | --- | --- | --- |
-| `BIGINT` + `DOUBLE` | `DOUBLE` | `DOUBLE` — unchanged |
+| `BIGINT` + `DOUBLE` | `DOUBLE` | `DOUBLE` — unchanged, and the one deliberate exception to the rule above |
 | `DATE` + `TIMESTAMP` | `JSON` | `TIMESTAMP` — a date is midnight, the widening SQL itself performs |
 | every other scalar pair | `JSON` | `VARCHAR` |
+
+**`BIGINT` + `DOUBLE` → `DOUBLE` is not lossless, and is kept anyway.** A double cannot hold an
+integer above 2^53: a column with `9007199254740993` beside `1.5` returns `9007199254740992`. That
+contradicts the rule this ADR states, so it is recorded as an exception rather than left to be
+discovered. It is kept because it is what SQL itself does — verified against DuckDB, which resolves
+`BIGINT` with `DOUBLE` to `DOUBLE` in a `UNION`, in arithmetic, in `COALESCE` and in a list, and
+loses exactly the same precision silently; the SQL standard's numeric rule (exact + approximate →
+approximate) says the same. Making readb's most ordinary numeric shape — an integer beside a
+decimal — into text to avoid a precision loss above 2^53 would cost every numeric comparison in the
+column and surprise every user who knows SQL. Values above 2^53 remain exact in `__raw`, and an
+integer too large for `BIGINT` at all is still `VARCHAR`.
 
 The scalar order is `NULL` < {`BOOLEAN`, `BIGINT` < `DOUBLE`, `DATE` < `TIMESTAMP`} < `VARCHAR` <
 `JSON`. A value promoted into a `VARCHAR` column is rendered canonically from the *parsed* value —

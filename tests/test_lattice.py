@@ -165,3 +165,17 @@ def test_pytz_canary_timestamptz_fetch_still_requires_pytz() -> None:
             con.execute("SELECT TIMESTAMPTZ '2026-01-01 00:00:00+00'").fetchall()
     finally:
         con.close()
+
+
+def test_int_and_float_meet_at_double_which_is_the_one_lossy_widening() -> None:
+    """ADR 0008 keeps SQL's own numeric rule, so the rounding above 2^53 is documented, not a bug.
+
+    DuckDB resolves BIGINT with DOUBLE to DOUBLE in a UNION, in arithmetic and in COALESCE, and
+    rounds the same way. Making the commonest numeric shape into text to avoid it would cost
+    every numeric comparison in the column.
+    """
+    from readb.schema import BIGINT, DOUBLE, coerce, unify
+
+    assert _ddl([1, 2.5]) == "DOUBLE"
+    assert unify(BIGINT, DOUBLE) == DOUBLE
+    assert coerce(9007199254740993, DOUBLE) == 9007199254740992.0

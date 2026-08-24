@@ -81,6 +81,8 @@ Rules, narrowest-fit-wins:
 - All values one scalar kind → that type. `int` mixed with `float` → `double`; `date` mixed with
   `timestamp` → `timestamp`; any other pair of scalars → `varchar`, rendered canonically from the
   parsed value.
+- `int` + `float` → `double` is the one lossy widening, kept because SQL resolves the pair the same
+  way and loses the same precision: an integer above 2^53 is rounded. `__raw` keeps the original.
 - An integer outside BIGINT's range is `varchar`, carrying its decimal text.
 - Scalar mixed with list for the same key → promote each scalar to a singleton list; the
   column is a LIST. Unify element types by these same rules.

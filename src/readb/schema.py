@@ -326,9 +326,13 @@ def evidence_key(value: Any) -> str:
 def coerce(value: Any, t: LType) -> Any:
     """Coerce a raw Python value to a representation DuckDB will bind for column type ``t``.
 
-    Lossless by construction: incompatible shapes were unified to JSON upstream, so this never
-    discards data. JSON columns receive a JSON *string*; LIST columns a Python ``list``; STRUCT
-    columns a Python ``dict``.
+    Values that no single type holds were unified to JSON upstream, so this discards nothing —
+    with one documented exception (ADR 0008): a column mixing integers and floats is ``DOUBLE``,
+    which rounds an integer above 2^53. SQL resolves that pair the same way and loses the same
+    precision; ``__raw`` keeps the original text either way.
+
+    JSON columns receive a JSON *string*; LIST columns a Python ``list``; STRUCT columns a
+    Python ``dict``.
     """
     if value is None:
         return None
