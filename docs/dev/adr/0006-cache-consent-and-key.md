@@ -1,10 +1,10 @@
 ---
 type: ADR
 title: 'The persistent cache writes only under an existing .readb/, detects change by a per-file stat manifest, and applies changes incrementally'
-status: Proposed
+status: Accepted
 created: 2026-08-22
 sprint: sprint-006
-timestamp: '2026-08-23T00:00:00Z'
+timestamp: '2026-08-23T12:00:00Z'
 ---
 
 # Context

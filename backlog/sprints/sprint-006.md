@@ -5,16 +5,17 @@ description: Answer the Rust question on the benchmark's evidence, build the per
 tags:
 - architecture
 - performance
-timestamp: '2026-08-22T12:00:00Z'
+timestamp: '2026-08-23T12:00:00Z'
 branch: sprint/006
 created: '2026-08-22'
-status: Designing
+status: Implementing
 tasks:
 - 028-evaluate-rust-rewrite
 - 036-load-pandas-import-probe
 - 034-persistent-index-cache
 - 033-skill-discovery-rate
 - 032-unknown-table-error
+- 040-hash-virtual-column
 ---
 
 Sixth sprint under the [session/sprint workflow](../workflow.md), and the aftermath of the
@@ -64,6 +65,8 @@ delivers the decision plus the two fixes.
       37 of 78 runs and readb never invoked at all on 41
 - [ ] 032-unknown-table-error — a mistyped table names the bundle's tables and `readb schema`
       instead of DuckDB's `duckdb_indexes`
+- [ ] 040-hash-virtual-column — `__hash`, the hex SHA-256 of the file's bytes, in every table that
+      carries `__raw`; the cache consumes the same value
 
 Design order: `028-evaluate-rust-rewrite` → `036-load-pandas-import-probe` →
 `034-persistent-index-cache` → `033-skill-discovery-rate` → `032-unknown-table-error`.
@@ -85,7 +88,7 @@ against a load pass that is itself three times slower than it should be proves n
   pass for `028-evaluate-rust-rewrite`. It is the only high-priority task in the backlog and it
   gates `034-persistent-index-cache`'s measurement.
 
-## Design phase
+## Design phase (approved 2026-08-23)
 
 - [x] `028-evaluate-rust-rewrite` — decided on measurement; proposes [ADR
   0005](../../docs/dev/adr/0005-stay-on-python.md)
@@ -95,6 +98,8 @@ against a load pass that is itself three times slower than it should be proves n
   0006](../../docs/dev/adr/0006-cache-consent-and-key.md)
 - [x] `033-skill-discovery-rate` — the frozen description text and the rule it is held to
 - [x] `032-unknown-table-error` — the message, raised where the schema is known
+- [x] `040-hash-virtual-column` — added to scope during design; proposes
+      [ADR 0007](../../docs/dev/adr/0007-hash-virtual-column.md)
 
 ## Open questions
 
@@ -102,6 +107,10 @@ _(none yet)_
 
 ## Session log
 
+* **2026-08-23** — Design approved. ADRs 0005, 0006 and 0007 `Accepted`; six tasks `Designed`;
+  sprint `Implementing`; design merge to `main`. `040-hash-virtual-column` joined scope during the
+  phase; `038-derive-text-columns` and `039-git-aware-change-detection` were drafted out of it and
+  stay in the backlog.
 * **2026-08-22** — Design phase: all five designs written, ADRs 0005 and 0006 proposed. Load-pass
   and cache-prototype measurements taken on the branch (a cache hit is 4 ms at every bundle size).
 * **2026-08-22** — `036-load-pandas-import-probe` added to scope during 028's design measurements

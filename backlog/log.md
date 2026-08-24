@@ -1,5 +1,18 @@
 # Task Bundle Log
 
+## 2026-08-23
+* **Sprint 006 design approved**: [the Rust decision](archive/../tasks/028-evaluate-rust-rewrite.md),
+  [the load-pass defect](tasks/036-load-pandas-import-probe.md),
+  [the persistent index cache](tasks/034-persistent-index-cache.md),
+  [the skill's discovery rate](tasks/033-skill-discovery-rate.md),
+  [the unknown-table error](tasks/032-unknown-table-error.md) and
+  [the `__hash` column](tasks/040-hash-virtual-column.md) `Draft -> Designed`; sprint
+  `Designing -> Implementing`. Three ADRs accepted: 0005 keeps readb on Python and records the
+  Rust trade in full, 0006 fixes how the cache consents, detects change and applies it
+  incrementally, 0007 adds `__hash`. Four tasks were drafted out of the design phase and stay in
+  the backlog: `037-field-editor-list-values`, `038-derive-text-columns`,
+  `039-git-aware-change-detection` and `035-benchmark-v3-cached`.
+
 ## 2026-08-22
 * **Sprint 006 opened**: Scope approved — [the Rust decision](tasks/028-evaluate-rust-rewrite.md),
   [the persistent index cache](tasks/034-persistent-index-cache.md),

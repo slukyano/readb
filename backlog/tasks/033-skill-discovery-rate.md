@@ -2,13 +2,14 @@
 type: Task
 title: The shipped skill is invoked on fewer than half the runs where it is available
 description: In the v2 benchmark the skill arm loaded the readb skill on 37 of 78 runs and never invoked readb at all on 41 — the arm simply told readb's syntax did far better.
-status: Draft
+status: Designed
 priority: medium
 tags:
 - skill
 - agents
 - docs
 created: 2026-08-22
+timestamp: '2026-08-23T12:00:00Z'
 ---
 
 Found by the v2 agent-efficiency benchmark (`031-benchmark-v2`, sprint-005), which interleaved the

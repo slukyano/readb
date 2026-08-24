@@ -1,10 +1,10 @@
 ---
 type: ADR
 title: '__hash joins the virtual columns: the lowercase hex SHA-256 of the file bytes'
-status: Proposed
+status: Accepted
 created: 2026-08-23
 sprint: sprint-006
-timestamp: '2026-08-23T00:00:00Z'
+timestamp: '2026-08-23T12:00:00Z'
 ---
 
 # Context

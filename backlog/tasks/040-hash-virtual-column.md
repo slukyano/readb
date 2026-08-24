@@ -2,13 +2,14 @@
 type: Task
 title: Expose the file's content hash as a __hash virtual column
 description: The cache computes a per-file digest for change detection; exposing it as a queryable virtual column makes duplicate-finding, change tracking and cross-bundle comparison one-liners.
-status: Draft
+status: Designed
 priority: medium
 tags:
 - query
 - schema
 - cache
 created: 2026-08-23
+timestamp: '2026-08-23T12:00:00Z'
 ---
 
 Raised while designing `034-persistent-index-cache`, which computes a content digest per file to
