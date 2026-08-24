@@ -41,73 +41,96 @@ failure is not a skipped file but a dead bundle — *every* query against it rai
 
 ## Design
 
-Two changes, and the second is the one that matters. The first makes the four known shapes load;
-the second makes an unknown fifth shape cost one column instead of the whole bundle.
+The failing shapes are symptoms: the lattice is not total, so some values have no representable
+type. The fix is to make it total **without introducing a second way to represent a mapping** —
+a column is a `STRUCT` or it is `JSON`, decided by what the values are, never by which awkward
+case was hit. That revises a rule in the binding spec, so it carries
+[ADR 0008](../../docs/dev/adr/0008-struct-field-union.md).
 
-### 1. The lattice becomes total
+### 1. Structs unify by recursive field union
 
-Each failing shape is a value `type_of_value` classifies as something DuckDB then cannot express.
-JSON is the lattice's declared universal fallback and the answer in every case:
+Today two mappings unify to a `STRUCT` only when their key sets match **exactly**, and to `JSON`
+otherwise (`docs/dev/design.md` line 82). That is the same problem the union-of-keys rule already
+solved one level up, solved differently: a type's table takes the union of every producer key and
+fills the gaps with NULL. Mappings now do the same.
 
-| Value | Today | After |
+| Values in a column | Today | After |
 | --- | --- | --- |
-| `{}` — a mapping with no entries | `STRUCT()`, which is not valid DDL | `JSON` |
-| A mapping whose stringified keys are not distinct (`{1: a, "1": b}`) | `STRUCT` with a duplicate field name | `JSON` |
-| A mapping with an empty-string key (`{"": 1}`) | `STRUCT` with a zero-length identifier | `JSON` |
-| An integer outside BIGINT — measured boundary is exactly ±2^63 | `BIGINT`, which the value does not fit | `JSON` |
+| `{a: 1}`, `{a: 2}` | `STRUCT(a BIGINT)` | `STRUCT(a BIGINT)` — unchanged |
+| `{a: 1}`, `{b: "x"}` | `JSON` | `STRUCT(a BIGINT, b VARCHAR)`, each missing field NULL |
+| `{a: {x: 1}}`, `{a: {y: 2}}` | `JSON` | `STRUCT(a STRUCT(x BIGINT, y BIGINT))` — recursive |
+| `{a: 1}`, `"text"` | `JSON` | `JSON` — a mapping and a non-mapping still meet at the top |
 
-The rule for mappings is stated once, positively: **a mapping is a `STRUCT` only when its keys
-stringify to a set of distinct, non-empty names; otherwise it is JSON.** The rule for integers is
-the same shape: **an integer is `BIGINT` only when it fits in one.** Nothing is dropped and nothing
-is guessed, which is the existing contract; these are the cases where the contract was not applied.
+Fields stay sorted by name, so the type is deterministic regardless of document order.
 
-Sub-values are classified by the same function, so `[{}]` becomes `JSON[]` and `{a: {}}` becomes
-JSON by way of its field — no special-casing per nesting depth.
+### 2. An all-empty mapping gets a placeholder field
 
-### 2. A table build cannot take the load down
+`{}` contributes no fields, so a column whose values are *all* empty mappings would render as
+`STRUCT()`, which is not valid DDL. Such a column is rendered `STRUCT("__DUMMY" VARCHAR)` — one
+placeholder field, always NULL. As soon as any value contributes a real field the placeholder is
+gone, because the union is non-empty; `{}` beside `{a: 1}` is simply `STRUCT(a BIGINT)` with a NULL
+row.
 
-The load's promise is that a bad file is logged and skipped, never fatal, and today a single
-unrenderable column breaks every query against the bundle. Type rules fix the shapes that are
-known; the promise has to hold for the ones that are not. `_build_table` gains a bounded ladder,
-each rung logged:
+The placeholder is visible: `readb schema` prints it and `SELECT flag FROM t` returns
+`{'__DUMMY': NULL}`. That is the price of a mapping column that carries no keys at all, and it is
+preferable to the column silently becoming something else.
+
+### 3. Keys are strings, and a collision keeps the last one
+
+YAML keys may be any scalar; a `STRUCT` field name is a string. Every key is stringified, which is
+already what the code does — the gap is that two distinct YAML keys can collide once stringified
+(`{1: a, "1": b}`), which DuckDB rejects as a duplicate field name.
+
+**The last occurrence in document order wins**, which is the rule PyYAML already applies to
+genuinely duplicate YAML keys, so one convention covers both and `readb get`/`SELECT` agree with
+the file. A collision is logged once per document, since a silently dropped value is worth a line.
+
+### 4. An integer that does not fit BIGINT is text
+
+`type_of_value` calls every Python integer a `BIGINT`; the measured boundary is exactly ±2^63, and a
+value outside it kills the load at insert time. Such a value is classified `VARCHAR` — its decimal
+text, lossless and comparable — and the normal lattice rules take it from there.
+
+**The consequence, stated because it is a decision and not an accident:** a column mixing in-range
+and out-of-range integers unifies `BIGINT` with `VARCHAR`, which the existing lattice sends to
+`JSON`. Ask 2 in the design presentation asks whether that is the wanted outcome or whether such a
+column should become `VARCHAR` throughout.
+
+### 5. A table build still cannot take the load down
+
+With the lattice total, the nine measured shapes load. The promise — a bad file is logged and
+skipped, never fatal — has to hold for shapes nobody has enumerated yet, so `_build_table` gains a
+bounded ladder, each rung logged and recorded in `schema.warnings`:
 
 1. Create and insert with the inferred DDL — today's path, unchanged for every bundle that works.
-2. On failure, rebuild that table with every non-virtual column as `JSON`. This is the widest
-   type in the lattice and the one thing that can hold any value the parser produced.
-3. On failure again, create the table with its virtual columns only (`__path`, `__name`, `__body`,
-   `__raw`, `__hash`) and no frontmatter columns, so the documents remain addressable and the rest
-   of the bundle remains queryable.
+2. On failure, rebuild that table with every non-virtual column as `JSON`.
+3. On failure again, create it with virtual columns only, so its documents stay addressable.
 
-Only the affected table degrades; the others are untouched. Each fallback appends to
-`schema.warnings`, so `readb schema` shows it and a caller can see that a table is degraded rather
-than wondering why a column is missing.
+Only the affected table degrades. This is defence in depth rather than a fix for anything known to
+be broken, and it can be dropped without affecting the four rules above.
 
-### Public-surface delta
+### Public-surface delta — including a breaking change
 
 | Surface | Change |
 | --- | --- |
-| Inferred column types | Four value shapes that previously killed the load now yield `JSON`. No bundle that loads today changes type: every affected shape is one that currently raises. |
-| `readb schema` | May now print a warning line for a degraded table. The table and column output is unchanged otherwise. |
+| Inferred column types | **Breaking:** a column of mappings with differing key sets is `STRUCT` where it was `JSON`. A query using JSON access (`flag ->> 'a'`) on such a column breaks; struct access (`flag.a`) starts working. Columns whose key sets already matched are unaffected. |
+| Inferred column types | Four shapes that previously *killed the load* now have types: empty mappings (`STRUCT("__DUMMY" VARCHAR)` when nothing else contributes), colliding stringified keys (last wins), an out-of-range integer (`VARCHAR`). |
+| `readb schema` | Prints `STRUCT(...)` where it printed `JSON` for those columns, plus a warning line for a degraded table. |
 | Exit codes, CLI commands, flags, Python API names, on-disk paths | Unchanged. |
 
-### Consequence for the cache, stated rather than discovered
-
-`schema.warnings` being non-empty makes the persistent cache refuse the incremental path (ADR 0006,
-because a whole-bundle warning cannot be attributed to a file). A bundle that degrades a table
-therefore rebuilds its cache on every change instead of updating it. That is correct and cheap for
-the rare bundle it applies to; if it ever stops being rare, the answer is attributable warnings,
-not a weaker rule.
+Caches built by an earlier readb are invalidated automatically: the cache key carries the readb
+version (ADR 0006), so no bundle is served types from the old rule.
 
 ### Tests
 
-- One fixture bundle carrying **all nine measured shapes** — `{}`, `[{}]`, `{a: {}}`, `tags: {}`,
-  duplicate stringified keys, an empty-string key, and integers at `2^63`, `2^64` and `-2^63` —
-  alongside healthy documents. Every healthy document stays queryable and every bad value round
-  trips as JSON.
-- The boundary is pinned on both sides: `2^62` is still `BIGINT`, `2^63` is `JSON`.
-- A test that forces rung 2 and a test that forces rung 3 by monkeypatching the DDL renderer to
-  emit something invalid — the ladder must be exercised by something other than the shapes rung 1
-  already handles, since those are exactly the ones this task removes.
-- A degraded table's warning appears in `schema.warnings` and in `readb schema` output.
-- The 12 acceptance criteria and the existing lattice suite keep passing unchanged: this task adds
-  total cases, it does not renegotiate any type that already worked.
+- A fixture bundle carrying **all nine measured shapes** alongside healthy documents: every healthy
+  document stays queryable, and every previously fatal value round trips.
+- The union rule at each shape: disjoint key sets, overlapping key sets, nested mappings unified
+  recursively, a mapping beside a non-mapping still meeting at `JSON`.
+- The placeholder: a column of only `{}` is `STRUCT("__DUMMY" VARCHAR)`; adding one real key removes
+  the placeholder entirely.
+- Key collision: `{1: a, "1": b}` keeps `b`, and logs.
+- The integer boundary on both sides: `2^62` is `BIGINT`, `2^63` and `-2^63 - 1` are `VARCHAR`.
+- Rungs 2 and 3 of the ladder, forced by monkeypatching the renderer to emit invalid DDL — the
+  shapes that used to reach them are exactly the ones this task removes.
+- The 12 acceptance criteria keep passing; the lattice suite gains cases and loses none.
