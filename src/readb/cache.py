@@ -301,14 +301,30 @@ def _replay_warnings(payload: str) -> None:
 
 
 def _merge_warnings(
-    stored: str, captured: list[tuple[str, str, str | None]], touched: set[str]
-) -> str:
-    """Carry forward the warnings for files this update did not read, and replace the rest."""
+    stored: str,
+    captured: list[tuple[str, str, str | None]],
+    touched: set[str],
+    present: set[str],
+) -> str | None:
+    """Carry forward the warnings for files this update did not read, and replace the rest.
+
+    A stored warning survives only when it names a file that is still in the bundle and that
+    this update did not re-read. Returns None — meaning "rebuild instead" — for anything else.
+    Some warnings belong to a whole type rather than to one document (a producer key shadowing
+    a virtual column names the *key*, not a path), and this path can neither confirm nor retire
+    those; repeating one about a document that has since been deleted is worse than reloading.
+    """
     try:
         previous = json.loads(stored)
     except ValueError:
         previous = []
-    kept = [entry for entry in previous if len(entry) < 3 or entry[2] not in touched]
+    kept = []
+    for entry in previous:
+        subject = entry[2] if len(entry) > 2 else None
+        if subject is None or subject not in present:
+            return None
+        if subject not in touched:
+            kept.append(entry)
     return json.dumps(kept + [list(entry) for entry in captured])
 
 
@@ -575,10 +591,13 @@ def _apply_incremental(
         }
         # How many concepts each type table holds: a table whose last one leaves must not
         # survive as an empty table, which a fresh load would never produce.
+        # A table exists only because documents of its type do exactly when the loader recorded
+        # an original type for it. Testing the name's prefix instead would exclude a *user* type
+        # that normalizes to `__something`, and leave its table behind empty.
         populations = {
             table: reader.execute(f"SELECT count(*) FROM {quote_ident(table)}").fetchone()[0]
-            for table in schema.tables
-            if not table.startswith("__")
+            for table, described in schema.tables.items()
+            if described.original_type is not None
         }
     except (KeyError, duckdb.Error):
         reader.close()
@@ -614,8 +633,13 @@ def _apply_incremental(
             return None
         deletes, inserts, evidence = plan
         warnings = _merge_warnings(
-            meta.get("warnings", "[]"), collector.records, set(changed) | set(added) | set(removed)
+            meta.get("warnings", "[]"),
+            collector.records,
+            set(changed) | set(added) | set(removed),
+            set(entries),
         )
+        if warnings is None:
+            return None
 
     # Build the updated cache beside its destination and rename it into place, exactly as a
     # full write does: until the rename, no file carries the new manifest key, so a crash or a
@@ -716,6 +740,19 @@ def _plan_delta(
     """Work out the row deltas, or return None when a full rebuild is the honest answer."""
     from readb.schema import RESERVED_FILENAMES
 
+    if schema.warnings:
+        # `BundleSchema.warnings` describes the bundle as a whole — a shadowed virtual column, a
+        # type-name collision — and is recomputed only by a full load. Carrying it forward would
+        # repeat a warning about a document that has since been deleted.
+        return None
+
+    if _has_normalization_collision(schema):
+        # Two raw types normalizing to one name are told apart by a suffix, and which of them
+        # owns the un-suffixed name is decided by whichever document comes first in path order
+        # (loader._assign_table_name). A delete or a rename can reassign that, and no row delta
+        # can express it — so a bundle with a collision is always rebuilt.
+        return None
+
     working = {
         table: {c: Counter(counts) for c, counts in cols.items()}
         for table, cols in evidence.items()
@@ -777,6 +814,19 @@ def _plan_delta(
             inserts.append((name, columns, values))
 
     return changed + removed, inserts, working
+
+
+def _has_normalization_collision(schema: BundleSchema) -> bool:
+    """Do two distinct raw ``type:`` strings normalize to the same table name?"""
+    seen: set[str] = set()
+    for table in schema.tables.values():
+        if table.original_type is None:
+            continue
+        normalized = normalize_type(table.original_type)
+        if normalized in seen:
+            return True
+        seen.add(normalized)
+    return False
 
 
 def _concept_from_raw(path: str, raw: str) -> Concept | None:

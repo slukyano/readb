@@ -111,7 +111,9 @@ disposable — delete it, or `readb cache clear`, and the next query rebuilds it
 answers from a stale one: any change, corruption, or readb or DuckDB version difference is a
 rebuild. One thing differs between a cached and an uncached load: the cached database carries a
 `__readb_meta` table of readb's own bookkeeping, so `SHOW TABLES` and `duckdb_tables()` list it.
-It is excluded from `readb schema`, and every bundle table answers identically either way.
+It is excluded from `readb schema`, and every bundle table holds identical rows either way.
+Row order is not a contract — a query with no `ORDER BY` may return the same rows in a different
+sequence with the cache on — so sort explicitly when order matters.
 
 ```sh
 readb cache status --bundle ./library   # where it is, how big, whether it is current

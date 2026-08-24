@@ -118,7 +118,11 @@ column) **type evidence** — how many concepts contribute each lattice type —
 and incremented as files leave and enter, and the unified type recomputed from it.
 
 The invariant, stated so it can be tested rather than asserted: **every table derived from the
-bundle answers exactly as a freshly loaded one does, and `readb schema` prints the same thing.** The
+bundle holds exactly the rows a freshly loaded one holds, and `readb schema` prints the same
+thing.** Row *order* is not part of it: a fresh load inserts in path order while an incremental
+update appends, so a query with no `ORDER BY` can return the same rows in a different sequence —
+which SQL does not promise in the first place, and which two uncached loads need not agree on
+either. Anything that depends on order has to say so. The
 two databases are not identical: a cached one additionally carries the `__readb_meta` table holding
 readb's own bookkeeping, which a cacheless load has no reason to build. It is excluded from
 `readb schema` and from the table list an unknown-table error prints, but a catalog query

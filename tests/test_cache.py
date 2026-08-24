@@ -536,3 +536,66 @@ def test_a_path_containing_a_quote_still_caches(tmp_path: Path) -> None:
     assert _rows(bundle) == _fresh_rows(bundle)
     assert list((root / ".readb" / "cache").glob("*.duckdb")), "the cache must actually be written"
     assert cache.status(str(bundle))["current"] is True
+
+
+def test_a_user_type_named_like_a_system_table_does_not_survive_empty(tmp_path: Path) -> None:
+    """The "last document of a type left" guard keys on the recorded type, not the table name."""
+    bundle = tmp_path / "notes"
+    bundle.mkdir()
+    (tmp_path / ".readb").mkdir()
+    (tmp_path / ".readb" / "config.toml").write_text(
+        'version = 1\nbundles = ["notes"]\n', encoding="utf-8"
+    )
+    (bundle / "a.md").write_text("---\ntype: Task\ntitle: A\n---\na\n", encoding="utf-8")
+    (bundle / "z.md").write_text("---\ntype: __internal\ntitle: Z\n---\nz\n", encoding="utf-8")
+
+    def tables(cached: bool) -> tuple:
+        with readb.open(str(bundle), cache=cached) as db:
+            schema = db.schema()
+            return tuple(sorted(schema.tables)), tuple(sorted(schema.type_mapping.items()))
+
+    tables(True)
+    (bundle / "z.md").unlink()
+    assert tables(True) == tables(False)
+
+
+def test_a_collision_bundle_is_never_updated_incrementally(tmp_path: Path) -> None:
+    """Which colliding type owns the un-suffixed name depends on document order, not on rows."""
+    bundle = tmp_path / "notes"
+    bundle.mkdir()
+    (tmp_path / ".readb").mkdir()
+    (tmp_path / ".readb" / "config.toml").write_text(
+        'version = 1\nbundles = ["notes"]\n', encoding="utf-8"
+    )
+    (bundle / "a.md").write_text("---\ntype: Foo\ntitle: A\n---\na\n", encoding="utf-8")
+    (bundle / "b.md").write_text("---\ntype: F-oo\ntitle: B\n---\nb\n", encoding="utf-8")
+    (bundle / "c.md").write_text("---\ntype: Foo\ntitle: C\n---\nc\n", encoding="utf-8")
+
+    def routing(cached: bool) -> tuple:
+        with readb.open(str(bundle), cache=cached) as db:
+            mapping = tuple(sorted(db.schema().type_mapping.items()))
+            rows = tuple(
+                tuple(sorted(r.items()))
+                for r in db.sql("SELECT __path, type FROM foo ORDER BY __path")
+            )
+            return mapping, rows
+
+    routing(True)
+    (bundle / "a.md").unlink()
+    assert routing(True) == routing(False)
+
+
+def test_a_warning_about_a_deleted_document_is_not_replayed(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    """A stored warning survives only while it names a file the bundle still has."""
+    bundle = _bundle(tmp_path)
+    (bundle / "spoof.md").write_text(
+        "---\ntype: Note\n__path: nonsense\n---\nbody\n", encoding="utf-8"
+    )
+    readb.open(str(bundle)).close()
+    (bundle / "spoof.md").unlink()
+    caplog.clear()
+    with caplog.at_level(logging.WARNING, logger="readb"):
+        readb.open(str(bundle)).close()
+    assert not [r for r in caplog.records if "shadows a virtual column" in r.getMessage()]
