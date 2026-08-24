@@ -40,6 +40,7 @@ readb query "SELECT __name, status, title FROM adr ORDER BY __name" --bundle ./d
 ## Proposed
 
 * [0006 — The persistent cache writes only under an existing .readb/](adr/0006-cache-consent-and-key.md)
+* [0007 — __hash joins the virtual columns: the hex SHA-256 of the file bytes](adr/0007-hash-virtual-column.md)
 
 ## Accepted
 
