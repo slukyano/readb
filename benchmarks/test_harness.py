@@ -1022,3 +1022,44 @@ def test_e2_compares_a_proportion_against_v2s_recorded_rate():
     assert analyze.two_proportion_p(70, 78, 37, 78) < 0.001
     # Degenerate inputs return NaN rather than dividing by zero.
     assert math.isnan(analyze.two_proportion_p(0, 0, 37, 78))
+
+
+# --- findings from the independent review of the v3 instrument ---------------------------------
+
+
+def test_e2_uses_an_exact_test_not_a_normal_approximation():
+    """Each arm is 78 runs; the approximation is anti-conservative exactly where it matters."""
+    assert analyze.two_proportion_p(50, 78, 37, 78) == pytest.approx(0.0527, abs=0.001)
+    assert analyze.two_proportion_p(37, 78, 37, 78) == pytest.approx(1.0)
+
+
+def test_the_holm_family_is_the_three_endpoints_the_design_declares():
+    """Correcting two while declaring three publishes a p smaller than the design allows."""
+    family = analyze.holm([0.90, 0.03, 0.02])
+    assert family == pytest.approx([0.90, 0.06, 0.06], abs=1e-9)
+    pair = analyze.holm([0.03, 0.02])
+    assert pair[0] < family[1], "a family of two is more permissive — that is the defect"
+
+
+def test_the_declared_exclusion_rules_are_the_applied_ones():
+    base = {"arm": "readb-bare", "answer_parsed": True, "supported": True}
+    assert analyze.invalid({**base, "rate_limited": True})
+    assert analyze.invalid({**base, "compacted": True})
+    assert analyze.invalid({**base, "answer_parsed": False, "supported": False})
+    # A wrong answer is never excluded: it is the measurement.
+    assert analyze.invalid({**base, "exact": False}) is None
+    # A missing field is not evidence of anything.
+    assert analyze.invalid({"arm": "readb-bare"}) is None
+
+
+def test_a_cached_arm_whose_treatment_did_not_apply_is_excluded():
+    """An unapplied treatment produces exactly the null result E1 predicts."""
+    applied = {"arm": "readb-cached", "cache_state": "current"}
+    assert analyze.invalid(applied) is None
+    assert analyze.invalid({"arm": "readb-cached", "cache_state": "NOT-PRIMED: caching off"})
+
+
+def test_the_wall_clock_secondary_is_scoped_to_the_declared_stratum():
+    """Reporting it over every question and both models publishes an undeclared number."""
+    assert analyze.CACHE_SECONDARY_STRATUM == "backlog"
+    assert 0.9 < analyze.AA_WALL_ARTEFACT_SONNET < 1.0, "the A/A ordering bias, from v2's records"

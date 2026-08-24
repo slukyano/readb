@@ -75,25 +75,87 @@ ENDPOINTS = [
     },
 ]
 
-# E2 is a proportion rather than a paired contrast over questions, so it is computed apart from
-# these two and reported beside them.
-SKILL_INVOCATION_V2 = (37, 78)  # v2: the skill arm loaded the skill on 37 of 78 runs
+# E2 is a proportion rather than a paired contrast over questions, so it is computed by
+# `skill_discovery()` rather than `run_endpoint()` — but it is a member of the same declared
+# family of three, and its p is Holm-corrected with E1's and E3's. Correcting a family of two
+# while declaring three publishes a p that is smaller than the design allows.
+SKILL_INVOCATION_V2 = (37, 78)
+
+# The stratum the pre-registration scopes the wall-clock secondary to (E1's).
+CACHE_SECONDARY_STRATUM = "backlog"
+
+# Measured from v2's records, where `readb-bare` and `readb-nudged` were both uncached and
+# adjacent in every cell: the later-running arm looks this much faster with no treatment at all.
+# Any wall-clock effect smaller than this is an ordering artefact, not a finding.
+AA_WALL_ARTEFACT_SONNET = 0.944  # v2: the skill arm loaded the skill on 37 of 78 runs
 
 
 def two_proportion_p(hits_a: int, n_a: int, hits_b: int, n_b: int) -> float:
-    """Two-sided p for two independent proportions, by normal approximation.
+    """Two-sided p for two independent proportions — Fisher's exact test.
 
-    Both arms here run in the hundreds, so the approximation holds; a tiny battery would need
-    an exact test, and the count is printed beside the p-value so a reader can judge.
+    Each arm here is 78 runs, not the hundreds a normal approximation wants, and at that size the
+    approximation is anti-conservative exactly where it matters: 50/78 against 37/78 is p = 0.036
+    by the normal approximation and 0.053 exactly. Publishing the first would call a result
+    significant that is not.
     """
     if not n_a or not n_b:
         return float("nan")
-    pooled = (hits_a + hits_b) / (n_a + n_b)
-    spread = math.sqrt(pooled * (1 - pooled) * (1 / n_a + 1 / n_b))
-    if spread == 0:
-        return 1.0
-    z = (hits_a / n_a - hits_b / n_b) / spread
-    return math.erfc(abs(z) / math.sqrt(2))
+    table = [[hits_a, n_a - hits_a], [hits_b, n_b - hits_b]]
+    return _fisher_exact_two_sided(table)
+
+
+def _fisher_exact_two_sided(table: list[list[int]]) -> float:
+    """Sum the hypergeometric probabilities no larger than the observed one."""
+    (a, b), (c, d) = table
+    row1, row2 = a + b, c + d
+    col1, total = a + c, a + b + c + d
+    if total == 0:
+        return float("nan")
+
+    def probability(x: int) -> float:
+        return math.exp(
+            math.lgamma(row1 + 1)
+            + math.lgamma(row2 + 1)
+            + math.lgamma(col1 + 1)
+            + math.lgamma(total - col1 + 1)
+            - math.lgamma(total + 1)
+            - math.lgamma(x + 1)
+            - math.lgamma(row1 - x + 1)
+            - math.lgamma(col1 - x + 1)
+            - math.lgamma(total - col1 - row1 + x + 1)
+        )
+
+    observed = probability(a)
+    low, high = max(0, col1 - row2), min(col1, row1)
+    return min(
+        1.0, sum(p for x in range(low, high + 1) if (p := probability(x)) <= observed * 1.0000001)
+    )
+
+
+def skill_discovery(clean: list[dict]) -> dict | None:
+    """E2: how often the skill arm actually invoked the skill, against v2's recorded rate.
+
+    Pinned to Sonnet, as every other endpoint is: v2's 37/78 is a Sonnet-only figure, and
+    pooling a second model in on this side alone would compare different things.
+    """
+    rows = [
+        r
+        for r in clean
+        if r["arm"] == "readb-skill" and (r.get("model") or "") == "claude-sonnet-5"
+    ]
+    if not rows:
+        return None
+    fired = sum(1 for r in rows if r.get("skill_readb_used"))
+    was, was_of = SKILL_INVOCATION_V2
+    return {
+        "n": len(rows),
+        "fired": fired,
+        "rate": fired / len(rows),
+        "never_readb": sum(1 for r in rows if not r.get("readb_used")),
+        "was": was,
+        "was_of": was_of,
+        "p": two_proportion_p(fired, len(rows), was, was_of),
+    }
 
 
 def load(path: Path) -> list[dict]:
@@ -105,15 +167,36 @@ def faulted(rec: dict) -> bool:
 
 
 def invalid(rec: dict) -> str | None:
-    """Runs whose numbers must not be used, and why."""
+    """Runs whose numbers must not be used, and why — v3's declared rules, in order.
+
+    A wrong answer is never excluded; it is the measurement. Each rule below is one the
+    pre-registration names, and each is applied here rather than merely recorded, which is the
+    defect an independent review of this file found: the published "N excluded" sentence has to
+    describe the rules that actually ran.
+    """
     if rec.get("retracted"):
         return rec["retracted"]
     if faulted(rec):
         return rec.get("harness_error") or f"api error {rec.get('api_error_status')}"
+    if rec.get("rate_limited"):
+        return "the runtime was rate-limited mid-run"
     if rec.get("leak_baseline_readb"):
         return "readb leaked into the baseline arm"
     if rec.get("permission_denials"):
         return "permission denied mid-run"
+    if rec.get("compacted"):
+        return "context compaction fired, so the run is not comparable"
+    if (
+        "answer_parsed" in rec
+        and "supported" in rec
+        and not rec["answer_parsed"]
+        and not rec["supported"]
+    ):
+        # Both fields must be present to conclude anything: a record that simply does not carry
+        # them is not evidence that the question went unattempted.
+        return "no ANSWER line and no tool call: the question was never attempted"
+    if rec.get("arm", "").endswith("cached") and rec.get("cache_state", "current") != "current":
+        return f"the cache treatment did not apply ({rec.get('cache_state')})"
     return None
 
 
@@ -349,8 +432,13 @@ def main() -> None:
     if not args.skip_endpoints and not args.sweep_only:
         print("## Pre-registered endpoints\n")
         results = [run_endpoint(e, clean, strata_of) for e in ENDPOINTS]
+        # E2 is computed differently — a proportion, not a paired contrast — but it belongs to
+        # the same declared family of three, so its p enters the Holm correction with the others.
+        e2 = skill_discovery(clean)
         raw = [r["test"]["p"] if r["test"] else 1.0 for r in results]
-        adjusted = holm(raw)
+        raw_family = [*raw, e2["p"] if e2 and not math.isnan(e2["p"]) else 1.0]
+        adjusted_family = holm(raw_family)
+        adjusted, e2_holm = adjusted_family[:-1], adjusted_family[-1]
         print("| id | contrast | model | questions | effect | p | Holm p | test |")
         print("|" + "---|" * 8)
         for result, p_adj in zip(results, adjusted, strict=True):
@@ -364,8 +452,22 @@ def main() -> None:
                 f"| {result['effect']} {result['ci']} | {raw_p} | {holm_p} | {method} |"
             )
         print()
+        if e2:
+            print(
+                f"| E2 | skill invocation rate, `readb-skill` vs v2's {e2['was']}/{e2['was_of']} "
+                f"| sonnet-5 | {e2['n']} runs | {e2['fired']}/{e2['n']} = {e2['rate']:.0%} "
+                f"| {e2['p']:.4f} | {e2_holm:.4f} | Fisher exact |"
+            )
+        print()
         for result in results:
             print(f"- **{result['id']}** — {result['why']}.")
+        if e2:
+            print(
+                "- **E2** — whether the description rewritten in sprint-006 is found more often "
+                "than the one v2 measured. Read with the confounds in the write-up: v3's skill "
+                "arm also runs against a primed cache, the skill's body changed, and the runtime "
+                "moved between batteries."
+            )
         print()
 
     by_arm_model = defaultdict(list)
@@ -467,27 +569,54 @@ def main() -> None:
         print()
 
     # --- the cache contrast ---------------------------------------------------
-    for model in models:
-        if {(model, "readb-bare"), (model, "readb-cached")} <= set(by_arm_model):
-            rows_here = [r for r in clean if (r.get("model") or "?") == model]
-            bare_med = question_medians(rows_here, "readb-bare", model, "cost_billed_usd")
-            cached_med = question_medians(rows_here, "readb-cached", model, "cost_billed_usd")
-            shared = sorted(set(bare_med) & set(cached_med))
-            ratios = [cached_med[q] / bare_med[q] for q in shared if bare_med[q]]
-            wall_bare = question_medians(rows_here, "readb-bare", model, "wall_s")
-            wall_cached = question_medians(rows_here, "readb-cached", model, "wall_s")
-            wall_shared = sorted(set(wall_bare) & set(wall_cached))
-            wall_ratios = [wall_cached[q] / wall_bare[q] for q in wall_shared if wall_bare[q]]
-            print(f"\n### The cache — `readb-cached` against `readb-bare` ({model})\n")
-            print("Identical preambles; the corpus is a registry with a primed cache.\n")
-            print("| measure | ratio, cached/bare | questions |")
-            print("| --- | --- | --- |")
-            if ratios:
-                print(f"| billed cost | {med(ratios):.2f}x | {len(ratios)} |")
-            if wall_ratios:
-                wall = f"{med(wall_ratios):.2f}x"
-                print(f"| wall clock (declared secondary) | {wall} | {len(wall_ratios)} |")
-            print()
+    # Scoped exactly as the pre-registration declares: E1's stratum, E1's model. Reporting it
+    # over every question and both models — which an earlier draft of this file did — publishes
+    # a number the design never claimed.
+    cache_model = "claude-sonnet-5"
+    if {(cache_model, "readb-bare"), (cache_model, "readb-cached")} <= set(by_arm_model):
+        here = [
+            r
+            for r in clean
+            if (r.get("model") or "?") == cache_model
+            and strata_of.get(r["question"]) == CACHE_SECONDARY_STRATUM
+        ]
+        bare_cost = question_medians(here, "readb-bare", cache_model, "cost_billed_usd")
+        cached_cost = question_medians(here, "readb-cached", cache_model, "cost_billed_usd")
+        bare_wall = question_medians(here, "readb-bare", cache_model, "wall_s")
+        cached_wall = question_medians(here, "readb-cached", cache_model, "wall_s")
+        cost_ratios = [
+            cached_cost[q] / bare_cost[q]
+            for q in sorted(set(bare_cost) & set(cached_cost))
+            if bare_cost[q]
+        ]
+        wall_ratios = [
+            cached_wall[q] / bare_wall[q]
+            for q in sorted(set(bare_wall) & set(cached_wall))
+            if bare_wall[q]
+        ]
+        print("\n### The cache — `readb-cached` against `readb-bare`\n")
+        print(
+            f"{cache_model.replace('claude-', '')}, {CACHE_SECONDARY_STRATUM} stratum. Identical "
+            "preambles; the corpus is a registry with a primed cache.\n"
+        )
+        print("| measure | ratio, cached/bare | questions |")
+        print("| --- | --- | --- |")
+        if cost_ratios:
+            print(f"| billed cost | {med(cost_ratios):.2f}x | {len(cost_ratios)} |")
+        if wall_ratios:
+            wall = f"{med(wall_ratios):.2f}x"
+            print(f"| wall clock (declared secondary) | {wall} | {len(wall_ratios)} |")
+        print(
+            f"\n**The wall-clock figure cannot be read as the cache's effect.** Arms run in a "
+            f"fixed order within every cell, and `readb-cached` always runs immediately after "
+            f"`readb-bare`. v2's `readb-bare` vs `readb-nudged` pair — both uncached, adjacent in "
+            f"the same way — shows a median wall ratio of {AA_WALL_ARTEFACT_SONNET:.2f} favouring "
+            "the later arm on Sonnet with no treatment present at all. Any wall-clock effect "
+            "smaller than that is indistinguishable from running second. The cache's speed is "
+            "established by direct measurement of readb itself, reported in the write-up, not by "
+            "this contrast."
+        )
+        print()
 
     # --- hazard diagnostics ---------------------------------------------------
     hazard = (

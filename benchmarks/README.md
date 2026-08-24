@@ -72,6 +72,11 @@ without any visible sign.
 
 ## Reproducing v2
 
+> These commands reproduce **v2**, whose arm set included `readb-nudged` and no `readb-cached`,
+> against `readb==0.2.0`. Run them into a fresh results path: the runner treats an
+> `(arm, question, model, corpus, repeat)` cell already present in the file as done, so pointing
+> them at v2's existing files would skip every run and mix two batteries in one analysis.
+
 Four corpora, then four blocks. `$C` below stands for the four `--corpus` flags, which every
 block passes identically.
 
@@ -101,14 +106,14 @@ python benchmarks/run_benchmark.py $C --results benchmarks/results/v2-sonnet.jso
 # 2. Haiku — four arms, no skill arm (312 runs)
 python benchmarks/run_benchmark.py $C --results benchmarks/results/v2-haiku.jsonl \
     --models claude-haiku-4-5 --repeats 3 \
-    --arms baseline,shell-coached,readb-bare,readb-cached
+    --arms baseline,shell-coached,readb-bare,readb-nudged
 
 # 3. Floors — the fixed harness overhead, per arm and model (27 runs)
 python benchmarks/run_benchmark.py $C --results benchmarks/results/v2-floor.jsonl \
     --models claude-sonnet-5 --repeats 3 --questions q1 --floor
 python benchmarks/run_benchmark.py $C --results benchmarks/results/v2-floor.jsonl \
     --models claude-haiku-4-5 --repeats 3 --questions q1 --floor \
-    --arms baseline,shell-coached,readb-bare,readb-cached
+    --arms baseline,shell-coached,readb-bare,readb-nudged
 
 # 4. Messy against tidy — the same questions, both renderings (54 runs), one file:
 #    resume keys on the corpus, so the second half is not mistaken for the first

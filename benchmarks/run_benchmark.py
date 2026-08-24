@@ -551,7 +551,7 @@ def costs(usage: dict, prices: dict) -> dict:
     }
 
 
-def prime_cache(workdir: Path, readb_bin: Path) -> None:
+def prime_cache(workdir: Path, readb_bin: Path) -> str:
     """Make this run's corpus a readb registry and build its cache before the agent starts.
 
     The claim under test is about repeat invocation — an agent working in a repository someone
@@ -565,6 +565,17 @@ def prime_cache(workdir: Path, readb_bin: Path) -> None:
         check=True,
         capture_output=True,
     )
+    # An arm whose treatment silently failed to apply would produce exactly the null result E1
+    # predicts, so the treatment is verified rather than assumed. `readb cache status` reports
+    # "current" only when a cache exists and matches the bundle as it stands.
+    status = subprocess.run(
+        [str(readb_bin), "cache", "status", "--bundle", "corpus"],
+        cwd=workdir,
+        check=False,
+        capture_output=True,
+        text=True,
+    ).stdout
+    return "current" if "current" in status else f"NOT-PRIMED: {status.strip()[:120]}"
 
 
 # --- one run ------------------------------------------------------------------
@@ -578,8 +589,7 @@ def run_one(
     workdir = cfg.workroot / f"kb-{uuid.uuid4().hex[:12]}"
     workdir.mkdir(parents=True)
     shutil.copytree(corpus, workdir / "corpus")
-    if arm.cached:
-        prime_cache(workdir, cfg.readb_bin)
+    cache_state = prime_cache(workdir, cfg.readb_bin) if arm.cached else "not-requested"
 
     env = {
         "HOME": os.environ["HOME"],
@@ -676,6 +686,9 @@ def run_one(
 
     record = {
         "arm": arm.name,
+        # Whether the arm's treatment actually applied. An arm whose cache silently failed to
+        # build would produce exactly the null result E1 predicts, so it is recorded, not assumed.
+        "cache_state": cache_state,
         "question": question.id,
         "shape": question.shape,
         "favours": question.favours,
@@ -1116,8 +1129,15 @@ def main() -> None:
     questions = questions_wanted
     already = done_cells(cfg.results)
 
-    # Interleave: arms round-robin inside each repeat and the question order rotates per
-    # repeat, so no arm systematically inherits a warm cache or a quiet machine.
+    # Question order rotates per repeat, so no question systematically runs on a quiet machine.
+    #
+    # Arm order does NOT rotate: every cell runs the arms in the order given, so an arm always
+    # follows the same neighbour. Cost is robust to that (v2's uncached A/A pair sits at 0.996 on
+    # Sonnet), but wall clock is not — the later arm of an adjacent pair looks ~6% faster with no
+    # treatment at all. Any wall-clock contrast between adjacent arms has to be read against that
+    # artefact, which is why the analysis prints it beside the number. Rotating arm order would
+    # remove the artefact and is the right fix for a future battery; it changes what a resumed
+    # run's recorded cells mean, so it is not a change to make mid-battery.
     plan = []
     models = cfg.models.split(",")
     for repeat in range(1, cfg.repeats + 1):
