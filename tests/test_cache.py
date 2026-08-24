@@ -255,6 +255,17 @@ def test_a_cache_hit_repeats_the_warnings_the_load_emitted(
     assert any("broken.md" in record.getMessage() for record in caplog.records)
 
 
+def test_cache_bookkeeping_never_shows_up_in_a_user_facing_list(tmp_path: Path) -> None:
+    """The cache's own tables are readb's, not the bundle's."""
+    bundle = _bundle(tmp_path)
+    _rows(bundle)
+    with readb.open(str(bundle)) as db:
+        assert all(not name.startswith("__readb_") for name in db.schema().tables)
+        with pytest.raises(readb.UnknownTableError) as caught:
+            db.sql("SELECT * FROM nope")
+    assert "__readb_" not in str(caught.value)
+
+
 def test_a_cache_hit_opens_read_only(tmp_path: Path) -> None:
     bundle = _bundle(tmp_path)
     _rows(bundle)

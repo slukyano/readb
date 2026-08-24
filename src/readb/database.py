@@ -94,7 +94,9 @@ class Database:
             ).fetchall()
         except Exception:  # noqa: BLE001 - never let error reporting raise its own error
             return list(self._schema.tables)
-        return [row[0] for row in rows]
+        # The cache's own bookkeeping lives in the same database on a hit; it is readb's, not
+        # the bundle's, and naming it here would be as unhelpful as DuckDB's `duckdb_indexes`.
+        return [row[0] for row in rows if not row[0].startswith("__readb_")]
 
     def schema(self) -> BundleSchema:
         """Return the detected schema: types, normalized table names, columns + inferred types."""
