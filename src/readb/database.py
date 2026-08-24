@@ -32,15 +32,17 @@ class Database:
         self._bundle_path = bundle_path
 
     @classmethod
-    def from_bundle(cls, bundle_path: str) -> Database:
-        """Load ``bundle_path`` into a fresh in-memory DuckDB and return a Database.
+    def from_bundle(cls, bundle_path: str, *, cache: bool = True) -> Database:
+        """Load ``bundle_path`` and return a Database.
 
-        Implementation lives in :mod:`readb.loader` (the load seam), so a persistent-index
-        cache can later wrap loading without touching this class.
+        Loading goes through :mod:`readb.cache`, which serves an unchanged bundle from a
+        materialized DuckDB file when the user consented to one with ``readb init`` (ADR 0006),
+        and otherwise calls the load seam in :mod:`readb.loader` directly. ``cache=False``
+        always loads from source.
         """
-        from readb.loader import load_bundle
+        from readb.cache import load
 
-        connection, schema = load_bundle(bundle_path)
+        connection, schema = load(bundle_path, enabled=cache)
         return cls(connection, schema, bundle_path)
 
     def sql(self, query: str, parameters: list[Any] | None = None) -> list[dict[str, Any]]:

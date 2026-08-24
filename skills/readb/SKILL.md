@@ -51,6 +51,11 @@ prints every table, its original type, and every column with its inferred type.
 | `__raw` | the byte-exact file text, frontmatter included |
 | `__hash` | lowercase hex SHA-256 of the file's bytes, as `sha256sum` prints it |
 
+**Repeat queries are cached** once the directory sits under a `.readb/` registry: run
+`readb init <dir>` there once, and an unchanged bundle is served from a materialized index
+instead of being re-read. Without that registry readb writes nothing anywhere, and a query that
+must not touch disk at all can pass `--no-cache`.
+
 `__name` is derived from the filename and is immutable. A `name:` key in frontmatter is an
 ordinary data column and changes nothing about addressing.
 

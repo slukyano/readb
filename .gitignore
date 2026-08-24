@@ -46,3 +46,6 @@ tests/fixtures/upstream/
 # The aggregated analyses and the per-batch manifests are.
 benchmarks/results/*.jsonl
 benchmarks/results/transcripts/
+
+# readb's own persistent index cache (disposable; ADR 0006)
+.readb/cache/

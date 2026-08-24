@@ -46,6 +46,9 @@ packages = ["src/readb"]
 exclude = ["backlog", "docs", "benchmarks", ".readb", "AGENTS.md", "CLAUDE.md"]
 
 [tool.pytest.ini_options]
+markers = [
+    "uses_cache: exercises the persistent index cache against a real registry",
+]
 testpaths = ["tests"]
 # Never collect the cloned upstream fixtures (they ship their own, unrelated test suite).
 addopts = "-ra --ignore=tests/fixtures"

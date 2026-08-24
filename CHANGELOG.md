@@ -7,6 +7,15 @@ All notable changes to readb are documented here, following
 
 ### Added
 
+- A persistent index cache. Once a bundle sits under a `.readb/` registry (`readb init`), readb
+  keeps a materialized index in `.readb/cache/` and serves an unchanged bundle from it: on a
+  6000-concept bundle a query goes from 4.1 s to 0.14 s, editing one file then querying costs
+  0.18 s, and touching every file without changing any costs 0.27 s and re-reads nothing. A
+  changed file is re-indexed on its own; anything that would alter the inferred schema rebuilds
+  the whole index. Without a registry readb writes nothing, anywhere, exactly as before.
+  `readb cache status` and `readb cache clear` inspect and remove it; `--no-cache`,
+  `cache = false` in the registry config, and `readb.open(path, cache=False)` switch it off.
+
 - `__hash`, a fifth virtual column on every table: the lowercase hex SHA-256 of the file's bytes,
   the same value `sha256sum` prints. Byte-identical documents are now
   `GROUP BY __hash HAVING count(*) > 1`, and a bundle can be compared against an external record

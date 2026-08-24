@@ -32,7 +32,7 @@ from __future__ import annotations
 import contextlib
 import logging
 import sys
-from collections import defaultdict
+from collections import Counter, defaultdict
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -49,6 +49,7 @@ from readb.schema import (
     TableSchema,
     as_list_type,
     coerce,
+    evidence_key,
     infer_type,
     normalize_type,
     quote_ident,
@@ -94,12 +95,21 @@ _TAGS = "__TAGS"
 _TAGS_FIELD = "tags"
 
 
-def load_bundle(bundle_path: str) -> tuple[duckdb.DuckDBPyConnection, BundleSchema]:
+def load_bundle(
+    bundle_path: str, *, evidence: dict[str, dict[str, Counter[str]]] | None = None
+) -> tuple[duckdb.DuckDBPyConnection, BundleSchema]:
     """Read and parse the whole bundle, returning a populated DuckDB connection and its schema.
 
-    Strictly read-only with respect to the bundle: no files are created or modified. The current
-    implementation re-reads and re-parses every file on each call (milliseconds at hundreds of
-    files); a cache may later wrap this seam.
+    Strictly read-only with respect to the bundle: no files are created or modified. This call
+    always loads from source; :mod:`readb.cache` wraps it and may answer from a materialized
+    database instead.
+
+    Args:
+        bundle_path: the bundle root.
+        evidence: when given, filled with ``{table: {column: Counter[type key]}}`` — how many
+            concepts contribute each lattice type to each column. The cache needs it to decide
+            whether a change alters an inferred column type; a plain load passes None and pays
+            nothing.
 
     Raises:
         FileNotFoundError: if ``bundle_path`` does not exist or is not a directory.
@@ -116,18 +126,20 @@ def load_bundle(bundle_path: str) -> tuple[duckdb.DuckDBPyConnection, BundleSche
     by_table, name_to_original, unknown = _route_concepts(concepts, schema)
 
     # Build every table (pass 1 infer + pass 2 insert happen inside _build_table per table).
-    _build_table(connection, _DOCUMENTS, concepts, list(RESERVED_FIELDS), None, schema)
+    _build_table(connection, _DOCUMENTS, concepts, list(RESERVED_FIELDS), None, schema, evidence)
     for table_name in sorted(by_table):
         rows = by_table[table_name]
         columns = list(RESERVED_FIELDS) + _producer_keys(rows)
-        _build_table(connection, table_name, rows, columns, name_to_original[table_name], schema)
+        _build_table(
+            connection, table_name, rows, columns, name_to_original[table_name], schema, evidence
+        )
 
     unknown_columns = list(RESERVED_FIELDS) + _producer_keys(unknown)
-    _build_table(connection, _UNKNOWNTYPE, unknown, unknown_columns, None, schema)
+    _build_table(connection, _UNKNOWNTYPE, unknown, unknown_columns, None, schema, evidence)
 
-    _build_table(connection, _INDEXES, indexes, _frontmatter_union(indexes), None, schema)
+    _build_table(connection, _INDEXES, indexes, _frontmatter_union(indexes), None, schema, evidence)
     if logs:
-        _build_table(connection, _LOG, logs, _frontmatter_union(logs), None, schema)
+        _build_table(connection, _LOG, logs, _frontmatter_union(logs), None, schema, evidence)
 
     _create_tags_view(connection)
 
@@ -237,6 +249,7 @@ def _build_table(
     frontmatter_columns: list[str],
     original_type: str | None,
     schema: BundleSchema,
+    evidence: dict[str, dict[str, Counter[str]]] | None = None,
 ) -> None:
     """Infer types for ``frontmatter_columns``, create ``table_name``, and insert ``rows``.
 
@@ -262,6 +275,16 @@ def _build_table(
             connection.executemany(
                 f"INSERT INTO {quote_ident(table_name)} VALUES ({placeholders})", bound_rows
             )
+
+    if evidence is not None:
+        # One entry per concept that *has* the key: a column exists while its count is positive,
+        # and its type is the lattice join over the types counted here.
+        table_evidence = evidence.setdefault(table_name, {})
+        for column in frontmatter_columns:
+            counts = table_evidence.setdefault(column, Counter())
+            for concept in rows:
+                if column in concept.frontmatter:
+                    counts[evidence_key(concept.frontmatter[column])] += 1
 
     table_schema = TableSchema(table_name=table_name, original_type=original_type)
     for column in frontmatter_columns:

@@ -32,16 +32,22 @@ except PackageNotFoundError:  # a source tree that was never installed
 __all__ = ["Database", "UnknownTableError", "open", "__version__"]
 
 
-def open(bundle_path: str) -> Database:  # noqa: A001 - mirrors the sqlite3/duckdb `open` idiom
+def open(  # noqa: A001 - mirrors the sqlite3/duckdb `open` idiom
+    bundle_path: str, *, cache: bool = True
+) -> Database:
     """Open an OKF bundle and return a queryable, read-only :class:`Database`.
 
-    Builds an in-memory DuckDB from the markdown-with-frontmatter files under
-    ``bundle_path``. No files are created or modified anywhere in the bundle.
+    Builds a DuckDB from the markdown-with-frontmatter files under ``bundle_path``. No file in
+    the bundle is ever created or modified.
 
     Args:
         bundle_path: Path to the root directory of an OKF bundle.
+        cache: Use the persistent index cache when the user consented to one by running
+            ``readb init`` (ADR 0006). The cache lives under that ``.readb/`` directory and
+            nowhere else; with no registry above the bundle nothing is written either way.
+            Pass False to always load from source.
 
     Returns:
         A :class:`Database` ready to accept ``.sql(...)`` queries.
     """
-    return Database.from_bundle(bundle_path)
+    return Database.from_bundle(bundle_path, cache=cache)

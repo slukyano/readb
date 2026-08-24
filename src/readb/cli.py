@@ -31,6 +31,7 @@ import click
 import duckdb
 
 import readb
+from readb import cache as cache_module
 from readb import fields, parser, registry
 
 # --bundle never defaults to the cwd: that silently treats any directory (a repo root, $HOME)
@@ -71,7 +72,15 @@ def main() -> None:
     help="Output format (default: table). raw prints values verbatim, one per line.",
 )
 @click.option("--json", "as_json", is_flag=True, help="Alias for --format json.")
-def query(sql: str, bundle: str | None, output_format: str | None, as_json: bool) -> None:
+@click.option(
+    "--no-cache",
+    "no_cache",
+    is_flag=True,
+    help="Load from source: neither read nor write the persistent index cache.",
+)
+def query(
+    sql: str, bundle: str | None, output_format: str | None, as_json: bool, no_cache: bool
+) -> None:
     """Execute SQL against the bundle and print the result rows."""
     if as_json and output_format not in (None, "json"):
         raise click.UsageError(f"--json conflicts with --format {output_format}")
@@ -79,7 +88,7 @@ def query(sql: str, bundle: str | None, output_format: str | None, as_json: bool
     from_flag = bundle is not None
     bundle = _resolve_bundle(bundle)
     try:
-        with readb.open(bundle) as db:
+        with readb.open(bundle, cache=not no_cache) as db:
             columns, raw_rows = db.sql_table(sql)
     except readb.UnknownTableError as exc:
         # A registry-resolved bundle needs no --bundle in the suggested command (ADR 0004).
@@ -100,11 +109,17 @@ def query(sql: str, bundle: str | None, output_format: str | None, as_json: bool
 
 @main.command()
 @_BUNDLE_OPTION
-def schema(bundle: str | None) -> None:
+@click.option(
+    "--no-cache",
+    "no_cache",
+    is_flag=True,
+    help="Load from source: neither read nor write the persistent index cache.",
+)
+def schema(bundle: str | None, no_cache: bool) -> None:
     """Print detected types, their normalized table names, and columns + types."""
     bundle = _resolve_bundle(bundle)
     try:
-        with readb.open(bundle) as db:
+        with readb.open(bundle, cache=not no_cache) as db:
             bundle_schema = db.schema()
     except duckdb.Error as exc:
         raise click.ClickException(str(exc)) from exc
@@ -373,3 +388,42 @@ def _format_schema(bundle_schema: Any) -> str:
 
 if __name__ == "__main__":
     main()
+
+
+@main.group()
+def cache() -> None:
+    """Inspect or remove the persistent index cache (ADR 0006).
+
+    The cache lives under the ``.readb/`` directory ``readb init`` created, and nowhere else:
+    a bundle with no registry above it is never cached and never written to.
+    """
+
+
+@cache.command("status")
+@_BUNDLE_OPTION
+def cache_status(bundle: str | None) -> None:
+    """Report whether this bundle has a cache, where it is, and how current it is."""
+    bundle = _resolve_bundle(bundle)
+    reported = cache_module.status(bundle)
+    if not reported["enabled"]:
+        click.echo(f"caching off: {reported['reason']}")
+        return
+    if reported["path"] is None:
+        click.echo(f"caching on: {reported['reason']} ({cache_module.cache_dir_for(bundle)})")
+        return
+    size = reported["bytes"] / 1_000_000
+    state = "current" if reported["current"] else "stale (the next query refreshes it)"
+    click.echo(f"{reported['path']}\n{size:.1f} MB, {reported['files']} files indexed, {state}")
+
+
+@cache.command("clear")
+@_BUNDLE_OPTION
+def cache_clear(bundle: str | None) -> None:
+    """Delete this bundle's cache files. The next query rebuilds them."""
+    bundle = _resolve_bundle(bundle)
+    removed = cache_module.clear(bundle)
+    if not removed:
+        click.echo("nothing to clear")
+        return
+    for path in removed:
+        click.echo(f"removed {path}")
