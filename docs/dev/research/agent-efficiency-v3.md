@@ -28,9 +28,11 @@ describe a load path that no longer exists:
 
 # Method
 
-Identical to v2 in corpora, battery and strata — four corpora (`ops` 600 concepts messy,
-`ops-malformed` 612, `ops-tidy` 600 as the sweep control, `backlog` 192) and the same 26 questions
-across five strata — so the two batteries stay comparable line for line. Two things differ.
+Corpora, battery and strata are v2's — four corpora (`ops` 600 concepts messy, `ops-malformed` 612,
+`ops-tidy` 600 as the sweep control, `backlog` 192) and the same 26 questions across five strata —
+so the two batteries stay comparable on those axes. What differs is listed in full below, including
+the differences that were not intended as treatments, because E2 compares a rate across batteries
+and every uncontrolled difference is a rival explanation for a move in it.
 
 ## One arm added, to price the cache
 
@@ -73,6 +75,23 @@ chose the "wrong" tool.
 changes seconds rather than turns. Wall clock returns as a **declared secondary** for E1's contrast
 alone — the one place two arms share a machine, a repeat and a corpus, which is what made wall clock
 untrustworthy in v2 and trustworthy here.
+
+## What differs between v2 and v3, in full
+
+Two intended changes, and four that came along with them:
+
+| Difference | Intended? | Bears on |
+| --- | --- | --- |
+| `readb-cached` added | yes | E1, E3 |
+| `readb-nudged` dropped | yes | comparability of the arm set |
+| `readb-skill`'s corpus is now a primed registry too | **no** — a consequence of the arm design | **E2** |
+| The skill's *body* changed in sprint-006: a `__hash` row and a paragraph about `readb init` | **no** | **E2** |
+| The agent runtime moved between batteries | **no** | everything, weakly |
+| Arms run in a fixed order, so `readb-cached` always follows `readb-bare` | pre-existing | the wall-clock secondary |
+
+The last one is why the wall-clock secondary cannot be read as the cache's effect: v2's uncached
+`readb-bare`/`readb-nudged` pair, adjacent in exactly the same way, shows the later arm ~6% faster
+on Sonnet with no treatment at all.
 
 <!-- RESULTS PENDING: this document is not complete until the sections below are written from the
      measured runs. Do not publish or cite it in this state. -->
