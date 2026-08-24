@@ -110,6 +110,15 @@ assumed unique but not guaranteed), `__body` (the markdown body, frontmatter str
 hex SHA-256 of the file's bytes — the value `sha256sum` prints, so duplicate detection is
 `GROUP BY __hash HAVING count(*) > 1`).
 
+A query naming a table the bundle does not have is answered with the tables it *does* have:
+
+```
+$ readb query "SELECT * FROM concepts" --bundle ./library
+Error: no table named 'concepts' in this bundle.
+Tables: author, book, __DOCUMENTS, __INDEXES, __TAGS, __UNKNOWNTYPE.
+Run 'readb schema --bundle ./library' for their columns.
+```
+
 ## Type inference
 
 Each column's type is inferred once at load time as the narrowest DuckDB type that losslessly

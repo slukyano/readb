@@ -76,10 +76,14 @@ def query(sql: str, bundle: str | None, output_format: str | None, as_json: bool
     if as_json and output_format not in (None, "json"):
         raise click.UsageError(f"--json conflicts with --format {output_format}")
     output_format = "json" if as_json else (output_format or "table")
+    from_flag = bundle is not None
     bundle = _resolve_bundle(bundle)
     try:
         with readb.open(bundle) as db:
             columns, raw_rows = db.sql_table(sql)
+    except readb.UnknownTableError as exc:
+        # A registry-resolved bundle needs no --bundle in the suggested command (ADR 0004).
+        raise click.ClickException(exc.render(show_bundle=from_flag)) from exc
     except duckdb.Error as exc:
         raise click.ClickException(str(exc)) from exc
     rows = [dict(zip(columns, row, strict=True)) for row in raw_rows]

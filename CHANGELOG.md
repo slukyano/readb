@@ -21,6 +21,13 @@ All notable changes to readb are documented here, following
 
 ### Fixed
 
+- A query naming a table that does not exist is now answered with the bundle's own tables and a
+  pointer to `readb schema`. DuckDB's catalog error was passed through verbatim, so a mistyped
+  name could be answered with `Did you mean "duckdb_indexes"?` — a table that exists in no bundle.
+  An unknown *column* keeps DuckDB's candidate bindings, which are drawn from the right table, and
+  gains the same pointer. `readb.UnknownTableError` is exported and subclasses
+  `duckdb.CatalogException`, so existing handlers keep working.
+
 - The shipped usage skill's leading example now invokes `readb` directly. It opened with
   `uvx readb query ...`, so the first runnable line an agent read failed with `command not found`
   on any machine where readb was installed without `uv` — by pip, pipx, Homebrew, a distribution

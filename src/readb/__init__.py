@@ -18,6 +18,7 @@ from importlib.metadata import PackageNotFoundError
 from importlib.metadata import version as _installed_version
 
 from readb.database import Database
+from readb.errors import UnknownTableError
 
 try:
     # Derived, never written down twice: pyproject.toml is the single version source, and a
@@ -28,7 +29,7 @@ try:
 except PackageNotFoundError:  # a source tree that was never installed
     __version__ = "0+unknown"
 
-__all__ = ["Database", "open", "__version__"]
+__all__ = ["Database", "UnknownTableError", "open", "__version__"]
 
 
 def open(bundle_path: str) -> Database:  # noqa: A001 - mirrors the sqlite3/duckdb `open` idiom
