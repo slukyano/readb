@@ -431,17 +431,38 @@ def test_only_the_skill_arm_carries_uv():
     assert not any(a.uv_on_path for name, a in ARMS.items() if name != "readb-skill")
 
 
-def test_the_nudge_is_an_arm_and_never_an_edit_to_the_base_arm():
-    """Folding routing guidance into `readb-bare` would silently redefine what v1 measured."""
-    from run_benchmark import ARMS, NUDGE, PREAMBLE_READB
+def test_the_cache_arm_differs_from_the_bare_arm_only_in_the_corpus():
+    """`readb-cached` prices the cache, so its treatment must not be a word of prompt text."""
+    from run_benchmark import ARMS, PREAMBLE_READB
 
-    assert NUDGE not in ARMS["readb-bare"].preamble
-    assert ARMS["readb-bare"].preamble == PREAMBLE_READB
-    assert ARMS["readb-nudged"].preamble == PREAMBLE_READB + NUDGE
-    # The nudge routes; it must not answer. Naming a table or a column would leak the schema
-    # to one arm and turn the contrast into a hint.
-    for leak in ("SELECT", "FROM", "service", "task", "GROUP BY"):
-        assert leak not in NUDGE, f"the nudge names {leak!r}, which is coaching, not routing"
+    bare, cached = ARMS["readb-bare"], ARMS["readb-cached"]
+    assert bare.preamble == PREAMBLE_READB
+    assert cached.preamble == bare.preamble
+    assert (bare.readb_on_path, bare.extra_args, bare.expects_skill, bare.uv_on_path) == (
+        cached.readb_on_path,
+        cached.extra_args,
+        cached.expects_skill,
+        cached.uv_on_path,
+    )
+    assert cached.cached is True and bare.cached is False
+
+
+def test_the_dropped_nudge_arm_is_gone_entirely():
+    """v2 published the nudge as a negative; carrying a half-removed arm would confuse v3."""
+    import run_benchmark
+
+    assert "readb-nudged" not in run_benchmark.ARMS
+    assert not hasattr(run_benchmark, "NUDGE")
+
+
+def test_priming_is_not_charged_to_the_arm():
+    """The cache is built before the runtime call whose tokens and wall clock are recorded."""
+    import inspect
+
+    from run_benchmark import run_one
+
+    source = inspect.getsource(run_one)
+    assert source.index("prime_cache") < source.index("CLAUDE_BIN")
 
 
 def test_every_corpus_has_a_coached_recipe():
