@@ -47,8 +47,8 @@ the backlog; the release has no task yet and needs one when it is next proposed.
 - [x] 041-empty-struct-crashes-the-load — the lattice is total: scalars promote to text, maps
       unify by field union, keys normalize at the parse boundary, and a table degrades rather
       than failing the load
-- [ ] 035-benchmark-v3-cached — the full matrix re-run: five arms, two models, four corpora, the
-      26-question battery, pre-registered before the first measured run
+- [~] 035-benchmark-v3-cached — harness changed, pre-registration committed, matrix running:
+      Sonnet's five arms, then Haiku's four, then the floors
 
 ## Design phase
 
