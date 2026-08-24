@@ -164,6 +164,11 @@ be broken, and it can be dropped without affecting the four rules above.
 | `readb schema` | Prints `STRUCT(...)` where it printed `JSON` for those columns, plus a warning line for a degraded table. |
 | Exit codes, CLI commands, flags, Python API names, on-disk paths | Unchanged. |
 
+**How much this actually breaks, measured rather than estimated:** every real bundle available was
+loaded under both lattices and its schema compared — the three upstream OKF bundles and this
+project's own two. All five produce identical column types, because none has a mapping-valued or
+mixed-scalar column. The break matters for a bundle that has one; none was found.
+
 Caches built by an earlier readb are invalidated automatically: the cache key carries the readb
 version (ADR 0006), so no bundle is served types from the old rule.
 

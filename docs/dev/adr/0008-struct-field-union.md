@@ -100,6 +100,11 @@ Three rules make the mapping case total:
   JSON access (`flag ->> 'a'`) on such a column breaks, and struct access (`flag.a`) starts
   working. Columns whose key sets already matched are unaffected, as is every non-mapping column.
   Persistent caches are invalidated automatically, since the cache key carries the readb version.
+- **Measured blast radius: nothing observed changes.** Every real bundle to hand was loaded under
+  both lattices and its `readb schema` output compared — the three upstream OKF bundles
+  (`crypto_bitcoin`, `ga4`, `stackoverflow`) and this project's own `backlog/` and `docs/dev/`.
+  All five are byte-identical: none carries a mapping-valued column or a mixed-scalar column, so
+  none is affected. The break is real for a bundle that has one, and no such bundle is at hand.
 - Four value shapes that made an entire bundle unqueryable now load.
 - A frontmatter key that is not a string becomes a column under its stringified name. Today the
   loader skips it and the value is reachable only through `__raw` — a silent breach of the
