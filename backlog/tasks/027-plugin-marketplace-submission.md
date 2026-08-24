@@ -77,7 +77,8 @@ The `skillflag` convention (`<tool> --skill list|show|export`) has no adoption: 
 search for `"--skill export"` returns one repository, and the hit is a test file; the convention
 repository sits at 8 stars seven months after its proposal. `gh skill` covers the same need
 without per-tool code. **Do not revisit** a `readb skill`-style command — the design decision in
-[025](../archive/025-ship-usage-skill.md) that rejected it is confirmed by the evidence here.
+[025-ship-usage-skill](../archive/025-ship-usage-skill.md) that rejected it is confirmed by the
+evidence here.
 
 ### What this leaves
 

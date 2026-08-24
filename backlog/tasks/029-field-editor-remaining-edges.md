@@ -12,9 +12,10 @@ timestamp: '2026-08-07T00:00:00Z'
 ---
 
 Surfaced by the independent review of sprint-003, alongside the multi-line corruption bug that
-sprint fixed ([026](../archive/026-field-editor-multiline-corruption.md)). These are older, rarer
-and were left alone deliberately — none of them is a regression, and each needs a decision rather
-than a patch.
+sprint fixed
+([026-field-editor-multiline-corruption](../archive/026-field-editor-multiline-corruption.md)).
+These are older, rarer and were left alone deliberately — none of them is a regression, and each
+needs a decision rather than a patch.
 
 ## 1. Duplicate keys: `get` and `query` disagree
 

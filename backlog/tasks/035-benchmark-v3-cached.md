@@ -15,13 +15,13 @@ Planned in the sprint-006 scope session. Two things this sprint changes invalida
 numbers rather than extend them, so the honest answer is one full re-measure afterwards rather
 than a targeted contrast during:
 
-- **The cache.** [034](034-persistent-index-cache.md) changes what a readb invocation costs in
-  wall clock, and v2's per-invocation load time is paid per query. Every readb arm's timing —
-  and the multi-query session question specifically, the one place readb *lost* wall clock at
-  2000 concepts — is measured against a load path that no longer exists.
-- **The skill's `description`.** [033](033-skill-discovery-rate.md) changes the surface a runtime
-  matches a task against before loading the skill body. v2 measured the old one: the skill was
-  loaded on 37 of 78 runs, and readb was never invoked at all on 41.
+- **The cache.** [034-persistent-index-cache](034-persistent-index-cache.md) changes what a readb
+  invocation costs in wall clock, and v2's per-invocation load time is paid per query. Every readb
+  arm's timing — and the multi-query session question specifically, the one place readb *lost* wall
+  clock at 2000 concepts — is measured against a load path that no longer exists.
+- **The skill's `description`.** [033-skill-discovery-rate](033-skill-discovery-rate.md) changes the
+  surface a runtime matches a task against before loading the skill body. v2 measured the old one:
+  the skill was loaded on 37 of 78 runs, and readb was never invoked at all on 41.
 
 ## What this must not become
 

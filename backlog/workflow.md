@@ -398,6 +398,14 @@ The **body** is the working state: scope rationale, a per-task checklist (`[ ]` 
 current during implementation, `## Open questions` (the stop-and-ask log), and a short
 `## Session log` (one line per session: date, what moved).
 
+## Naming a task
+
+A task is **always referred to by its full concept name — `NNN-slug`** — never by its number
+alone. This holds everywhere: chat, commit messages, task and sprint bodies, ADRs, and the
+`tasks`/`blocked_by` lists. `034-persistent-index-cache` says what it is; `034` makes every
+reader open a file to find out. The same rule applies to sprints (`sprint-006`) and ADRs
+(`0006-cache-consent-and-key`).
+
 # Task frontmatter schema
 
 | Field | Required | Type | Notes |
