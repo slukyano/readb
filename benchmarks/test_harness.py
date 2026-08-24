@@ -9,6 +9,7 @@ collect this directory, and the sdist does not ship it.
 from __future__ import annotations
 
 import json
+import math
 import pathlib
 import sys
 from pathlib import Path
@@ -1011,3 +1012,13 @@ def test_a_name_kind_question_can_be_matched_by_a_read():
         )
         == "shell"
     )
+
+
+def test_e2_compares_a_proportion_against_v2s_recorded_rate():
+    """E2 is a rate, not a paired contrast, so it needs its own test and its own comparison."""
+    # Identical rates cannot be distinguished.
+    assert analyze.two_proportion_p(37, 78, 37, 78) == pytest.approx(1.0)
+    # A large move on a few hundred runs should be significant.
+    assert analyze.two_proportion_p(70, 78, 37, 78) < 0.001
+    # Degenerate inputs return NaN rather than dividing by zero.
+    assert math.isnan(analyze.two_proportion_p(0, 0, 37, 78))

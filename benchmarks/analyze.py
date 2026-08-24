@@ -80,6 +80,22 @@ ENDPOINTS = [
 SKILL_INVOCATION_V2 = (37, 78)  # v2: the skill arm loaded the skill on 37 of 78 runs
 
 
+def two_proportion_p(hits_a: int, n_a: int, hits_b: int, n_b: int) -> float:
+    """Two-sided p for two independent proportions, by normal approximation.
+
+    Both arms here run in the hundreds, so the approximation holds; a tiny battery would need
+    an exact test, and the count is printed beside the p-value so a reader can judge.
+    """
+    if not n_a or not n_b:
+        return float("nan")
+    pooled = (hits_a + hits_b) / (n_a + n_b)
+    spread = math.sqrt(pooled * (1 - pooled) * (1 / n_a + 1 / n_b))
+    if spread == 0:
+        return 1.0
+    z = (hits_a / n_a - hits_b / n_b) / spread
+    return math.erfc(abs(z) / math.sqrt(2))
+
+
 def load(path: Path) -> list[dict]:
     return [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
 
@@ -652,6 +668,27 @@ def main() -> None:
                     f"{f'{med(ratios):.2f}x' if ratios else '—'} | "
                     f"{f'{med(per_turn):.2f}x' if per_turn else '—'} |"
                 )
+
+    # --- E2: did the revised skill description move discovery? ----------------
+    skill_rows = [r for r in clean if r["arm"] == "readb-skill"]
+    if skill_rows:
+        fired = sum(1 for r in skill_rows if r.get("skill_readb_used"))
+        never = sum(1 for r in skill_rows if not r.get("readb_used"))
+        was_fired, was_of = SKILL_INVOCATION_V2
+        p_value = two_proportion_p(fired, len(skill_rows), was_fired, was_of)
+        print("\n## E2 — skill discovery, against v2's recorded rate\n")
+        print("| battery | skill loaded | rate | readb never invoked |")
+        print("| --- | --- | --- | --- |")
+        print(f"| v2 (old description) | {was_fired} / {was_of} | {was_fired / was_of:.0%} | 41 |")
+        print(
+            f"| v3 (revised description) | {fired} / {len(skill_rows)} | "
+            f"{fired / len(skill_rows):.0%} | {never} |"
+        )
+        print(f"\nTwo-proportion test against v2: p = {p_value:.4f}.")
+        print(
+            "\nThe description was frozen before this run and is not edited after it. A rate "
+            "that did not move is the result, not a prompt to try different wording."
+        )
 
     print("\n## Integrity\n")
     print(
