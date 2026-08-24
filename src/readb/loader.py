@@ -20,14 +20,20 @@ Derived tables / views:
   * ``__UNKNOWNTYPE`` — one row per non-conformant concept (no / non-string / empty-norm type).
   * ``__TAGS``        — a view exploding ``__DOCUMENTS.tags`` for join-style tag filtering.
 
+The insert pass runs inside :func:`_suppress_pandas_probe`, which is the one place this module
+touches process-global state; the reason is documented on the function.
+
 NON-goals (seams only, not implemented): no on-disk index, no git awareness, no incremental
 rebuild, no watcher, no write-back, no body-structure parsing, no schema enforcement.
 """
 
 from __future__ import annotations
 
+import contextlib
 import logging
+import sys
 from collections import defaultdict
+from collections.abc import Iterator
 from pathlib import Path
 
 import duckdb
@@ -50,6 +56,35 @@ from readb.schema import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+@contextlib.contextmanager
+def _suppress_pandas_probe() -> Iterator[None]:
+    """Stop DuckDB re-attempting an import of pandas for every value it binds.
+
+    DuckDB's Python client tests each non-NULL bound value for pandas types, and Python never
+    caches a *failed* import: with pandas absent, every attempt walks the whole ``sys.path``
+    again. A 600-concept bundle triggers 25,326 of them, and the load runs ~2.9x slower than it
+    otherwise would at every bundle size measured.
+
+    ``sys.modules[name] = None`` is the documented sentinel for "this import fails": Python
+    raises ``ImportError`` on sight of it without consulting a single finder. The sentinel is
+    installed only when pandas has not already been imported (so a caller who uses pandas keeps
+    it) and removed afterwards, leaving ``import pandas`` working normally.
+
+    Known limitation: ``sys.modules`` is process-global, so another thread importing pandas for
+    the first time *during* a load would see the sentinel and fail. The window is the insert
+    pass of one load; the alternatives cost more than the defect.
+    """
+    absent = "pandas" not in sys.modules
+    if absent:
+        sys.modules["pandas"] = None  # type: ignore[assignment]
+    try:
+        yield
+    finally:
+        if absent:
+            del sys.modules["pandas"]
+
 
 _DOCUMENTS = "__DOCUMENTS"
 _INDEXES = "__INDEXES"
@@ -223,9 +258,10 @@ def _build_table(
     if rows:
         bound_rows = [_bind_row(concept, frontmatter_columns, column_types) for concept in rows]
         placeholders = ", ".join("?" * (len(frontmatter_columns) + len(VIRTUAL_FIELDS)))
-        connection.executemany(
-            f"INSERT INTO {quote_ident(table_name)} VALUES ({placeholders})", bound_rows
-        )
+        with _suppress_pandas_probe():
+            connection.executemany(
+                f"INSERT INTO {quote_ident(table_name)} VALUES ({placeholders})", bound_rows
+            )
 
     table_schema = TableSchema(table_name=table_name, original_type=original_type)
     for column in frontmatter_columns:
