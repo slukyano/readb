@@ -233,7 +233,9 @@ def _column_ltype(counts: Counter[str], column: str) -> LType:
 # --------------------------------------------------------------------------------------------
 
 
-def _open_cache(path: Path) -> tuple[duckdb.DuckDBPyConnection, BundleSchema] | None:
+def _open_cache(
+    path: Path, *, replay: bool = True
+) -> tuple[duckdb.DuckDBPyConnection, BundleSchema] | None:
     """Open a cache file read-only and restore its schema, or None if it cannot be trusted.
 
     Read-only matters twice: a caller's stray ``CREATE TABLE`` cannot be persisted into the
@@ -246,7 +248,8 @@ def _open_cache(path: Path) -> tuple[duckdb.DuckDBPyConnection, BundleSchema] | 
             connection.close()
             return None
         schema = _schema_from_json(meta["schema"])
-        _replay_warnings(meta.get("warnings", "[]"))
+        if replay:
+            _replay_warnings(meta.get("warnings", "[]"))
     except Exception as exc:  # noqa: BLE001 - a cache that will not open is a miss, never an error
         logger.debug("cache: %s unusable (%s)", path, exc)
         return None
@@ -264,8 +267,21 @@ def _replay_warnings(payload: str) -> None:
         stored = json.loads(payload)
     except ValueError:
         return
-    for name, message in stored:
+    for entry in stored:
+        name, message = entry[0], entry[1]
         logging.getLogger(name).warning("%s", message)
+
+
+def _merge_warnings(
+    stored: str, captured: list[tuple[str, str, str | None]], touched: set[str]
+) -> str:
+    """Carry forward the warnings for files this update did not read, and replace the rest."""
+    try:
+        previous = json.loads(stored)
+    except ValueError:
+        previous = []
+    kept = [entry for entry in previous if len(entry) < 3 or entry[2] not in touched]
+    return json.dumps(kept + [list(entry) for entry in captured])
 
 
 class _WarningCollector(logging.Handler):
@@ -273,10 +289,15 @@ class _WarningCollector(logging.Handler):
 
     def __init__(self) -> None:
         super().__init__(level=logging.WARNING)
-        self.records: list[tuple[str, str]] = []
+        self.records: list[tuple[str, str, str | None]] = []
 
     def emit(self, record: logging.LogRecord) -> None:
-        self.records.append((record.name, record.getMessage()))
+        # The bundle-relative path is the parser's first argument, which is what lets an
+        # incremental update replace exactly the warnings belonging to the files it re-read.
+        subject = record.args[0] if isinstance(record.args, tuple) and record.args else None
+        self.records.append(
+            (record.name, record.getMessage(), subject if isinstance(subject, str) else None)
+        )
 
 
 def _manifest_to_json(entries: dict[str, FileStat], hashes: dict[str, str]) -> str:
@@ -487,7 +508,7 @@ def _apply_incremental(
     type or table, a reserved file appears, or the change set is large enough that a bulk load
     would be quicker. Those conditions are the correctness argument for this whole module.
     """
-    opened = _open_cache(previous)
+    opened = _open_cache(previous, replay=False)
     if opened is None:
         return None
     reader, schema = opened
@@ -512,8 +533,6 @@ def _apply_incremental(
     reader.close()
 
     changed, added, removed = _change_set(root, entries, stored)
-    if changed is None:
-        return None
     touched = len(changed) + len(added) + len(removed)
     limit = max(INCREMENTAL_FLOOR, int(len(entries) * INCREMENTAL_SHARE))
     if touched > limit:
@@ -525,11 +544,25 @@ def _apply_incremental(
         # the new mtimes, so the next load recognizes the bundle without hashing anything.
         deletes: list[str] = []
         inserts: list[tuple[str, list[str], list[Any]]] = []
+        warnings = meta.get("warnings", "[]")
     else:
-        plan = _plan_delta(root, schema, evidence, old_rows, populations, changed, added, removed)
+        # Warnings belong to the files that produced them: the ones this update re-read are
+        # replaced by whatever re-reading them says now, and the rest carry over untouched.
+        collector = _WarningCollector()
+        readb_logger = logging.getLogger("readb")
+        readb_logger.addHandler(collector)
+        try:
+            plan = _plan_delta(
+                root, schema, evidence, old_rows, populations, changed, added, removed
+            )
+        finally:
+            readb_logger.removeHandler(collector)
         if plan is None:
             return None
         deletes, inserts, evidence = plan
+        warnings = _merge_warnings(
+            meta.get("warnings", "[]"), collector.records, set(changed) | set(added) | set(removed)
+        )
 
     shutil.copy2(previous, target)
     try:
@@ -554,13 +587,16 @@ def _apply_incremental(
             )
             for path in entries
         }
-        writer.execute(f"DELETE FROM {META_TABLE} WHERE key IN ('evidence', 'manifest')")
+        writer.execute(
+            f"DELETE FROM {META_TABLE} WHERE key IN ('evidence', 'manifest', 'warnings')"
+        )
         with _suppress_pandas_probe():
             writer.executemany(
                 f"INSERT INTO {META_TABLE} VALUES (?, ?)",
                 [
                     ("evidence", _evidence_to_json(evidence)),
                     ("manifest", _manifest_to_json(entries, hashes)),
+                    ("warnings", warnings),
                 ],
             )
         writer.close()
@@ -575,7 +611,7 @@ def _apply_incremental(
 
 def _change_set(
     root: Path, entries: dict[str, FileStat], stored: dict[str, tuple[FileStat, str]]
-) -> tuple[list[str] | None, list[str], list[str]]:
+) -> tuple[list[str], list[str], list[str]]:
     """Split the bundle into genuinely changed, added and removed files.
 
     A file whose stat moved is a *suspect*: it is read and hashed before it is believed changed,

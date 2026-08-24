@@ -426,3 +426,26 @@ def test_cli_cache_status_says_why_it_is_off(tmp_path: Path) -> None:
     result = CliRunner().invoke(main, ["cache", "status", "--bundle", str(bundle)])
     assert "caching off" in result.output
     assert "readb init" in result.output
+
+
+def test_warnings_follow_the_files_that_produced_them(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    """A warning is repeated once per load, and disappears when its file is fixed."""
+    bundle = _bundle(tmp_path)
+    broken = bundle / "broken.md"
+    broken.write_text("---\nnot: [yaml\n: :\n---\nbody\n", encoding="utf-8")
+    readb.open(str(bundle)).close()
+
+    caplog.clear()
+    with caplog.at_level(logging.WARNING, logger="readb"):
+        readb.open(str(bundle)).close()
+    complaints = [r for r in caplog.records if "broken.md" in r.getMessage()]
+    assert len(complaints) == 1, "the warning must be repeated exactly once, not duplicated"
+
+    broken.write_text("---\ntype: Note\ntitle: Fixed\nrank: 1\n---\nbody\n", encoding="utf-8")
+    readb.open(str(bundle)).close()
+    caplog.clear()
+    with caplog.at_level(logging.WARNING, logger="readb"):
+        readb.open(str(bundle)).close()
+    assert not [r for r in caplog.records if "broken.md" in r.getMessage()]
