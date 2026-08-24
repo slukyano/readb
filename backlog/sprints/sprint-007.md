@@ -75,6 +75,13 @@ _(none)_
 
 ## Session log
 
+* **2026-08-23** — Two independent reviews of `041` returned twelve findings: eleven fixed and
+  pinned (five made a whole bundle unqueryable, four lost values silently, one re-typed healthy
+  columns, one stored a set non-deterministically), and the twelfth — `int` + `float` meeting at
+  `DOUBLE` — kept as a deliberate carve-out after verifying DuckDB resolves and rounds the pair
+  the same way. The lattice itself was fuzzed for order dependence and found clean.
+* **2026-08-23** — v3 pre-registered and the matrix started: four corpora generated, the harness
+  smoke-tested, Sonnet's 390 runs under way against a $40 cap.
 * **2026-08-23** — `041` implemented: 264 tests pass (249 before), the nine fatal shapes load,
   and the binding spec, README and changelog carry the revised rule. Two defects surfaced while
   building it: the degradation ladder mutated the type map it was reading from, and degrading
