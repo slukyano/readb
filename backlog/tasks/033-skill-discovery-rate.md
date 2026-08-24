@@ -70,11 +70,16 @@ the **tools it would otherwise reach for**, and keeps the trigger verbs:
 
 > Answer questions about a directory of markdown files by running SQL over their YAML frontmatter,
 > and change one frontmatter field without rewriting the file. Use when a question spans many `.md`
-> files in one tree — a docs directory, a notes vault, a task backlog, an OKF bundle — and
+> files in one tree — a docs directory, a notes vault, a knowledge base, an OKF bundle — and
 > answering it would otherwise mean grepping, cat-ing or `yq`-ing file after file: counts and
 > rollups, "which files have X", filtering or grouping by a frontmatter key, or cross-referencing
 > one document type against another. Also use when a single frontmatter field in one file needs
 > setting or removing.
+
+**Deviation from the approved text**: the design said "a task backlog" among the example trees.
+`tests/test_skill.py` forbids the word *backlog* in the shipped skill — the guard that keeps this
+project's own process out of readb's public surfaces — so the example is "a knowledge base"
+instead. The guard was right and the text changed, not the guard.
 
 `plugin.json`'s description gets the same treatment in one line, since it is what a marketplace
 listing shows:

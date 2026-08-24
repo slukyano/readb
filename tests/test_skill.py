@@ -131,3 +131,36 @@ def test_plugin_version_tracks_the_package_version() -> None:
     pyproject = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
     plugin = json.loads(PLUGIN_MANIFEST.read_text(encoding="utf-8"))
     assert plugin["version"] == pyproject["project"]["version"]
+
+
+# --------------------------------------------------------------------------------------------
+# The description is the surface a runtime matches a task against before loading the body
+# (task 033-skill-discovery-rate). It has to stay readable by the tools that read it.
+# --------------------------------------------------------------------------------------------
+
+
+def test_skill_description_is_one_line_within_budget() -> None:
+    frontmatter = SKILL.read_text(encoding="utf-8").split("---")[1]
+    description = next(
+        line for line in frontmatter.splitlines() if line.startswith("description: ")
+    )
+    value = description[len("description: ") :]
+    assert value.strip(), "the description must not be empty"
+    assert len(value) <= 1024, f"description is {len(value)} characters; budget is 1024"
+
+
+def test_plugin_and_skill_descriptions_are_not_the_same_string() -> None:
+    """Two surfaces, two audiences: a marketplace line and a task-matching line."""
+    import json
+
+    plugin = json.loads(PLUGIN_MANIFEST.read_text(encoding="utf-8"))
+    frontmatter = SKILL.read_text(encoding="utf-8").split("---")[1]
+    skill_description = next(
+        line[len("description: ") :]
+        for line in frontmatter.splitlines()
+        if line.startswith("description: ")
+    )
+    assert plugin["description"] != skill_description
+    for surface in (plugin["description"], skill_description):
+        assert "SQL" in surface or "sql" in surface
+        assert "frontmatter" in surface

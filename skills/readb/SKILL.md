@@ -1,6 +1,6 @@
 ---
 name: readb
-description: Query a directory of markdown files with YAML frontmatter using real SQL, and make surgical single-field frontmatter edits. Use when asked to search, filter, count, group, or cross-reference markdown documents by their frontmatter, when answering a question would otherwise mean opening many files, or when one frontmatter field needs changing.
+description: Answer questions about a directory of markdown files by running SQL over their YAML frontmatter, and change one frontmatter field without rewriting the file. Use when a question spans many .md files in one tree — a docs directory, a notes vault, a knowledge base, an OKF bundle — and answering it would otherwise mean grepping, cat-ing or yq-ing file after file: counts and rollups, "which files have X", filtering or grouping by a frontmatter key, or cross-referencing one document type against another. Also use when a single frontmatter field in one file needs setting or removing.
 license: Apache-2.0
 ---
 

@@ -14,6 +14,12 @@ All notable changes to readb are documented here, following
 
 ### Changed
 
+- The shipped skill and plugin now describe themselves by the situation they apply to rather than
+  by their mechanism, naming the trees a question spans and the tools it would otherwise take. A
+  benchmark measured the old wording being matched on fewer than half the runs where the skill was
+  installed; whether the new wording moves that is a question for the next benchmark, not a claim
+  made here.
+
 - Loading a bundle is about 2.9x faster at every size measured. DuckDB's Python client probes each
   non-NULL bound value for pandas types and Python never caches a failed import, so with pandas
   absent every probe walked `sys.path` again — 25,326 times for a 600-concept bundle. The insert
