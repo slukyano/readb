@@ -103,7 +103,9 @@ against a load pass that is itself three times slower than it should be proves n
 
 ## Open questions
 
-_(none — every deferral has a named home: `037-field-editor-list-values` holds the field editor's
+_(none — every deferral has a named home: `041-empty-struct-crashes-the-load` holds the
+permissive-load defect the adversarial review found in code that predates this sprint,
+`037-field-editor-list-values` holds the field editor's
 inability to change a list, `038-derive-text-columns` holds the duplicated text storage the cache
 exposed, `039-git-aware-change-detection` holds change detection for filesystems where stat is
 expensive, and `035-benchmark-v3-cached` holds the re-measure the cache and the new skill
@@ -133,13 +135,34 @@ anything.
 `040-hash-virtual-column` joined scope during design: the cache needed a per-file digest, and
 exposing it as `__hash` turned duplicate detection and change tracking into queries.
 
-Two defects were found by driving the built artifact and re-reading the diff rather than by tests:
-the cache's own bookkeeping table appeared in the unknown-table error's list of tables, and an
-incremental update replayed the previous cache's warnings so every skipped file was reported twice.
-Both are fixed and pinned.
+Fourteen defects were found and fixed before the merge, and only three of them by the tests written
+alongside the code. Two came from driving the built artifact and re-reading the diff. The other nine
+came from two independent reviews with no implementation context — one over the whole diff, one an
+adversarial differential fuzzer aimed at the cache's equivalence claim.
+
+The most serious was the fuzzer's: `unify` is commutative but **not** associative, so a column
+carrying more than one lattice type has a type that depends on the order its values were folded in.
+A fresh load folds in path order; evidence counts cannot reproduce that order, and the cache was
+comparing its own recomputation against itself. Such a column now forces a full rebuild. The second
+was routing: two raw types normalizing to one table name are told apart by a suffix, and which of
+them owns the un-suffixed name depends on which document comes first — so a delete or a rename could
+silently make a legitimate query return the other type's rows. A bundle with a collision is now
+never updated incrementally.
+
+The review also found that the incremental update built its result at its final, key-named path with
+no atomic rename, so a crash or a concurrent reader could see the previous contents under the new
+key — permanently. It now stages and renames like the full write does.
+
+One finding is **not** this sprint's and is not fixed: four frontmatter shapes, `flag: {}` among
+them, make a whole bundle unqueryable rather than skipping one file, which breaks the permissive-load
+promise outright. It reproduces identically on pre-sprint `main`, and is held by
+[`041-empty-struct-crashes-the-load`](../tasks/041-empty-struct-crashes-the-load.md) (high).
 
 ## Session log
 
+* **2026-08-23** — Two independent reviews ran against the finished branch and returned twelve
+  findings between them; eleven were fixed and pinned by regression tests, and the twelfth predates
+  the sprint and is now `041-empty-struct-crashes-the-load`.
 * **2026-08-23** — Implemented all six tasks, ran the gates, and closed the sprint out on the
   branch. `040-hash-virtual-column` was added to scope during design; `038-derive-text-columns` and
   `039-git-aware-change-detection` were drafted out of it.

@@ -8,7 +8,8 @@
   should be because DuckDB re-probed for pandas on every bound value, and what remained is what
   the cache removes. On a 6000-concept bundle a query now costs 0.14 s against 4.1 s, editing one
   file costs 0.18 s, and touching every file costs 0.27 s and re-reads nothing. Four tasks were
-  drafted along the way and stay open: `037-field-editor-list-values`,
+  drafted along the way and stay open, plus `041-empty-struct-crashes-the-load` from the review:
+  `037-field-editor-list-values`,
   `038-derive-text-columns`, `039-git-aware-change-detection` and `035-benchmark-v3-cached`.
 
 * **Sprint 006 design approved**: [the Rust decision](archive/../tasks/028-evaluate-rust-rewrite.md),
