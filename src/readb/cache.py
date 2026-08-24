@@ -221,12 +221,15 @@ def _evidence_from_json(payload: str) -> Evidence:
 def _is_order_sensitive(counts: Counter[str]) -> bool:
     """Does this column's type depend on the order its values were folded in?
 
-    ``unify`` is commutative but **not associative**: folding {DOUBLE, VARCHAR, LIST<BIGINT>}
-    as ``(DOUBLE|VARCHAR)|LIST`` gives JSON, while ``(VARCHAR|LIST)|DOUBLE`` gives JSON[]. A
-    fresh load folds a column's values in path order; evidence counts cannot reproduce that
-    order, so a column carrying more than one distinct lattice type is not something this
-    module may recompute. Such a column forces a full rebuild, where the loader does the fold
-    itself.
+    A fresh load folds a column's values in path order, and evidence counts cannot reproduce
+    that order. The guard was introduced when ``unify`` was demonstrably non-associative — the
+    counterexample was {DOUBLE, VARCHAR, LIST<BIGINT>} — and ADR 0008's scalar promotion has
+    since removed that case; independent fuzzing over 8,436 ordered triples and 73,815
+    4-multisets found no order dependence left in the lattice.
+
+    The guard stays anyway, because "no counterexample was found" is not "order cannot matter",
+    and the cost of being wrong is a cache that answers differently from a fresh load. Relaxing
+    it needs a proof, not an absence of evidence.
     """
     return sum(1 for count in counts.values() if count > 0) > 1
 

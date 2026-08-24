@@ -351,12 +351,12 @@ def coerce(value: Any, t: LType) -> Any:
         except (TypeError, ValueError):
             return value
     if kind is Kind.VARCHAR and not isinstance(value, str):
-        return _canonical_text(value)
+        return canonical_text(value)
     # BOOLEAN, BIGINT, DATE, TIMESTAMP, and NULL(->VARCHAR): bind as-is.
     return value
 
 
-def _canonical_text(value: Any) -> str:
+def canonical_text(value: Any) -> str:
     """Render a non-string scalar for a promoted VARCHAR column.
 
     Canonical form of the *parsed* value, not the file's bytes: ``true``/``false``, decimal
@@ -375,6 +375,10 @@ def _canonical_text(value: Any) -> str:
 
 def _json_default(obj: Any) -> Any:
     """Fallback serializer for the JSON column: ISO-8601 for temporals, str() otherwise."""
+    if isinstance(obj, (set, frozenset)):
+        # `str(a_set)` is hash-randomized, so the same bundle stored different bytes in different
+        # processes — and a cache keyed on content would disagree with a fresh load.
+        return sorted(obj, key=canonical_text)
     if isinstance(obj, (date, datetime)):
         return obj.isoformat()
     return str(obj)

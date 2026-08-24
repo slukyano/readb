@@ -306,19 +306,29 @@ def _create_and_fill(
     against the bundle down with it. Each rung is narrower in what it keeps and is recorded in
     ``schema.warnings`` so ``readb schema`` shows that a table is degraded.
     """
-    attempts = (
-        (column_types, None),
-        ({column: JSON for column in frontmatter_columns}, "every column widened to JSON"),
-        ({}, "frontmatter columns dropped"),
-    )
-    for types, degradation in attempts:
+    culprits = None  # computed only if the first attempt fails, and only to narrow the damage
+    attempts: list[tuple[dict[str, LType], str | None]] = [(column_types, None)]
+    while attempts:
+        types, degradation = attempts.pop(0)
         columns = [c for c in frontmatter_columns if c in types]
         try:
             _create_table(connection, table_name, columns, types)
             _insert_rows(connection, table_name, rows, columns, types)
-        except duckdb.Error as exc:
+        except Exception as exc:  # noqa: BLE001 - the whole point of this ladder is containment
+            # Not just duckdb.Error: binding a lone surrogate raises RuntimeError from pybind11,
+            # and a net that only catches the failures already thought of is not a net.
             connection.execute(f"DROP TABLE IF EXISTS {quote_ident(table_name)}")
             logger.debug("table %s failed to build (%s)", table_name, exc)
+            if culprits is None:
+                # Narrow the blast radius: widen only the columns that actually fail, so one
+                # bad column does not re-type its healthy siblings and silently break their
+                # predicates. Falls back to widening everything if no single column is at fault.
+                culprits = _failing_columns(connection, rows, columns, types)
+                widened = dict(types)
+                widened.update({c: JSON for c in (culprits or columns)})
+                named = ", ".join(repr(c) for c in culprits) if culprits else "every column"
+                attempts.append((widened, f"{named} widened to JSON"))
+                attempts.append(({}, "frontmatter columns dropped"))
             continue
         if degradation is not None:
             message = f"table {table_name!r} could not be built as inferred: {degradation}"
@@ -326,6 +336,39 @@ def _create_and_fill(
             schema.warnings.append(message)
         return columns, {column: types[column] for column in columns}
     raise RuntimeError(f"table {table_name!r} could not be created even without its columns")
+
+
+def _failing_columns(
+    connection: duckdb.DuckDBPyConnection,
+    rows: list[Concept],
+    frontmatter_columns: list[str],
+    column_types: dict[str, LType],
+) -> list[str]:
+    """Which columns cannot be created or filled as inferred, tried one at a time.
+
+    Only reached when a table has already failed to build, so the cost is paid once and never
+    on a healthy bundle.
+    """
+    probe = "__readb_probe"
+    failing: list[str] = []
+    for column in frontmatter_columns:
+        try:
+            connection.execute(f"DROP TABLE IF EXISTS {quote_ident(probe)}")
+            connection.execute(
+                f"CREATE TABLE {quote_ident(probe)} "
+                f"({quote_ident(column)} {render_ddl(column_types[column])})"
+            )
+            values = [
+                [coerce(concept.frontmatter.get(column), column_types[column])] for concept in rows
+            ]
+            if values:
+                with _suppress_pandas_probe():
+                    connection.executemany(f"INSERT INTO {quote_ident(probe)} VALUES (?)", values)
+        except Exception:  # noqa: BLE001 - same net, one column at a time
+            failing.append(column)
+        finally:
+            connection.execute(f"DROP TABLE IF EXISTS {quote_ident(probe)}")
+    return failing
 
 
 def _create_table(
@@ -415,6 +458,14 @@ def _frontmatter_union(rows: list[Concept]) -> list[str]:
 # --------------------------------------------------------------------------------------------
 
 
+def _create_empty_tags_view(connection: duckdb.DuckDBPyConnection) -> None:
+    """``__TAGS`` with the right shape and no rows, so a query naming it still answers."""
+    connection.execute(
+        f"CREATE VIEW {quote_ident(_TAGS)} AS "
+        "SELECT NULL::VARCHAR AS concept_path, NULL::VARCHAR AS tag WHERE FALSE"
+    )
+
+
 def _create_tags_view(connection: duckdb.DuckDBPyConnection) -> None:
     """Create ``__TAGS(concept_path, tag)`` by exploding ``__DOCUMENTS.tags``.
 
@@ -428,23 +479,24 @@ def _create_tags_view(connection: duckdb.DuckDBPyConnection) -> None:
     """
     path_col = quote_ident(VIRTUAL_PATH)
     tags_col = quote_ident(_TAGS_FIELD)
-    columns = {
-        row[0]
-        for row in connection.execute(
-            f"SELECT column_name FROM duckdb_columns() WHERE table_name = '{_DOCUMENTS}'"
-        ).fetchall()
-    }
+    # The column has to exist *and* still be a list: a degraded __DOCUMENTS holds JSON, and
+    # `unnest(JSON)` is a binder error raised outside every rung of the ladder.
+    listed = connection.execute(
+        f"SELECT column_name, data_type FROM duckdb_columns() WHERE table_name = '{_DOCUMENTS}'"
+    ).fetchall()
+    columns = {row[0] for row in listed if row[1].endswith("[]")}
     if _TAGS_FIELD not in columns:
-        connection.execute(
-            f"CREATE VIEW {quote_ident(_TAGS)} AS "
-            "SELECT NULL::VARCHAR AS concept_path, NULL::VARCHAR AS tag WHERE FALSE"
-        )
+        _create_empty_tags_view(connection)
         return
-    connection.execute(
-        f"""
-        CREATE VIEW {quote_ident(_TAGS)} AS
-        SELECT {path_col} AS concept_path, unnest({tags_col}) AS tag
-        FROM {quote_ident(_DOCUMENTS)}
-        WHERE {tags_col} IS NOT NULL
-        """
-    )
+    try:
+        connection.execute(
+            f"""
+            CREATE VIEW {quote_ident(_TAGS)} AS
+            SELECT {path_col} AS concept_path, unnest({tags_col}) AS tag
+            FROM {quote_ident(_DOCUMENTS)}
+            WHERE {tags_col} IS NOT NULL
+            """
+        )
+    except duckdb.Error as exc:  # belt and braces: a view must never fail the load
+        logger.warning("__TAGS could not be built over this bundle's tags column (%s)", exc)
+        _create_empty_tags_view(connection)
