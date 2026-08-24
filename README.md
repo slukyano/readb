@@ -108,7 +108,10 @@ nothing, anywhere. Once `.readb/` exists, readb keeps a materialized index in
 Editing a file re-indexes that file, not the bundle. A file whose timestamp moved but whose
 bytes did not is not re-read at all, so mass-touching a tree costs nothing. The cache is
 disposable — delete it, or `readb cache clear`, and the next query rebuilds it — and readb never
-answers from a stale one: any change, corruption or version mismatch is a rebuild.
+answers from a stale one: any change, corruption, or readb or DuckDB version difference is a
+rebuild. One thing differs between a cached and an uncached load: the cached database carries a
+`__readb_meta` table of readb's own bookkeeping, so `SHOW TABLES` and `duckdb_tables()` list it.
+It is excluded from `readb schema`, and every bundle table answers identically either way.
 
 ```sh
 readb cache status --bundle ./library   # where it is, how big, whether it is current

@@ -117,10 +117,12 @@ version change. To decide the first two exactly rather than guess, the cache sto
 column) **type evidence** — how many concepts contribute each lattice type — which is decremented
 and incremented as files leave and enter, and the unified type recomputed from it.
 
-The invariant, stated so it can be tested rather than asserted: **a cache-hit database answers every
-query, and prints every `readb schema`, exactly as a freshly loaded one does.** It is not required to
-be byte-identical, because the cache carries its own metadata tables that a cacheless load has no
-reason to build.
+The invariant, stated so it can be tested rather than asserted: **every table derived from the
+bundle answers exactly as a freshly loaded one does, and `readb schema` prints the same thing.** The
+two databases are not identical: a cached one additionally carries the `__readb_meta` table holding
+readb's own bookkeeping, which a cacheless load has no reason to build. It is excluded from
+`readb schema` and from the table list an unknown-table error prints, but a catalog query
+(`SHOW TABLES`, `duckdb_tables()`) does see it.
 
 **5. The cache file is immutable; updates are copy-apply-rename.** An update copies the current cache
 (4.7 ms at 20 MB), applies the delta to the copy, and lands it with `os.replace`, which is atomic.

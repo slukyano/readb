@@ -386,10 +386,6 @@ def _format_schema(bundle_schema: Any) -> str:
     return "\n".join(lines)
 
 
-if __name__ == "__main__":
-    main()
-
-
 @main.group()
 def cache() -> None:
     """Inspect or remove the persistent index cache (ADR 0006).
@@ -427,3 +423,7 @@ def cache_clear(bundle: str | None) -> None:
         return
     for path in removed:
         click.echo(f"removed {path}")
+
+
+if __name__ == "__main__":
+    main()

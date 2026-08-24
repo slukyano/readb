@@ -20,6 +20,7 @@ Three rules from ADR 0006 shape everything here:
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import json
 import logging
@@ -217,8 +218,24 @@ def _evidence_from_json(payload: str) -> Evidence:
     }
 
 
+def _is_order_sensitive(counts: Counter[str]) -> bool:
+    """Does this column's type depend on the order its values were folded in?
+
+    ``unify`` is commutative but **not associative**: folding {DOUBLE, VARCHAR, LIST<BIGINT>}
+    as ``(DOUBLE|VARCHAR)|LIST`` gives JSON, while ``(VARCHAR|LIST)|DOUBLE`` gives JSON[]. A
+    fresh load folds a column's values in path order; evidence counts cannot reproduce that
+    order, so a column carrying more than one distinct lattice type is not something this
+    module may recompute. Such a column forces a full rebuild, where the loader does the fold
+    itself.
+    """
+    return sum(1 for count in counts.values() if count > 0) > 1
+
+
 def _column_ltype(counts: Counter[str], column: str) -> LType:
-    """A column's unified type, recomputed from evidence exactly as a fresh load infers it."""
+    """A column's unified type, recomputed from evidence as a fresh load infers it.
+
+    Only sound when :func:`_is_order_sensitive` is False for ``counts``.
+    """
     inferred = NULL
     for key, count in counts.items():
         if count > 0:
@@ -241,10 +258,18 @@ def _open_cache(
     Read-only matters twice: a caller's stray ``CREATE TABLE`` cannot be persisted into the
     cache, and many readers can hold the same file at once.
     """
+    connection: duckdb.DuckDBPyConnection | None = None
     try:
         connection = duckdb.connect(str(path), read_only=True)
         meta = dict(connection.execute(f"SELECT key, value FROM {META_TABLE}").fetchall())
-        if meta.get("format") != _CACHE_FORMAT:
+        if (
+            meta.get("format") != _CACHE_FORMAT
+            or meta.get("readb_version") != _readb_version()
+            or meta.get("duckdb_version") != duckdb.__version__
+        ):
+            # The manifest key already carries these, so a hit cannot cross versions — but the
+            # incremental path picks up any sibling as its base, and must not inherit a database
+            # built by different load semantics.
             connection.close()
             return None
         schema = _schema_from_json(meta["schema"])
@@ -252,6 +277,9 @@ def _open_cache(
             _replay_warnings(meta.get("warnings", "[]"))
     except Exception as exc:  # noqa: BLE001 - a cache that will not open is a miss, never an error
         logger.debug("cache: %s unusable (%s)", path, exc)
+        if connection is not None:
+            with contextlib.suppress(Exception):
+                connection.close()
         return None
     return connection, schema
 
@@ -345,7 +373,9 @@ def _write_cache(
     # a bulk copy costs a fraction of inserting thousands of rows into a file-backed database,
     # and the caller is left with exactly the database a cacheless load would have produced.
     _build_metadata(connection, schema, evidence, entries, hashes, warnings)
-    connection.execute(f"ATTACH '{temporary}' AS __readb_cache (BLOCK_SIZE {BLOCK_SIZE})")
+    connection.execute(
+        f"ATTACH '{_sql_literal(temporary)}' AS __readb_cache (BLOCK_SIZE {BLOCK_SIZE})"
+    )
     try:
         connection.execute("COPY FROM DATABASE memory TO __readb_cache")
     finally:
@@ -379,11 +409,34 @@ def _build_metadata(
         )
 
 
+def _sql_literal(path: Path) -> str:
+    """Escape a path for a SQL string literal — ATTACH takes no bound parameters.
+
+    A repository whose path contains an apostrophe would otherwise turn every cache write into
+    a parser error, and a crafted directory name into an injection.
+    """
+    return str(path).replace("'", "''")
+
+
 def _discard_siblings(directory: Path, slug: str, keep: Path) -> None:
-    """One cache file per bundle: older revisions are removed once the new one has landed."""
-    for candidate in directory.glob(f"{slug}-*.duckdb"):
+    """One cache file per bundle: older revisions and abandoned temporaries are removed."""
+    for candidate in _cache_files(directory, slug):
         if candidate != keep:
             candidate.unlink(missing_ok=True)
+
+
+def _cache_files(directory: Path, slug: str) -> list[Path]:
+    """Every file this bundle owns in the cache directory, half-written ones included.
+
+    The temporaries and write-ahead logs an interrupted write leaves behind belong to the
+    bundle as much as the cache itself does, and have to be reachable by ``readb cache clear``.
+    """
+    patterns = (f"{slug}-*.duckdb", f".{slug}-*.tmp", f"{slug}-*.duckdb.wal", f".{slug}-*.tmp.wal")
+    seen: dict[str, Path] = {}
+    for pattern in patterns:
+        for candidate in directory.glob(pattern):
+            seen[str(candidate)] = candidate
+    return sorted(seen.values())
 
 
 # --------------------------------------------------------------------------------------------
@@ -564,9 +617,15 @@ def _apply_incremental(
             meta.get("warnings", "[]"), collector.records, set(changed) | set(added) | set(removed)
         )
 
-    shutil.copy2(previous, target)
+    # Build the updated cache beside its destination and rename it into place, exactly as a
+    # full write does: until the rename, no file carries the new manifest key, so a crash or a
+    # concurrent reader can never mistake the previous contents for the current ones.
+    staging = target.parent / f".{target.name}.{os.getpid()}.tmp"
+    staging.unlink(missing_ok=True)
+    shutil.copy2(previous, staging)
+    writer: duckdb.DuckDBPyConnection | None = None
     try:
-        writer = duckdb.connect(str(target))
+        writer = duckdb.connect(str(staging))
         for path in deletes:
             for table in _tables_holding(schema, table_names=None):
                 writer.execute(f"DELETE FROM {quote_ident(table)} WHERE __path = ?", [path])
@@ -600,9 +659,15 @@ def _apply_incremental(
                 ],
             )
         writer.close()
+        writer = None
+        os.replace(staging, target)
     except (OSError, duckdb.Error) as exc:
         logger.debug("cache: incremental update failed (%s)", exc)
-        target.unlink(missing_ok=True)
+        if writer is not None:
+            with contextlib.suppress(Exception):
+                writer.close()
+        staging.unlink(missing_ok=True)
+        Path(f"{staging}.wal").unlink(missing_ok=True)
         return None
 
     logger.debug("cache: applied %d changed files incrementally", touched)
@@ -786,6 +851,8 @@ def _schema_unchanged(schema: BundleSchema, evidence: Evidence, table: str) -> b
         total = sum(c for c in column_counts.values() if c > 0)
         if total == 0 and column not in reserved:
             return False  # the last document carrying this key is gone: the column would vanish
+        if _is_order_sensitive(column_counts):
+            return False  # a mixed-type column: only the loader's own fold order is authoritative
         if render_ddl(_column_ltype(column_counts, column)) != ddl:
             return False
     for column, column_counts in counts.items():
@@ -836,13 +903,14 @@ def status(bundle_path: str) -> dict[str, Any]:
         )
         return {"enabled": False, "reason": reason, "path": None}
     slug = _slug(root)
-    files = sorted(directory.glob(f"{slug}-*.duckdb"))
+    files = [f for f in directory.glob(f"{slug}-*.duckdb") if f.is_file()]
     if not files:
         return {"enabled": True, "reason": "no cache written yet", "path": None}
-    newest = files[-1]
-    stat = newest.stat()
     entries = scan(root)
-    fresh = newest.name == f"{slug}-{manifest_key(entries, root)}.duckdb"
+    current = directory / f"{slug}-{manifest_key(entries, root)}.duckdb"
+    newest = current if current in files else max(files, key=lambda f: f.stat().st_mtime)
+    stat = newest.stat()
+    fresh = newest == current
     return {
         "enabled": True,
         "path": str(newest),
@@ -859,7 +927,7 @@ def clear(bundle_path: str) -> list[str]:
     if directory is None or not directory.is_dir():
         return []
     removed = []
-    for candidate in sorted(directory.glob(f"{_slug(Path(bundle_path))}-*.duckdb")):
+    for candidate in _cache_files(directory, _slug(Path(bundle_path))):
         candidate.unlink(missing_ok=True)
         removed.append(str(candidate))
     return removed

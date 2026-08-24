@@ -449,3 +449,90 @@ def test_warnings_follow_the_files_that_produced_them(
     with caplog.at_level(logging.WARNING, logger="readb"):
         readb.open(str(bundle)).close()
     assert not [r for r in caplog.records if "broken.md" in r.getMessage()]
+
+
+# --------------------------------------------------------------------------------------------
+# Findings from the sprint's independent review. Each of these failed before its fix.
+# --------------------------------------------------------------------------------------------
+
+
+def test_a_mixed_type_column_is_never_recomputed_from_evidence(tmp_path: Path) -> None:
+    """`unify` is commutative but not associative, so fold order decides a mixed column's type.
+
+    Evidence counts cannot reproduce the loader's path-order fold, so any column carrying more
+    than one lattice type must send the load to a full rebuild.
+    """
+    bundle = tmp_path / "notes"
+    bundle.mkdir()
+    (tmp_path / ".readb").mkdir()
+    (tmp_path / ".readb" / "config.toml").write_text(
+        'version = 1\nbundles = ["notes"]\n', encoding="utf-8"
+    )
+    (bundle / "b.md").write_text('---\ntype: T\nf: "x"\n---\nbody\n', encoding="utf-8")
+    (bundle / "c.md").write_text("---\ntype: T\nf: [1]\n---\nbody\n", encoding="utf-8")
+
+    def look(cached: bool) -> tuple:
+        with readb.open(str(bundle), cache=cached) as db:
+            return (
+                db.schema().tables["t"].columns["f"],
+                tuple(tuple(r.items()) for r in db.sql("SELECT __name, f FROM t ORDER BY __name")),
+            )
+
+    look(True)  # prime
+    (bundle / "a.md").write_text("---\ntype: T\nf: 1.5\n---\nbody\n", encoding="utf-8")
+    assert look(True) == look(False)
+
+
+def test_an_interrupted_incremental_update_leaves_no_cache_under_the_new_key(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Until the rename, no file may carry the new key: a crash must not look like a hit."""
+    bundle = _bundle(tmp_path)
+    _rows(bundle)
+    (bundle / "note1.md").write_text(
+        "---\ntype: Note\ntitle: Changed\nrank: 1\n---\nbody\n", encoding="utf-8"
+    )
+
+    def explode(*_args: object, **_kwargs: object) -> None:
+        raise OSError("interrupted")
+
+    monkeypatch.setattr(cache.os, "replace", explode)
+    rows = _rows(bundle)  # must still answer, from a full load
+    assert [r["title"] for r in rows if r["__name"] == "note1"] == ["Changed"]
+    monkeypatch.undo()
+    directory = tmp_path / ".readb" / "cache"
+    key = cache.manifest_key(cache.scan(bundle), bundle)
+    assert not (directory / f"{cache._slug(bundle)}-{key}.duckdb").exists()
+    assert _rows(bundle) == _fresh_rows(bundle)
+
+
+def test_a_version_change_rebuilds_rather_than_carrying_the_old_database_forward(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, spy: _ParseSpy
+) -> None:
+    bundle = _bundle(tmp_path)
+    _rows(bundle)
+    monkeypatch.setattr(cache, "_readb_version", lambda: "99.0.0-next")
+    spy.reset()
+    assert _rows(bundle) == _fresh_rows(bundle)
+    assert len(spy.parsed) >= 6, "a version bump must re-read the bundle, not reuse the old cache"
+
+
+def test_clear_removes_temporaries_an_interrupted_write_left_behind(tmp_path: Path) -> None:
+    bundle = _bundle(tmp_path)
+    _rows(bundle)
+    directory = tmp_path / ".readb" / "cache"
+    leftover = directory / f".{cache._slug(bundle)}-deadbeef.duckdb.4242.tmp"
+    leftover.write_bytes(b"half a database")
+    removed = cache.clear(str(bundle))
+    assert str(leftover) in removed
+    assert not leftover.exists()
+    assert not list(directory.glob("*"))
+
+
+def test_a_path_containing_a_quote_still_caches(tmp_path: Path) -> None:
+    """ATTACH takes no bound parameters, so the path has to be escaped rather than interpolated."""
+    root = tmp_path / "it's a repo"
+    bundle = _bundle(root)
+    assert _rows(bundle) == _fresh_rows(bundle)
+    assert list((root / ".readb" / "cache").glob("*.duckdb")), "the cache must actually be written"
+    assert cache.status(str(bundle))["current"] is True

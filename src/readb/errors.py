@@ -17,7 +17,7 @@ from collections.abc import Sequence
 import duckdb
 
 # DuckDB's own phrasing, matched narrowly: anything else is passed through untouched.
-_UNKNOWN_TABLE = re.compile(r"Table with name ([^\s]+) does not exist")
+_UNKNOWN_TABLE = re.compile(r"Table with name (.+?) does not exist")
 _UNKNOWN_COLUMN = re.compile(r"Referenced column .* not found")
 
 _MAX_LISTED_TABLES = 25
