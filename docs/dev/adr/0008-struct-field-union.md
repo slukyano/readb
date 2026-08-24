@@ -1,10 +1,10 @@
 ---
 type: ADR
 title: 'The lattice promotes to the narrowest type that holds every value: field union for mappings, VARCHAR for mixed scalars'
-status: Proposed
+status: Accepted
 created: 2026-08-23
 sprint: sprint-007
-timestamp: '2026-08-23T00:00:00Z'
+timestamp: '2026-08-23T22:00:00Z'
 ---
 
 # Context

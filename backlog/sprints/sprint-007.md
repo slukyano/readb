@@ -5,10 +5,10 @@ description: Fix the frontmatter shapes that kill a whole load instead of skippi
 tags:
 - correctness
 - benchmarks
-timestamp: '2026-08-23T20:00:00Z'
+timestamp: '2026-08-23T22:00:00Z'
 branch: sprint/007
 created: '2026-08-23'
-status: Designing
+status: Implementing
 tasks:
 - 041-empty-struct-crashes-the-load
 - 035-benchmark-v3-cached
