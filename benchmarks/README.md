@@ -7,6 +7,9 @@ bundle faster and cheaper with readb than without?
 - **v2** — [`docs/dev/research/agent-efficiency-v2.md`](../docs/dev/research/agent-efficiency-v2.md),
   pre-registered in
   [`agent-efficiency-v2-preregistration.md`](../docs/dev/research/agent-efficiency-v2-preregistration.md)
+- **v3** — pre-registered in
+  [`agent-efficiency-v3-preregistration.md`](../docs/dev/research/agent-efficiency-v3-preregistration.md);
+  adds `readb-cached` to price the persistent index cache and drops `readb-nudged`
 
 Development material — excluded from the sdist, not part of the readb package.
 
@@ -35,7 +38,7 @@ uv run pytest benchmarks
 | `baseline` | Orientation only | readb kept off `PATH` |
 | `shell-coached` | Orientation plus a worked recipe, one per corpus family | readb kept off `PATH` |
 | `readb-bare` | Orientation plus `readb query` / `readb schema` syntax | readb on `PATH` |
-| `readb-nudged` | `readb-bare` plus one frozen routing sentence | readb on `PATH` |
+| `readb-cached` | Identical to `readb-bare`, word for word | readb on `PATH`; the corpus is a `readb init` registry with a primed cache |
 | `readb-skill` | Identical to `baseline` | readb and `uv` on `PATH`, the repository's plugin loaded so the shipped skill is discoverable |
 
 `shell-coached` exists because readb's honest competitor is a shell pipeline, not an uncoached
@@ -44,10 +47,17 @@ against the real corpus before any measured run — and, where the answer is kno
 ground truth. A recipe that runs and under-counts is worse than one that fails: it makes the
 competitor a straw man, which is worth more to readb's published ratio than any real effect.
 
-`readb-nudged` carries routing guidance as an **arm rather than an edit**. Folding it into
-`readb-bare` would silently redefine what v1 measured, and adjusting prompt text until an agent
-picks the tool the experimenter prefers is tuning the benchmark until it flatters the tool. The
-sentence is frozen in `run_benchmark.py`; changing it after a measured run retracts that arm.
+`readb-cached` prices the persistent index cache, and its treatment is **not prompt text**: it is
+identical to `readb-bare` word for word, and differs only in whether the corpus is a registry with
+a warm cache. A test asserts every other field of the two arms is equal, so the contrast cannot
+drift into measuring something else. The priming call runs before the measured invocation and is
+not charged to the arm.
+
+v2 ran a `readb-nudged` arm carrying one frozen sentence of routing guidance. It moved readb usage
+without moving any cost ratio and roughly doubled failed readb calls; that result is published, and
+v3 drops the arm rather than spending a fifth of the battery re-confirming it. The rule it enforced
+still governs this harness: prompt text is never adjusted because an agent chose the "wrong" tool.
+A routing hypothesis is an arm declared in advance, or it is not tested.
 
 `uv` is on the skill arm's `PATH` alone. It was once a requirement — the shipped skill's leading
 example was `uvx readb`, and an arm without `uv` measured that failure instead of the skill, which
@@ -91,14 +101,14 @@ python benchmarks/run_benchmark.py $C --results benchmarks/results/v2-sonnet.jso
 # 2. Haiku — four arms, no skill arm (312 runs)
 python benchmarks/run_benchmark.py $C --results benchmarks/results/v2-haiku.jsonl \
     --models claude-haiku-4-5 --repeats 3 \
-    --arms baseline,shell-coached,readb-bare,readb-nudged
+    --arms baseline,shell-coached,readb-bare,readb-cached
 
 # 3. Floors — the fixed harness overhead, per arm and model (27 runs)
 python benchmarks/run_benchmark.py $C --results benchmarks/results/v2-floor.jsonl \
     --models claude-sonnet-5 --repeats 3 --questions q1 --floor
 python benchmarks/run_benchmark.py $C --results benchmarks/results/v2-floor.jsonl \
     --models claude-haiku-4-5 --repeats 3 --questions q1 --floor \
-    --arms baseline,shell-coached,readb-bare,readb-nudged
+    --arms baseline,shell-coached,readb-bare,readb-cached
 
 # 4. Messy against tidy — the same questions, both renderings (54 runs), one file:
 #    resume keys on the corpus, so the second half is not mistaken for the first
