@@ -1,6 +1,6 @@
 {
   "name": "readb",
-  "description": "Query markdown files with YAML frontmatter using real SQL, and make surgical frontmatter edits.",
+  "description": "Ask a directory of markdown files a question in SQL — counts, filters and cross-references over YAML frontmatter — and edit one frontmatter field in place.",
   "version": "0.2.0",
   "author": {
     "name": "Stanislav Lukyanov"

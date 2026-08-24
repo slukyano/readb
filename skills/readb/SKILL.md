@@ -1,6 +1,6 @@
 ---
 name: readb
-description: Query a directory of markdown files with YAML frontmatter using real SQL, and make surgical single-field frontmatter edits. Use when asked to search, filter, count, group, or cross-reference markdown documents by their frontmatter, when answering a question would otherwise mean opening many files, or when one frontmatter field needs changing.
+description: Answer questions about a directory of markdown files by running SQL over their YAML frontmatter, and change one frontmatter field without rewriting the file. Use when a question spans many .md files in one tree — a docs directory, a notes vault, a knowledge base, an OKF bundle — and answering it would otherwise mean grepping, cat-ing or yq-ing file after file: counts and rollups, "which files have X", filtering or grouping by a frontmatter key, or cross-referencing one document type against another. Also use when a single frontmatter field in one file needs setting or removing.
 license: Apache-2.0
 ---
 
@@ -41,7 +41,7 @@ prints every table, its original type, and every column with its inferred type.
 | `__UNKNOWNTYPE` | concepts with a missing or unusable `type` |
 | `__TAGS` | a `(concept_path, tag)` view, for tag filtering by join |
 
-**Four virtual columns** are on every table:
+**Five virtual columns** are on every table:
 
 | Column | Value |
 | --- | --- |
@@ -49,6 +49,12 @@ prints every table, its original type, and every column with its inferred type.
 | `__name` | the bare file name, no directory and no `.md` (wiki-style) |
 | `__body` | the markdown body with frontmatter stripped |
 | `__raw` | the byte-exact file text, frontmatter included |
+| `__hash` | lowercase hex SHA-256 of the file's bytes, as `sha256sum` prints it |
+
+**Repeat queries are cached** once the directory sits under a `.readb/` registry: run
+`readb init <dir>` there once, and an unchanged bundle is served from a materialized index
+instead of being re-read. Without that registry readb writes nothing anywhere, and a query that
+must not touch disk at all can pass `--no-cache`.
 
 `__name` is derived from the filename and is immutable. A `name:` key in frontmatter is an
 ordinary data column and changes nothing about addressing.

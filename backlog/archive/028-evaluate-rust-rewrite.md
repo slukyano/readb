@@ -2,14 +2,14 @@
 type: Task
 title: Evaluate rewriting readb in Rust
 description: Decide, on measured evidence, whether readb's core should move from Python to Rust — and what that would cost in public surface, distribution, and YAML semantics.
-status: Designed
+status: Done
 priority: medium
 tags:
 - research
 - architecture
 - packaging
 created: 2026-08-07
-timestamp: '2026-08-23T12:00:00Z'
+timestamp: '2026-08-23T18:00:00Z'
 ---
 
 Raised by the maintainer 2026-08-07, while sprint-003 was designing release automation: if readb

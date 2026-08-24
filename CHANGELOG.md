@@ -5,7 +5,43 @@ All notable changes to readb are documented here, following
 
 ## [Unreleased]
 
+### Added
+
+- A persistent index cache. Once a bundle sits under a `.readb/` registry (`readb init`), readb
+  keeps a materialized index in `.readb/cache/` and serves an unchanged bundle from it: on a
+  6000-concept bundle a query goes from 4.1 s to 0.14 s, editing one file then querying costs
+  0.18 s, and touching every file without changing any costs 0.27 s and re-reads nothing. A
+  changed file is re-indexed on its own; anything that would alter the inferred schema rebuilds
+  the whole index. Without a registry readb writes nothing, anywhere, exactly as before.
+  `readb cache status` and `readb cache clear` inspect and remove it; `--no-cache`,
+  `cache = false` in the registry config, and `readb.open(path, cache=False)` switch it off.
+
+- `__hash`, a fifth virtual column on every table: the lowercase hex SHA-256 of the file's bytes,
+  the same value `sha256sum` prints. Byte-identical documents are now
+  `GROUP BY __hash HAVING count(*) > 1`, and a bundle can be compared against an external record
+  without readb growing a feature for it.
+
+### Changed
+
+- The shipped skill and plugin now describe themselves by the situation they apply to rather than
+  by their mechanism, naming the trees a question spans and the tools it would otherwise take. A
+  benchmark measured the old wording being matched on fewer than half the runs where the skill was
+  installed; whether the new wording moves that is a question for the next benchmark, not a claim
+  made here.
+
+- Loading a bundle is about 2.9x faster at every size measured. DuckDB's Python client probes each
+  non-NULL bound value for pandas types and Python never caches a failed import, so with pandas
+  absent every probe walked `sys.path` again — 25,326 times for a 600-concept bundle. The insert
+  pass now suppresses the probe: 2000 concepts load in 1.37 s against 3.63 s.
+
 ### Fixed
+
+- A query naming a table that does not exist is now answered with the bundle's own tables and a
+  pointer to `readb schema`. DuckDB's catalog error was passed through verbatim, so a mistyped
+  name could be answered with `Did you mean "duckdb_indexes"?` — a table that exists in no bundle.
+  An unknown *column* keeps DuckDB's candidate bindings, which are drawn from the right table, and
+  gains the same pointer. `readb.UnknownTableError` is exported and subclasses
+  `duckdb.CatalogException`, so existing handlers keep working.
 
 - The shipped usage skill's leading example now invokes `readb` directly. It opened with
   `uvx readb query ...`, so the first runnable line an agent read failed with `command not found`

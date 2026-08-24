@@ -10,6 +10,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from readb.errors import translate
+
 if TYPE_CHECKING:
     import duckdb
 
@@ -19,21 +21,29 @@ if TYPE_CHECKING:
 class Database:
     """A read-only SQL handle over a loaded OKF bundle."""
 
-    def __init__(self, connection: duckdb.DuckDBPyConnection, schema: BundleSchema) -> None:
+    def __init__(
+        self,
+        connection: duckdb.DuckDBPyConnection,
+        schema: BundleSchema,
+        bundle_path: str = "",
+    ) -> None:
         self._conn = connection
         self._schema = schema
+        self._bundle_path = bundle_path
 
     @classmethod
-    def from_bundle(cls, bundle_path: str) -> Database:
-        """Load ``bundle_path`` into a fresh in-memory DuckDB and return a Database.
+    def from_bundle(cls, bundle_path: str, *, cache: bool = True) -> Database:
+        """Load ``bundle_path`` and return a Database.
 
-        Implementation lives in :mod:`readb.loader` (the load seam), so a persistent-index
-        cache can later wrap loading without touching this class.
+        Loading goes through :mod:`readb.cache`, which serves an unchanged bundle from a
+        materialized DuckDB file when the user consented to one with ``readb init`` (ADR 0006),
+        and otherwise calls the load seam in :mod:`readb.loader` directly. ``cache=False``
+        always loads from source.
         """
-        from readb.loader import load_bundle
+        from readb.cache import load
 
-        connection, schema = load_bundle(bundle_path)
-        return cls(connection, schema)
+        connection, schema = load(bundle_path, enabled=cache)
+        return cls(connection, schema, bundle_path)
 
     def sql(self, query: str, parameters: list[Any] | None = None) -> list[dict[str, Any]]:
         """Execute ``query`` against the loaded bundle and return rows as dicts.
@@ -54,11 +64,39 @@ class Database:
         (so e.g. csv output can print a header), which the dict-shaped ``sql`` cannot convey.
         A statement that returns no result set yields ``([], [])``.
         """
-        cursor = self._conn.execute(query, parameters) if parameters else self._conn.execute(query)
+        import duckdb
+
+        try:
+            cursor = (
+                self._conn.execute(query, parameters) if parameters else self._conn.execute(query)
+            )
+        except duckdb.Error as exc:
+            # readb knows the bundle's tables; DuckDB answers from its own catalog (032).
+            raise translate(
+                exc, tables=self._table_names(), bundle_path=self._bundle_path
+            ) from None
         if cursor.description is None:
             return [], []
         columns = [descriptor[0] for descriptor in cursor.description]
         return columns, cursor.fetchall()
+
+    def _table_names(self) -> list[str]:
+        """Every relation a query could name, views included — asked of DuckDB, not inferred.
+
+        ``BundleSchema`` covers the tables the loader built but not ``__TAGS``, which is a view;
+        the catalog knows both. Falls back to the schema if the catalog query itself fails,
+        since this runs while another error is already being reported.
+        """
+        try:
+            rows = self._conn.execute(
+                "SELECT table_name FROM duckdb_tables() "
+                "UNION ALL SELECT view_name FROM duckdb_views() WHERE NOT internal"
+            ).fetchall()
+        except Exception:  # noqa: BLE001 - never let error reporting raise its own error
+            return list(self._schema.tables)
+        # The cache's own bookkeeping lives in the same database on a hit; it is readb's, not
+        # the bundle's, and naming it here would be as unhelpful as DuckDB's `duckdb_indexes`.
+        return [row[0] for row in rows if not row[0].startswith("__readb_")]
 
     def schema(self) -> BundleSchema:
         """Return the detected schema: types, normalized table names, columns + inferred types."""

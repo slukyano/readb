@@ -85,12 +85,46 @@ the config's optional `default_bundle`. Genuine ambiguity — e.g. the root of a
 several bundles, no default — is a hard error listing the choices, never a guess; a directory
 never silently becomes a bundle. Explicit `--bundle <dir>` always works on any directory,
 initialized or not, and never consults the registry. Re-running `init` merges new dirs and
-never removes. Besides the config, `.readb/` is reserved for readb's future persistent index —
-it is never read as bundle content.
+never removes. Besides the config, `.readb/` also holds readb's persistent index cache (below);
+nothing under it is ever read as bundle content.
 readb only addresses files inside the bundle root: a `../` path or a symlink that resolves
 outside the bundle is not supported and is refused with an explicit error (by name and by
 path alike). `--format raw` prints values verbatim, so
 `readb query "SELECT __raw FROM book WHERE __name = 'dune'" --format raw` reproduces the file.
+
+## The cache: `readb init` is what makes repeat queries fast
+
+Without a registry, every invocation re-reads and re-parses the whole bundle — and readb writes
+nothing, anywhere. Once `.readb/` exists, readb keeps a materialized index in
+`.readb/cache/` and an unchanged bundle is served from it. Measured on a 6000-concept bundle:
+
+| | |
+| --- | --- |
+| Query, no cache | 4.1 s |
+| Query, cache hit | 0.14 s |
+| Edit one file, then query | 0.18 s |
+| Touch all 6000 files (a formatter, a copy, a checkout), then query | 0.27 s |
+
+Editing a file re-indexes that file, not the bundle. A file whose timestamp moved but whose
+bytes did not is not re-read at all, so mass-touching a tree costs nothing. The cache is
+disposable — delete it, or `readb cache clear`, and the next query rebuilds it — and readb never
+answers from a stale one: any change, corruption, or readb or DuckDB version difference is a
+rebuild. One thing differs between a cached and an uncached load: the cached database carries a
+`__readb_meta` table of readb's own bookkeeping, so `SHOW TABLES` and `duckdb_tables()` list it.
+It is excluded from `readb schema`, and every bundle table holds identical rows either way.
+Row order is not a contract — a query with no `ORDER BY` may return the same rows in a different
+sequence with the cache on — so sort explicitly when order matters.
+
+```sh
+readb cache status --bundle ./library   # where it is, how big, whether it is current
+readb cache clear  --bundle ./library   # delete it; the next query rebuilds
+readb query "..." --bundle ./library --no-cache   # load from source, read and write nothing
+```
+
+Turn it off for a whole registry with `cache = false` in `.readb/config.toml`, or per call with
+`--no-cache` (`readb.open(path, cache=False)` from Python). Nothing in the bundle is ever
+written either way, and `.readb/cache/` is a good candidate for a `.gitignore` entry — readb
+never edits that file itself.
 
 ## Tables and views
 
@@ -103,10 +137,21 @@ path alike). `--format raw` prints values verbatim, so
 | `__UNKNOWNTYPE` | one per non-conformant concept (no / non-string / empty-normalized `type`) |
 | `__TAGS` | normalized `(concept_path, tag)` view for join-style tag filtering |
 
-Every table also carries four virtual columns: `__path` (bundle-relative path, with `.md` —
+Every table also carries five virtual columns: `__path` (bundle-relative path, with `.md` —
 the guaranteed-unique key), `__name` (the simple file name, no directories or `.md`; wiki-style,
-assumed unique but not guaranteed), `__body` (the markdown body, frontmatter stripped), and
-`__raw` (the byte-exact file text as on disk, frontmatter included).
+assumed unique but not guaranteed), `__body` (the markdown body, frontmatter stripped),
+`__raw` (the byte-exact file text as on disk, frontmatter included), and `__hash` (the lowercase
+hex SHA-256 of the file's bytes — the value `sha256sum` prints, so duplicate detection is
+`GROUP BY __hash HAVING count(*) > 1`).
+
+A query naming a table the bundle does not have is answered with the tables it *does* have:
+
+```
+$ readb query "SELECT * FROM concepts" --bundle ./library
+Error: no table named 'concepts' in this bundle.
+Tables: author, book, __DOCUMENTS, __INDEXES, __TAGS, __UNKNOWNTYPE.
+Run 'readb schema --bundle ./library' for their columns.
+```
 
 ## Type inference
 

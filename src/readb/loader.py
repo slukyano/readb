@@ -20,14 +20,20 @@ Derived tables / views:
   * ``__UNKNOWNTYPE`` — one row per non-conformant concept (no / non-string / empty-norm type).
   * ``__TAGS``        — a view exploding ``__DOCUMENTS.tags`` for join-style tag filtering.
 
+The insert pass runs inside :func:`_suppress_pandas_probe`, which is the one place this module
+touches process-global state; the reason is documented on the function.
+
 NON-goals (seams only, not implemented): no on-disk index, no git awareness, no incremental
 rebuild, no watcher, no write-back, no body-structure parsing, no schema enforcement.
 """
 
 from __future__ import annotations
 
+import contextlib
 import logging
-from collections import defaultdict
+import sys
+from collections import Counter, defaultdict
+from collections.abc import Iterator
 from pathlib import Path
 
 import duckdb
@@ -43,6 +49,7 @@ from readb.schema import (
     TableSchema,
     as_list_type,
     coerce,
+    evidence_key,
     infer_type,
     normalize_type,
     quote_ident,
@@ -50,6 +57,35 @@ from readb.schema import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+@contextlib.contextmanager
+def _suppress_pandas_probe() -> Iterator[None]:
+    """Stop DuckDB re-attempting an import of pandas for every value it binds.
+
+    DuckDB's Python client tests each non-NULL bound value for pandas types, and Python never
+    caches a *failed* import: with pandas absent, every attempt walks the whole ``sys.path``
+    again. A 600-concept bundle triggers 25,326 of them, and the load runs ~2.9x slower than it
+    otherwise would at every bundle size measured.
+
+    ``sys.modules[name] = None`` is the documented sentinel for "this import fails": Python
+    raises ``ImportError`` on sight of it without consulting a single finder. The sentinel is
+    installed only when pandas has not already been imported (so a caller who uses pandas keeps
+    it) and removed afterwards, leaving ``import pandas`` working normally.
+
+    Known limitation: ``sys.modules`` is process-global, so another thread importing pandas for
+    the first time *during* a load would see the sentinel and fail. The window is the insert
+    pass of one load; the alternatives cost more than the defect.
+    """
+    absent = "pandas" not in sys.modules
+    if absent:
+        sys.modules["pandas"] = None  # type: ignore[assignment]
+    try:
+        yield
+    finally:
+        if absent:
+            del sys.modules["pandas"]
+
 
 _DOCUMENTS = "__DOCUMENTS"
 _INDEXES = "__INDEXES"
@@ -59,12 +95,21 @@ _TAGS = "__TAGS"
 _TAGS_FIELD = "tags"
 
 
-def load_bundle(bundle_path: str) -> tuple[duckdb.DuckDBPyConnection, BundleSchema]:
+def load_bundle(
+    bundle_path: str, *, evidence: dict[str, dict[str, Counter[str]]] | None = None
+) -> tuple[duckdb.DuckDBPyConnection, BundleSchema]:
     """Read and parse the whole bundle, returning a populated DuckDB connection and its schema.
 
-    Strictly read-only with respect to the bundle: no files are created or modified. The current
-    implementation re-reads and re-parses every file on each call (milliseconds at hundreds of
-    files); a cache may later wrap this seam.
+    Strictly read-only with respect to the bundle: no files are created or modified. This call
+    always loads from source; :mod:`readb.cache` wraps it and may answer from a materialized
+    database instead.
+
+    Args:
+        bundle_path: the bundle root.
+        evidence: when given, filled with ``{table: {column: Counter[type key]}}`` — how many
+            concepts contribute each lattice type to each column. The cache needs it to decide
+            whether a change alters an inferred column type; a plain load passes None and pays
+            nothing.
 
     Raises:
         FileNotFoundError: if ``bundle_path`` does not exist or is not a directory.
@@ -81,18 +126,20 @@ def load_bundle(bundle_path: str) -> tuple[duckdb.DuckDBPyConnection, BundleSche
     by_table, name_to_original, unknown = _route_concepts(concepts, schema)
 
     # Build every table (pass 1 infer + pass 2 insert happen inside _build_table per table).
-    _build_table(connection, _DOCUMENTS, concepts, list(RESERVED_FIELDS), None, schema)
+    _build_table(connection, _DOCUMENTS, concepts, list(RESERVED_FIELDS), None, schema, evidence)
     for table_name in sorted(by_table):
         rows = by_table[table_name]
         columns = list(RESERVED_FIELDS) + _producer_keys(rows)
-        _build_table(connection, table_name, rows, columns, name_to_original[table_name], schema)
+        _build_table(
+            connection, table_name, rows, columns, name_to_original[table_name], schema, evidence
+        )
 
     unknown_columns = list(RESERVED_FIELDS) + _producer_keys(unknown)
-    _build_table(connection, _UNKNOWNTYPE, unknown, unknown_columns, None, schema)
+    _build_table(connection, _UNKNOWNTYPE, unknown, unknown_columns, None, schema, evidence)
 
-    _build_table(connection, _INDEXES, indexes, _frontmatter_union(indexes), None, schema)
+    _build_table(connection, _INDEXES, indexes, _frontmatter_union(indexes), None, schema, evidence)
     if logs:
-        _build_table(connection, _LOG, logs, _frontmatter_union(logs), None, schema)
+        _build_table(connection, _LOG, logs, _frontmatter_union(logs), None, schema, evidence)
 
     _create_tags_view(connection)
 
@@ -202,6 +249,7 @@ def _build_table(
     frontmatter_columns: list[str],
     original_type: str | None,
     schema: BundleSchema,
+    evidence: dict[str, dict[str, Counter[str]]] | None = None,
 ) -> None:
     """Infer types for ``frontmatter_columns``, create ``table_name``, and insert ``rows``.
 
@@ -223,9 +271,20 @@ def _build_table(
     if rows:
         bound_rows = [_bind_row(concept, frontmatter_columns, column_types) for concept in rows]
         placeholders = ", ".join("?" * (len(frontmatter_columns) + len(VIRTUAL_FIELDS)))
-        connection.executemany(
-            f"INSERT INTO {quote_ident(table_name)} VALUES ({placeholders})", bound_rows
-        )
+        with _suppress_pandas_probe():
+            connection.executemany(
+                f"INSERT INTO {quote_ident(table_name)} VALUES ({placeholders})", bound_rows
+            )
+
+    if evidence is not None:
+        # One entry per concept that *has* the key: a column exists while its count is positive,
+        # and its type is the lattice join over the types counted here.
+        table_evidence = evidence.setdefault(table_name, {})
+        for column in frontmatter_columns:
+            counts = table_evidence.setdefault(column, Counter())
+            for concept in rows:
+                if column in concept.frontmatter:
+                    counts[evidence_key(concept.frontmatter[column])] += 1
 
     table_schema = TableSchema(table_name=table_name, original_type=original_type)
     for column in frontmatter_columns:
@@ -247,6 +306,7 @@ def _bind_row(
     row.append(concept.name)  # __name
     row.append(concept.body)  # __body
     row.append(concept.raw)  # __raw
+    row.append(concept.content_hash)  # __hash
     return row
 
 

@@ -22,10 +22,11 @@ def _run(*args: str) -> Result:
 
 
 def test_query_missing_table_is_clean_error() -> None:
+    """An unknown table is answered from the bundle's own catalog (032-unknown-table-error)."""
     result = _run("query", "SELECT * FROM no_such_table", "--bundle", str(MINI_BUNDLE))
     assert result.exit_code == 1
     assert "no_such_table" in result.output
-    assert "Catalog Error" in result.output
+    assert "readb schema" in result.output
     assert "Traceback" not in result.output
 
 

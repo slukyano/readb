@@ -5,10 +5,10 @@ description: Answer the Rust question on the benchmark's evidence, build the per
 tags:
 - architecture
 - performance
-timestamp: '2026-08-23T12:00:00Z'
+timestamp: '2026-08-23T18:00:00Z'
 branch: sprint/006
 created: '2026-08-22'
-status: Implementing
+status: Done
 tasks:
 - 028-evaluate-rust-rewrite
 - 036-load-pandas-import-probe
@@ -55,17 +55,17 @@ delivers the decision plus the two fixes.
 
 ## Task checklist
 
-- [ ] 028-evaluate-rust-rewrite — decide Python vs. Rust on the measured evidence; ADR either way;
+- [x] 028-evaluate-rust-rewrite — decide Python vs. Rust on the measured evidence; ADR either way;
       no product code
-- [ ] 036-load-pandas-import-probe — DuckDB probes for pandas twice per non-NULL bound value; the
+- [x] 036-load-pandas-import-probe — DuckDB probes for pandas twice per non-NULL bound value; the
       load runs ~2.9x slower than it should at every bundle size measured
-- [ ] 034-persistent-index-cache — the `.readb/` index behind `load_bundle`, plus the ADR on how a
+- [x] 034-persistent-index-cache — the `.readb/` index behind `load_bundle`, plus the ADR on how a
       read-only tool may write a cache
-- [ ] 033-skill-discovery-rate — the shipped skill's `description` surface; the skill was loaded on
+- [x] 033-skill-discovery-rate — the shipped skill's `description` surface; the skill was loaded on
       37 of 78 runs and readb never invoked at all on 41
-- [ ] 032-unknown-table-error — a mistyped table names the bundle's tables and `readb schema`
+- [x] 032-unknown-table-error — a mistyped table names the bundle's tables and `readb schema`
       instead of DuckDB's `duckdb_indexes`
-- [ ] 040-hash-virtual-column — `__hash`, the hex SHA-256 of the file's bytes, in every table that
+- [x] 040-hash-virtual-column — `__hash`, the hex SHA-256 of the file's bytes, in every table that
       carries `__raw`; the cache consumes the same value
 
 Design order: `028-evaluate-rust-rewrite` → `036-load-pandas-import-probe` →
@@ -103,10 +103,69 @@ against a load pass that is itself three times slower than it should be proves n
 
 ## Open questions
 
-_(none yet)_
+_(none — every deferral has a named home: `041-empty-struct-crashes-the-load` holds the
+permissive-load defect the adversarial review found in code that predates this sprint,
+`037-field-editor-list-values` holds the field editor's
+inability to change a list, `038-derive-text-columns` holds the duplicated text storage the cache
+exposed, `039-git-aware-change-detection` holds change detection for filesystems where stat is
+expensive, and `035-benchmark-v3-cached` holds the re-measure the cache and the new skill
+description now owe.)_
+
+## Sprint summary
+
+Six tasks, all delivered, and the sprint's own measurements changed two of its designs while it ran.
+
+`028-evaluate-rust-rewrite` was answered by measuring rather than prototyping, and the measuring
+found `036-load-pandas-import-probe` immediately: two thirds of every load was DuckDB re-attempting
+an import of pandas, once per non-NULL bound value, with Python never caching the failure. That is
+a defect rather than a property of the language, and removing it made the load ~2.9x faster at every
+bundle size. What remained was what a cache removes, and what remains after *that* is process
+startup — which benchmark v2 already priced at nothing. ADR 0005 records the decision with the
+whole trade, and names the two things that would reopen it: a native install story `uvx` cannot
+serve, or a caller that pays the ~70 ms floor often enough for it to add up.
+
+`034-persistent-index-cache` is the sprint's build. It began as an all-or-nothing cache and became
+an incremental one during design review, because a full rebuild on every single-file edit would
+have made the common workflow the slow one. Two more decisions came out of measuring: git is not
+used for change detection (`git status` is no faster than the walk and has blind spots that fail
+toward a stale answer), and a file whose timestamp moved is confirmed by content hash before it is
+believed changed, which is 12x cheaper than re-parsing and keeps a mass mtime change from rewriting
+anything.
+
+`040-hash-virtual-column` joined scope during design: the cache needed a per-file digest, and
+exposing it as `__hash` turned duplicate detection and change tracking into queries.
+
+Fourteen defects were found and fixed before the merge, and only three of them by the tests written
+alongside the code. Two came from driving the built artifact and re-reading the diff. The other nine
+came from two independent reviews with no implementation context — one over the whole diff, one an
+adversarial differential fuzzer aimed at the cache's equivalence claim.
+
+The most serious was the fuzzer's: `unify` is commutative but **not** associative, so a column
+carrying more than one lattice type has a type that depends on the order its values were folded in.
+A fresh load folds in path order; evidence counts cannot reproduce that order, and the cache was
+comparing its own recomputation against itself. Such a column now forces a full rebuild. The second
+was routing: two raw types normalizing to one table name are told apart by a suffix, and which of
+them owns the un-suffixed name depends on which document comes first — so a delete or a rename could
+silently make a legitimate query return the other type's rows. A bundle with a collision is now
+never updated incrementally.
+
+The review also found that the incremental update built its result at its final, key-named path with
+no atomic rename, so a crash or a concurrent reader could see the previous contents under the new
+key — permanently. It now stages and renames like the full write does.
+
+One finding is **not** this sprint's and is not fixed: four frontmatter shapes, `flag: {}` among
+them, make a whole bundle unqueryable rather than skipping one file, which breaks the permissive-load
+promise outright. It reproduces identically on pre-sprint `main`, and is held by
+[`041-empty-struct-crashes-the-load`](../tasks/041-empty-struct-crashes-the-load.md) (high).
 
 ## Session log
 
+* **2026-08-23** — Two independent reviews ran against the finished branch and returned twelve
+  findings between them; eleven were fixed and pinned by regression tests, and the twelfth predates
+  the sprint and is now `041-empty-struct-crashes-the-load`.
+* **2026-08-23** — Implemented all six tasks, ran the gates, and closed the sprint out on the
+  branch. `040-hash-virtual-column` was added to scope during design; `038-derive-text-columns` and
+  `039-git-aware-change-detection` were drafted out of it.
 * **2026-08-23** — Design approved. ADRs 0005, 0006 and 0007 `Accepted`; six tasks `Designed`;
   sprint `Implementing`; design merge to `main`. `040-hash-virtual-column` joined scope during the
   phase; `038-derive-text-columns` and `039-git-aware-change-detection` were drafted out of it and

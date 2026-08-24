@@ -40,6 +40,7 @@ import re
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from enum import StrEnum
+from functools import cache
 from typing import Any
 
 # Reserved OKF frontmatter fields, guaranteed (as columns) on every concept table.
@@ -57,7 +58,14 @@ VIRTUAL_PATH = "__path"  # concept path relative to bundle root, WITH the .md su
 VIRTUAL_NAME = "__name"  # the simple file name, no dirs/.md; assumed unique, NOT guaranteed
 VIRTUAL_BODY = "__body"  # the markdown body, frontmatter stripped
 VIRTUAL_RAW = "__raw"  # the byte-exact file text as on disk, frontmatter included
-VIRTUAL_FIELDS: tuple[str, ...] = (VIRTUAL_PATH, VIRTUAL_NAME, VIRTUAL_BODY, VIRTUAL_RAW)
+VIRTUAL_HASH = "__hash"  # lowercase hex SHA-256 of the file's bytes, as `sha256sum` prints it
+VIRTUAL_FIELDS: tuple[str, ...] = (
+    VIRTUAL_PATH,
+    VIRTUAL_NAME,
+    VIRTUAL_BODY,
+    VIRTUAL_RAW,
+    VIRTUAL_HASH,
+)
 
 # Reserved filenames that are NOT concept docs.
 RESERVED_FILENAMES: frozenset[str] = frozenset({"index.md", "log.md"})
@@ -250,6 +258,38 @@ def render_ddl(t: LType) -> str:
         inner = ", ".join(f"{quote_ident(name)} {render_ddl(ft)}" for name, ft in (t.fields or ()))
         return f"STRUCT({inner})"
     return _LEAF_DDL[t.kind]
+
+
+def encode_ltype(t: LType) -> Any:
+    """A JSON-safe, round-trippable encoding of an LType (the persistent cache stores these)."""
+    if t.kind is Kind.LIST:
+        return {"l": encode_ltype(t.element or NULL)}
+    if t.kind is Kind.STRUCT:
+        return {"s": [[name, encode_ltype(ft)] for name, ft in (t.fields or ())]}
+    return t.kind.value
+
+
+def decode_ltype(encoded: Any) -> LType:
+    """Inverse of :func:`encode_ltype`."""
+    if isinstance(encoded, dict):
+        if "l" in encoded:
+            return LType(Kind.LIST, element=decode_ltype(encoded["l"]))
+        return LType(Kind.STRUCT, fields=tuple((n, decode_ltype(f)) for n, f in encoded["s"]))
+    return LType(Kind(encoded))
+
+
+@cache
+def _ltype_key(t: LType) -> str:
+    return json.dumps(encode_ltype(t), sort_keys=True)
+
+
+def evidence_key(value: Any) -> str:
+    """The stable string a cache counts one value's contribution to a column's type under.
+
+    Memoized on the LType rather than the value: a load classifies tens of thousands of values
+    into a handful of distinct types, and serializing the same type repeatedly is pure waste.
+    """
+    return _ltype_key(type_of_value(value))
 
 
 def coerce(value: Any, t: LType) -> Any:

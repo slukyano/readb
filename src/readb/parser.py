@@ -11,6 +11,7 @@ for index/log files); only a file that *opens* a frontmatter block it cannot par
 
 from __future__ import annotations
 
+import hashlib
 import logging
 from dataclasses import dataclass
 from pathlib import Path
@@ -40,6 +41,16 @@ class Concept:
     frontmatter: dict[str, Any]
     body: str
     raw: str
+
+    @property
+    def content_hash(self) -> str:
+        """Lowercase hex SHA-256 of the file's bytes — what ``sha256sum`` prints for it.
+
+        The ``__hash`` virtual field (ADR 0007). Derived from ``raw``, which is byte-exact by
+        contract, so re-encoding it as UTF-8 reproduces the file: no line-ending, encoding or
+        whitespace normalization, and none of the framing ``git hash-object`` applies.
+        """
+        return hashlib.sha256(self.raw.encode("utf-8")).hexdigest()
 
     @property
     def name(self) -> str:

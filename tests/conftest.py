@@ -21,6 +21,21 @@ GA4_BUNDLE = FIXTURES / "upstream" / "okf" / "bundles" / "ga4"
 CRYPTO_BUNDLE = FIXTURES / "upstream" / "okf" / "bundles" / "crypto_bitcoin"
 
 
+@pytest.fixture(autouse=True)
+def _cache_off_unless_asked(
+    request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Keep the repository's own ``.readb/`` registry out of the tests that are not about it.
+
+    The fixtures live inside this repository, which *is* a readb registry, so an unguarded test
+    would both write cache files into the working tree and exercise a code path it never meant
+    to. Tests that are about the cache carry ``@pytest.mark.uses_cache`` and see it for real.
+    """
+    if request.node.get_closest_marker("uses_cache"):
+        return
+    monkeypatch.setattr("readb.cache.cache_dir_for", lambda *_args, **_kwargs: None)
+
+
 @pytest.fixture
 def mini_path() -> Path:
     return MINI_BUNDLE

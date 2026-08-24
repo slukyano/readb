@@ -8,7 +8,7 @@ okf_version: "0.1"
 
 # Sprints
 
-* [Sprint 006 — Decide the language question, then make the load cheap](sprints/sprint-006.md) - Designing.
+* [Sprint 006 — Decide the language question, then make the load cheap](sprints/sprint-006.md) - Done.
 * [Sprint 005 — Benchmark v2: realistic workloads and a second model](sprints/sprint-005.md) - Done.
 * [Sprint 004 — Measure the efficiency claim](sprints/sprint-004.md) - Done.
 * [Sprint 003 — Post-0.1.0 adoption: usage skill, prior art, release automation](sprints/sprint-003.md) - Done.
@@ -24,18 +24,20 @@ okf_version: "0.1"
 * [Research frontmatter schema checking](tasks/017-frontmatter-schema-checking.md) - opt-in declare/check (`readb check`); load stays permissive.
 * [Research cross-bundle querying](tasks/021-cross-bundle-querying.md) - registry bundles as DuckDB schemas; joins across bundles.
 * [Submit the readb plugin to the community marketplace](tasks/027-plugin-marketplace-submission.md) - discovery only: `gh skill install` already works; the hint protocol needs an official listing.
-* [An unknown table should name the bundle's tables](tasks/032-unknown-table-error.md) - DuckDB's catalog error is passed through verbatim, suggesting a DuckDB internal table.
-* [The shipped skill is invoked on fewer than half the runs where it is available](tasks/033-skill-discovery-rate.md) - discovery, not content; measured by benchmark v2.
-* [Expose the file's content hash as a `__hash` virtual column](tasks/040-hash-virtual-column.md) - duplicate-finding and change tracking become queries; the cache computes the digest anyway.
+* [Four frontmatter shapes crash the whole load](tasks/041-empty-struct-crashes-the-load.md) - `key: {}` renders `STRUCT()` and every query against the bundle fails; predates sprint-006.
 * [Detect bundle changes without stat-ing every file](tasks/039-git-aware-change-detection.md) - the cache's detector assumes stat is cheap; S3-backed and network filesystems need an fsmonitor-backed one.
 * [Stop storing every file's text twice — derive the text columns instead](tasks/038-derive-text-columns.md) - `__raw` and `__body` duplicate the corpus in `__DOCUMENTS` and again per type table.
 * [The field editor cannot change a list-valued key](tasks/037-field-editor-list-values.md) - `set` refuses a list and `unset` destroys it; adding a task to a sprint needs a hand edit.
-* [The load pass spends two thirds of its time on a failed pandas import](tasks/036-load-pandas-import-probe.md) - DuckDB probes for pandas per bound value; the load is ~2.9x slower than it should be.
 * [Benchmark v3 — re-measure every arm with the cache enabled](tasks/035-benchmark-v3-cached.md) - one full re-measure after the cache and the revised skill description land.
-* [Persistent index cache behind the load seam](tasks/034-persistent-index-cache.md) - stop re-parsing the whole bundle every invocation; the `.readb/` index the loader seam was built for.
-* [Evaluate rewriting readb in Rust](tasks/028-evaluate-rust-rewrite.md) - binary distribution and startup vs. the Python API, YAML semantics, and rebuild cost; sequenced behind the benchmark.
 
 # Done
+
+* [An unknown table should name the bundle's tables](archive/032-unknown-table-error.md) - DuckDB's catalog error is passed through verbatim, suggesting a DuckDB internal table.
+* [The shipped skill is invoked on fewer than half the runs where it is available](archive/033-skill-discovery-rate.md) - discovery, not content; measured by benchmark v2.
+* [Expose the file's content hash as a `__hash` virtual column](archive/040-hash-virtual-column.md) - duplicate-finding and change tracking become queries; the cache computes the digest anyway.
+* [The load pass spends two thirds of its time on a failed pandas import](archive/036-load-pandas-import-probe.md) - DuckDB probes for pandas per bound value; the load is ~2.9x slower than it should be.
+* [Persistent index cache behind the load seam](archive/034-persistent-index-cache.md) - stop re-parsing the whole bundle every invocation; the `.readb/` index the loader seam was built for.
+* [Evaluate rewriting readb in Rust](archive/028-evaluate-rust-rewrite.md) - binary distribution and startup vs. the Python API, YAML semantics, and rebuild cost; sequenced behind the benchmark.
 
 Sprint 005:
 
