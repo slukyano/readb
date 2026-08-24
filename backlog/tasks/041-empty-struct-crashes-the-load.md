@@ -75,15 +75,38 @@ The placeholder is visible: `readb schema` prints it and `SELECT flag FROM t` re
 `{'__DUMMY': NULL}`. That is the price of a mapping column that carries no keys at all, and it is
 preferable to the column silently becoming something else.
 
-### 3. Keys are strings, and a collision keeps the last one
+### 3. Keys are normalized once, at the parse boundary — before any type is chosen
 
-YAML keys may be any scalar; a `STRUCT` field name is a string. Every key is stringified, which is
-already what the code does — the gap is that two distinct YAML keys can collide once stringified
-(`{1: a, "1": b}`), which DuckDB rejects as a duplicate field name.
+YAML keys may be any scalar; a `STRUCT` field name is a string. **JSON does not rescue this**, which
+is worth stating because it was the obvious escape: `json.dumps({1: "a", "1": "b"})` emits
+`{"1": "a", "1": "b"}` — a duplicate key in the text, malformed as data even though a reader happens
+to keep the last one. A mapping that cannot be a `STRUCT` cannot be honest JSON either, so the
+collision has to be resolved *before* a type is chosen, not by choosing a different type.
 
-**The last occurrence in document order wins**, which is the rule PyYAML already applies to
-genuinely duplicate YAML keys, so one convention covers both and `readb get`/`SELECT` agree with
-the file. A collision is logged once per document, since a silently dropped value is worth a line.
+So `parse_file` normalizes every mapping it returns, recursively: **each key is stringified, and
+when two collide the last occurrence in document order wins.** That is the rule PyYAML already
+applies to genuinely duplicate YAML keys, so one convention covers both, and `readb get` agrees with
+`SELECT`. Each collision is logged once per document, because a dropped value deserves a line.
+
+Everything downstream — `STRUCT` field names, JSON encoding, column naming, `readb set` — then sees
+one normalized mapping and cannot disagree about it.
+
+**This also fixes a losslessness bug found while designing the rule.** A non-string key at the *top*
+level is not just untyped, it is silently discarded: `_producer_keys` skips any key that is not a
+`str` (`loader.py:326`), so
+
+```yaml
+---
+type: T
+1: one
+true: yes
+2026-01-01: dated
+---
+```
+
+produces a `t` table with **no column for any of the three**, no warning, and the values reachable
+only through `__raw`. Union-of-keys is supposed to be lossless. With normalization at the parse
+boundary the keys arrive as `"1"`, `"True"` and `"2026-01-01"`, and become ordinary columns.
 
 ### 4. An integer that does not fit BIGINT is text
 
@@ -93,8 +116,11 @@ text, lossless and comparable — and the normal lattice rules take it from ther
 
 **The consequence, stated because it is a decision and not an accident:** a column mixing in-range
 and out-of-range integers unifies `BIGINT` with `VARCHAR`, which the existing lattice sends to
-`JSON`. Ask 2 in the design presentation asks whether that is the wanted outcome or whether such a
-column should become `VARCHAR` throughout.
+`JSON`. That is lossless — verified rather than assumed: DuckDB's JSON type stores
+`1180591620717411303424` and returns it intact, and each value keeps its own JSON encoding, so `42`
+and `"high"` remain a number and a string rather than being flattened into one type. JSON's weakness
+is duplicate *keys*, which rule 3 removes before typing begins; incompatible *values* are exactly
+what it is for.
 
 ### 5. A table build still cannot take the load down
 
@@ -115,6 +141,7 @@ be broken, and it can be dropped without affecting the four rules above.
 | --- | --- |
 | Inferred column types | **Breaking:** a column of mappings with differing key sets is `STRUCT` where it was `JSON`. A query using JSON access (`flag ->> 'a'`) on such a column breaks; struct access (`flag.a`) starts working. Columns whose key sets already matched are unaffected. |
 | Inferred column types | Four shapes that previously *killed the load* now have types: empty mappings (`STRUCT("__DUMMY" VARCHAR)` when nothing else contributes), colliding stringified keys (last wins), an out-of-range integer (`VARCHAR`). |
+| Columns | A frontmatter key that is not a string now becomes a column under its stringified name. Today it is silently dropped, so nothing that works loses a column — bundles gain the ones they were missing. |
 | `readb schema` | Prints `STRUCT(...)` where it printed `JSON` for those columns, plus a warning line for a degraded table. |
 | Exit codes, CLI commands, flags, Python API names, on-disk paths | Unchanged. |
 
@@ -129,7 +156,9 @@ version (ADR 0006), so no bundle is served types from the old rule.
   recursively, a mapping beside a non-mapping still meeting at `JSON`.
 - The placeholder: a column of only `{}` is `STRUCT("__DUMMY" VARCHAR)`; adding one real key removes
   the placeholder entirely.
-- Key collision: `{1: a, "1": b}` keeps `b`, and logs.
+- Key collision at both levels: `{1: a, "1": b}` keeps `b` and logs, nested and at the top level.
+- Non-string top-level keys (`1:`, `true:`, a date) become columns carrying their values, which is
+  the losslessness regression this rule closes.
 - The integer boundary on both sides: `2^62` is `BIGINT`, `2^63` and `-2^63 - 1` are `VARCHAR`.
 - Rungs 2 and 3 of the ladder, forced by monkeypatching the renderer to emit invalid DDL — the
   shapes that used to reach them are exactly the ones this task removes.

@@ -45,9 +45,12 @@ Three rules make the mapping case total:
 1. **A column whose mappings contribute no fields at all is `STRUCT("__DUMMY" VARCHAR)`** — one
    placeholder field, always NULL, because `STRUCT()` is not valid DDL. The placeholder disappears
    as soon as any value contributes a real field.
-2. **Keys are stringified, and when two collide the last occurrence in document order wins** — the
-   rule PyYAML already applies to genuinely duplicate YAML keys, so `readb get` and `SELECT` agree
-   with the file. A collision is logged.
+2. **Keys are normalized at the parse boundary, before any type is chosen**: stringified
+   recursively, and when two collide the last occurrence in document order wins — the rule PyYAML
+   already applies to genuinely duplicate YAML keys, so `readb get` and `SELECT` agree with the
+   file. A collision is logged. Choosing JSON instead would not have helped: `json.dumps` renders
+   `{1: "a", "1": "b"}` as `{"1": "a", "1": "b"}`, a duplicate key in the text. JSON absorbs
+   incompatible *values*; it cannot absorb a duplicate *key*.
 3. **An integer outside ±2^63 is `VARCHAR`**, carrying its decimal text. `type_of_value` claimed
    `BIGINT` for every Python integer, which is a promise the engine cannot keep.
 
@@ -58,6 +61,9 @@ Three rules make the mapping case total:
   working. Columns whose key sets already matched are unaffected, as is every non-mapping column.
   Persistent caches are invalidated automatically, since the cache key carries the readb version.
 - Four value shapes that made an entire bundle unqueryable now load.
+- A frontmatter key that is not a string becomes a column under its stringified name. Today the
+  loader skips it and the value is reachable only through `__raw` — a silent breach of the
+  union-of-keys promise, fixed by the same normalization.
 - Struct unification becomes **associative and commutative**, since set union is. That removes one
   source of the order-dependence that forced `readb.cache` to refuse mixed-type columns; the
   scalar-and-list rules are still order-dependent, so the guard stays.
