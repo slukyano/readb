@@ -5,10 +5,10 @@ description: Fix the frontmatter shapes that kill a whole load instead of skippi
 tags:
 - correctness
 - benchmarks
-timestamp: '2026-08-23T20:00:00Z'
+timestamp: '2026-08-23T22:00:00Z'
 branch: sprint/007
 created: '2026-08-23'
-status: Designing
+status: Implementing
 tasks:
 - 041-empty-struct-crashes-the-load
 - 035-benchmark-v3-cached
@@ -49,11 +49,32 @@ the backlog; the release has no task yet and needs one when it is next proposed.
 - [ ] 035-benchmark-v3-cached — the full matrix re-run: five arms, two models, four corpora, the
       26-question battery, pre-registered before the first measured run
 
+## Design phase
+
+- [x] `041-empty-struct-crashes-the-load` — retitled once the design outgrew the four crashing
+      shapes; proposes [ADR 0008](../../docs/dev/adr/0008-struct-field-union.md)
+- [x] `035-benchmark-v3-cached` — five arms, the cache isolated in one of them, three
+      pre-registered endpoints, ~$50-60
+
+## Decisions taken during design
+
+- **The lattice promotes rather than falling back.** The first design answered JSON for each
+  awkward shape; that was rejected for deciding a column's type by which disagreement it met. A
+  column now takes the narrowest type holding every value: field union for mappings, `VARCHAR` for
+  mixed scalars, JSON only for structural mismatches.
+- **Key normalization happens at the parse boundary**, because JSON cannot represent a duplicate
+  key — `json.dumps({1: "a", "1": "b"})` emits one twice. Last occurrence wins.
+- **The non-string top-level key fix is in scope**: such keys are silently dropped today, which
+  breaches union-of-keys, and the same normalization fixes them.
+- **v3 spends roughly $50-60** and drops the `readb-nudged` arm as a settled negative.
+
 ## Open questions
 
-_(none yet)_
+_(none)_
 
 ## Session log
 
+* **2026-08-23** — Design approved: ADR 0008 accepted, scalar promotion and parse-boundary key
+  normalization decided, v3's design and budget approved.
 * **2026-08-23** — Scope approved: two tasks, branch `sprint/007`. Narrowed from a four-item
   proposal; the field editor's gaps and the 0.3.0 release were dropped.

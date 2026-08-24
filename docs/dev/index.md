@@ -39,8 +39,7 @@ readb query "SELECT __name, status, title FROM adr ORDER BY __name" --bundle ./d
 
 ## Proposed
 
-* [0006 — The persistent cache writes only under an existing .readb/](adr/0006-cache-consent-and-key.md)
-* [0007 — __hash joins the virtual columns: the hex SHA-256 of the file bytes](adr/0007-hash-virtual-column.md)
+_(none)_
 
 ## Accepted
 
@@ -48,6 +47,9 @@ readb query "SELECT __name, status, title FROM adr ORDER BY __name" --bundle ./d
 * [0003 — Virtual columns __path/__name/__body/__raw; wiki-style name addressing; __id removed](adr/0003-virtual-columns.md)
 * [0004 — Explicit readb init writes a bundle registry; discovery walks up to it](adr/0004-init-registry-discovery.md)
 * [0005 — readb stays a Python package; per-invocation cost is fixed and cached, not rewritten](adr/0005-stay-on-python.md)
+* [0006 — The persistent cache writes only under an existing .readb/](adr/0006-cache-consent-and-key.md)
+* [0007 — __hash joins the virtual columns: the hex SHA-256 of the file bytes](adr/0007-hash-virtual-column.md)
+* [0008 — The lattice promotes to the narrowest type that holds every value](adr/0008-struct-field-union.md)
 
 # Research
 
