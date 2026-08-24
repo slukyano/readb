@@ -341,7 +341,7 @@ def main() -> None:
     expert_of = {r["question"]: r.get("expert_tool", "?") for r in records}
     strata = sorted({strata_of[q] for q in questions})
 
-    print("# Benchmark results — v2\n")
+    print("# Benchmark results — v3\n")
     print(f"{len(records)} runs recorded, {len(dropped)} excluded as invalid, {len(clean)} used.")
     print(f"Models: {', '.join(models)}. Arms: {', '.join(arms)}. Questions: {len(questions)}.\n")
 
@@ -469,12 +469,13 @@ def main() -> None:
     # --- the cache contrast ---------------------------------------------------
     for model in models:
         if {(model, "readb-bare"), (model, "readb-cached")} <= set(by_arm_model):
-            bare_med = question_medians(rows, "readb-bare", model, "cost_billed_usd")
-            cached_med = question_medians(rows, "readb-cached", model, "cost_billed_usd")
+            rows_here = [r for r in clean if (r.get("model") or "?") == model]
+            bare_med = question_medians(rows_here, "readb-bare", model, "cost_billed_usd")
+            cached_med = question_medians(rows_here, "readb-cached", model, "cost_billed_usd")
             shared = sorted(set(bare_med) & set(cached_med))
             ratios = [cached_med[q] / bare_med[q] for q in shared if bare_med[q]]
-            wall_bare = question_medians(rows, "readb-bare", model, "wall_s")
-            wall_cached = question_medians(rows, "readb-cached", model, "wall_s")
+            wall_bare = question_medians(rows_here, "readb-bare", model, "wall_s")
+            wall_cached = question_medians(rows_here, "readb-cached", model, "wall_s")
             wall_shared = sorted(set(wall_bare) & set(wall_cached))
             wall_ratios = [wall_cached[q] / wall_bare[q] for q in wall_shared if wall_bare[q]]
             print(f"\n### The cache — `readb-cached` against `readb-bare` ({model})\n")
