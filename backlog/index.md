@@ -8,6 +8,7 @@ okf_version: "0.1"
 
 # Sprints
 
+* [Sprint 007 — Keep the permissive-load promise, then measure the cache](sprints/sprint-007.md) - Designing.
 * [Sprint 006 — Decide the language question, then make the load cheap](sprints/sprint-006.md) - Done.
 * [Sprint 005 — Benchmark v2: realistic workloads and a second model](sprints/sprint-005.md) - Done.
 * [Sprint 004 — Measure the efficiency claim](sprints/sprint-004.md) - Done.

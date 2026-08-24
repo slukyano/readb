@@ -1,6 +1,12 @@
 # Task Bundle Log
 
 ## 2026-08-23
+* **Sprint 007 opened**: [the permissive-load defect](tasks/041-empty-struct-crashes-the-load.md)
+  and [benchmark v3](tasks/035-benchmark-v3-cached.md) on branch `sprint/007` (`Designing`). The
+  defect runs first because it changes which files load, and the benchmark must not measure an
+  instrument that is about to change. The field editor's gaps and a 0.3.0 release were proposed
+  and dropped.
+
 * **Sprint 006 merged**: final merge to `main`, branch deleted.
   [`041-empty-struct-crashes-the-load`](tasks/041-empty-struct-crashes-the-load.md) is queued to
   lead the next sprint: an empty mapping value in any file makes a whole bundle unqueryable, which
