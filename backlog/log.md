@@ -1,6 +1,10 @@
 # Task Bundle Log
 
 ## 2026-08-23
+* **Sprint 006 merged**: final merge to `main`, branch deleted.
+  [`041-empty-struct-crashes-the-load`](tasks/041-empty-struct-crashes-the-load.md) is queued to
+  lead the next sprint: an empty mapping value in any file makes a whole bundle unqueryable, which
+  breaks the permissive-load promise, and it predates this sprint.
 * **Sprint 006 closed**: six tasks `Designed -> Done` — the Rust decision, the load-pass defect,
   the persistent index cache, the `__hash` column, the skill's description, and the unknown-table
   error; sprint `Implementing -> Done`. readb stays a Python package
