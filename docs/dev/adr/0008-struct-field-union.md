@@ -1,6 +1,6 @@
 ---
 type: ADR
-title: 'Mappings unify by recursive field union, not by matching key sets'
+title: 'The lattice promotes to the narrowest type that holds every value: field union for mappings, VARCHAR for mixed scalars'
 status: Proposed
 created: 2026-08-23
 sprint: sprint-007
@@ -33,6 +33,28 @@ have made the lattice total while entrenching the first two costs.
 
 # Decision
 
+**A column takes the narrowest type that holds every value it has, and falls to JSON only when no
+such type exists.** Today the lattice reaches for JSON as soon as two values disagree at all, which
+throws away a type that would have held both.
+
+**Scalars promote to `VARCHAR` rather than to JSON.** Text holds any scalar losslessly, stays
+readable in query output, and remains usable with `LIKE` and ordering, where JSON is opaque. Of the
+fifteen scalar pairs, thirteen change:
+
+| | Today | After |
+| --- | --- | --- |
+| `BIGINT` + `DOUBLE` | `DOUBLE` | `DOUBLE` — unchanged |
+| `DATE` + `TIMESTAMP` | `JSON` | `TIMESTAMP` — a date is midnight, the widening SQL itself performs |
+| every other scalar pair | `JSON` | `VARCHAR` |
+
+The scalar order is `NULL` < {`BOOLEAN`, `BIGINT` < `DOUBLE`, `DATE` < `TIMESTAMP`} < `VARCHAR` <
+`JSON`. A value written into a `VARCHAR` column keeps its YAML rendering — `true`, `42`, `1.5`,
+`2026-01-01` — so the text is what the file said, not a Python repr.
+
+JSON remains the top of the lattice and the universal fallback, but it is now reached only when the
+values disagree *structurally* — a scalar against a mapping, a list against a mapping — where no
+narrower type can hold both.
+
 **Two mappings unify to a `STRUCT` whose fields are the union of theirs, recursively**, with each
 shared field's type unified in turn and each missing field NULL for the documents that lack it.
 Field order is by name, so the type does not depend on document order.
@@ -52,10 +74,15 @@ Three rules make the mapping case total:
    `{1: "a", "1": "b"}` as `{"1": "a", "1": "b"}`, a duplicate key in the text. JSON absorbs
    incompatible *values*; it cannot absorb a duplicate *key*.
 3. **An integer outside ±2^63 is `VARCHAR`**, carrying its decimal text. `type_of_value` claimed
-   `BIGINT` for every Python integer, which is a promise the engine cannot keep.
+   `BIGINT` for every Python integer, which is a promise the engine cannot keep. With scalar
+   promotion above, a column mixing in-range and out-of-range integers is `VARCHAR` throughout
+   rather than JSON — the whole column takes the type that holds all of it.
 
 # Consequences
 
+- **Breaking, and wider than the mapping rule alone.** Thirteen of the fifteen scalar pairs move
+  from `JSON` to `VARCHAR` (or `TIMESTAMP`), so a column mixing, say, `rank: 1` with `rank: high` is
+  now text. JSON extraction on such a column breaks; ordinary string predicates start working.
 - **Breaking.** A column of mappings with differing key sets is now `STRUCT` where it was `JSON`:
   JSON access (`flag ->> 'a'`) on such a column breaks, and struct access (`flag.a`) starts
   working. Columns whose key sets already matched are unaffected, as is every non-mapping column.
@@ -64,9 +91,11 @@ Three rules make the mapping case total:
 - A frontmatter key that is not a string becomes a column under its stringified name. Today the
   loader skips it and the value is reachable only through `__raw` — a silent breach of the
   union-of-keys promise, fixed by the same normalization.
-- Struct unification becomes **associative and commutative**, since set union is. That removes one
-  source of the order-dependence that forced `readb.cache` to refuse mixed-type columns; the
-  scalar-and-list rules are still order-dependent, so the guard stays.
+- Struct unification becomes **associative and commutative**, since set union is, and scalar
+  promotion removes the counterexample that forced `readb.cache` to refuse mixed-type columns
+  (`DOUBLE`, `VARCHAR`, `LIST<BIGINT>` folded in two orders now agree). Whether the lattice is
+  associative *everywhere* is a separate claim needing its own proof or fuzzing, so the cache's
+  guard stays until someone establishes it.
 - A pathological bundle can now produce a very wide struct — one field per distinct key across
   every document of that type. That is the same exposure the union-of-keys rule already accepts for
   table columns, and it is bounded by the same thing: what the producer actually wrote.
@@ -89,7 +118,7 @@ both: two rules for mappings, and the queryability loss stays.
 Rejected: the column *is* a mapping column, and the type should say so. A placeholder field is
 honest about the degeneracy; a different type hides it and changes again the moment a key appears.
 
-**Make `BIGINT` unify with `VARCHAR` as `VARCHAR`** so a column mixing in-range and out-of-range
-integers stays text rather than becoming `JSON`. Not decided here — it is a change to scalar
-unification affecting every mixed scalar column, not just oversized integers, and it is raised as
-an open question with `041-empty-struct-crashes-the-load`.
+**Keep JSON for mixed scalars, promoting only oversized integers to text.** The narrower change,
+and the one first proposed. Rejected: it decides a column's type by which case it met rather than by
+what would hold its values, which is the same inconsistency the mapping rule removes. A rule applied
+in one place and not the other is the thing worth avoiding here.

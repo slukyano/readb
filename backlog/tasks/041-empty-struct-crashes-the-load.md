@@ -1,6 +1,6 @@
 ---
 type: Task
-title: Four frontmatter shapes crash the whole load instead of skipping one file
+title: 'Make the type lattice total: promote to the narrowest type that holds every value'
 description: An empty mapping value anywhere in a bundle makes every query against it fail with a DuckDB parser error, which breaks the permissive-load promise outright.
 status: Draft
 priority: high
@@ -47,7 +47,23 @@ a column is a `STRUCT` or it is `JSON`, decided by what the values are, never by
 case was hit. That revises a rule in the binding spec, so it carries
 [ADR 0008](../../docs/dev/adr/0008-struct-field-union.md).
 
-### 1. Structs unify by recursive field union
+### 1. Scalars promote to text rather than falling to JSON
+
+Today a column reaches for JSON as soon as two values disagree: of the fifteen scalar pairs, only
+`BIGINT` + `DOUBLE` survives as a narrower type. A column takes instead **the narrowest type that
+holds every value it has**, and JSON only when none does.
+
+| | Today | After |
+| --- | --- | --- |
+| `BIGINT` + `DOUBLE` | `DOUBLE` | unchanged |
+| `DATE` + `TIMESTAMP` | `JSON` | `TIMESTAMP` |
+| the other thirteen scalar pairs | `JSON` | `VARCHAR` |
+
+A value written into a promoted `VARCHAR` column keeps its YAML rendering — `true`, `42`, `1.5`,
+`2026-01-01` — so a reader sees what the file said. Text also stays usable: `LIKE`, ordering and
+equality all work, where JSON needs extraction first.
+
+### 2. Structs unify by recursive field union
 
 Today two mappings unify to a `STRUCT` only when their key sets match **exactly**, and to `JSON`
 otherwise (`docs/dev/design.md` line 82). That is the same problem the union-of-keys rule already
@@ -63,7 +79,7 @@ fills the gaps with NULL. Mappings now do the same.
 
 Fields stay sorted by name, so the type is deterministic regardless of document order.
 
-### 2. An all-empty mapping gets a placeholder field
+### 3. An all-empty mapping gets a placeholder field
 
 `{}` contributes no fields, so a column whose values are *all* empty mappings would render as
 `STRUCT()`, which is not valid DDL. Such a column is rendered `STRUCT("__DUMMY" VARCHAR)` — one
@@ -75,7 +91,7 @@ The placeholder is visible: `readb schema` prints it and `SELECT flag FROM t` re
 `{'__DUMMY': NULL}`. That is the price of a mapping column that carries no keys at all, and it is
 preferable to the column silently becoming something else.
 
-### 3. Keys are normalized once, at the parse boundary — before any type is chosen
+### 4. Keys are normalized once, at the parse boundary — before any type is chosen
 
 YAML keys may be any scalar; a `STRUCT` field name is a string. **JSON does not rescue this**, which
 is worth stating because it was the obvious escape: `json.dumps({1: "a", "1": "b"})` emits
@@ -108,21 +124,17 @@ produces a `t` table with **no column for any of the three**, no warning, and th
 only through `__raw`. Union-of-keys is supposed to be lossless. With normalization at the parse
 boundary the keys arrive as `"1"`, `"True"` and `"2026-01-01"`, and become ordinary columns.
 
-### 4. An integer that does not fit BIGINT is text
+### 5. An integer that does not fit BIGINT is text
 
 `type_of_value` calls every Python integer a `BIGINT`; the measured boundary is exactly ±2^63, and a
 value outside it kills the load at insert time. Such a value is classified `VARCHAR` — its decimal
 text, lossless and comparable — and the normal lattice rules take it from there.
 
-**The consequence, stated because it is a decision and not an accident:** a column mixing in-range
-and out-of-range integers unifies `BIGINT` with `VARCHAR`, which the existing lattice sends to
-`JSON`. That is lossless — verified rather than assumed: DuckDB's JSON type stores
-`1180591620717411303424` and returns it intact, and each value keeps its own JSON encoding, so `42`
-and `"high"` remain a number and a string rather than being flattened into one type. JSON's weakness
-is duplicate *keys*, which rule 3 removes before typing begins; incompatible *values* are exactly
-what it is for.
+With rule 1 the whole column follows: a column mixing in-range and out-of-range integers is
+`VARCHAR` throughout, not JSON. The oversized value is not a special case with its own type — it is
+simply the value that made text the narrowest type holding everything.
 
-### 5. A table build still cannot take the load down
+### 6. A table build still cannot take the load down
 
 With the lattice total, the nine measured shapes load. The promise — a bad file is logged and
 skipped, never fatal — has to hold for shapes nobody has enumerated yet, so `_build_table` gains a
@@ -139,6 +151,7 @@ be broken, and it can be dropped without affecting the four rules above.
 
 | Surface | Change |
 | --- | --- |
+| Inferred column types | **Breaking:** thirteen of the fifteen scalar pairs move from `JSON` to `VARCHAR` (or `TIMESTAMP`), so a column mixing `rank: 1` with `rank: high` is now text. JSON extraction on such a column breaks; string predicates and ordering start working. |
 | Inferred column types | **Breaking:** a column of mappings with differing key sets is `STRUCT` where it was `JSON`. A query using JSON access (`flag ->> 'a'`) on such a column breaks; struct access (`flag.a`) starts working. Columns whose key sets already matched are unaffected. |
 | Inferred column types | Four shapes that previously *killed the load* now have types: empty mappings (`STRUCT("__DUMMY" VARCHAR)` when nothing else contributes), colliding stringified keys (last wins), an out-of-range integer (`VARCHAR`). |
 | Columns | A frontmatter key that is not a string now becomes a column under its stringified name. Today it is silently dropped, so nothing that works loses a column — bundles gain the ones they were missing. |
@@ -152,6 +165,8 @@ version (ADR 0006), so no bundle is served types from the old rule.
 
 - A fixture bundle carrying **all nine measured shapes** alongside healthy documents: every healthy
   document stays queryable, and every previously fatal value round trips.
+- Every scalar pair, asserted as a table: the two that keep a narrower type and the thirteen that
+  become `VARCHAR`, plus the rendering of each promoted value (`true`, not `True`).
 - The union rule at each shape: disjoint key sets, overlapping key sets, nested mappings unified
   recursively, a mapping beside a non-mapping still meeting at `JSON`.
 - The placeholder: a column of only `{}` is `STRUCT("__DUMMY" VARCHAR)`; adding one real key removes
