@@ -2,14 +2,14 @@
 type: Task
 title: Persistent index cache behind the load seam
 description: Stop re-parsing the whole bundle on every invocation — cache the loaded index under `.readb/` and reuse it when the working tree has not changed.
-status: Designed
+status: Done
 priority: medium
 tags:
 - performance
 - loader
 - architecture
 created: 2026-08-22
-timestamp: '2026-08-23T12:00:00Z'
+timestamp: '2026-08-23T18:00:00Z'
 ---
 
 The load path re-reads and re-parses every file on every invocation, by design: the MVP's

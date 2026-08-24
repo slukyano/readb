@@ -2,14 +2,14 @@
 type: Task
 title: The load pass spends two thirds of its time on a failed pandas import
 description: DuckDB attempts `import pandas` twice per non-NULL bound value during the insert pass; Python does not cache failed imports, so every attempt walks sys.path. Removing it makes the load ~2.9x faster.
-status: Designed
+status: Done
 priority: high
 tags:
 - performance
 - loader
 - bug
 created: 2026-08-22
-timestamp: '2026-08-23T12:00:00Z'
+timestamp: '2026-08-23T18:00:00Z'
 ---
 
 Found while measuring the load pass for [028-evaluate-rust-rewrite](028-evaluate-rust-rewrite.md),

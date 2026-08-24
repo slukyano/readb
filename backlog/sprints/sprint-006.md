@@ -5,10 +5,10 @@ description: Answer the Rust question on the benchmark's evidence, build the per
 tags:
 - architecture
 - performance
-timestamp: '2026-08-23T12:00:00Z'
+timestamp: '2026-08-23T18:00:00Z'
 branch: sprint/006
 created: '2026-08-22'
-status: Implementing
+status: Done
 tasks:
 - 028-evaluate-rust-rewrite
 - 036-load-pandas-import-probe
@@ -55,17 +55,17 @@ delivers the decision plus the two fixes.
 
 ## Task checklist
 
-- [ ] 028-evaluate-rust-rewrite — decide Python vs. Rust on the measured evidence; ADR either way;
+- [x] 028-evaluate-rust-rewrite — decide Python vs. Rust on the measured evidence; ADR either way;
       no product code
-- [ ] 036-load-pandas-import-probe — DuckDB probes for pandas twice per non-NULL bound value; the
+- [x] 036-load-pandas-import-probe — DuckDB probes for pandas twice per non-NULL bound value; the
       load runs ~2.9x slower than it should at every bundle size measured
-- [ ] 034-persistent-index-cache — the `.readb/` index behind `load_bundle`, plus the ADR on how a
+- [x] 034-persistent-index-cache — the `.readb/` index behind `load_bundle`, plus the ADR on how a
       read-only tool may write a cache
-- [ ] 033-skill-discovery-rate — the shipped skill's `description` surface; the skill was loaded on
+- [x] 033-skill-discovery-rate — the shipped skill's `description` surface; the skill was loaded on
       37 of 78 runs and readb never invoked at all on 41
-- [ ] 032-unknown-table-error — a mistyped table names the bundle's tables and `readb schema`
+- [x] 032-unknown-table-error — a mistyped table names the bundle's tables and `readb schema`
       instead of DuckDB's `duckdb_indexes`
-- [ ] 040-hash-virtual-column — `__hash`, the hex SHA-256 of the file's bytes, in every table that
+- [x] 040-hash-virtual-column — `__hash`, the hex SHA-256 of the file's bytes, in every table that
       carries `__raw`; the cache consumes the same value
 
 Design order: `028-evaluate-rust-rewrite` → `036-load-pandas-import-probe` →
@@ -103,10 +103,46 @@ against a load pass that is itself three times slower than it should be proves n
 
 ## Open questions
 
-_(none yet)_
+_(none — every deferral has a named home: `037-field-editor-list-values` holds the field editor's
+inability to change a list, `038-derive-text-columns` holds the duplicated text storage the cache
+exposed, `039-git-aware-change-detection` holds change detection for filesystems where stat is
+expensive, and `035-benchmark-v3-cached` holds the re-measure the cache and the new skill
+description now owe.)_
+
+## Sprint summary
+
+Six tasks, all delivered, and the sprint's own measurements changed two of its designs while it ran.
+
+`028-evaluate-rust-rewrite` was answered by measuring rather than prototyping, and the measuring
+found `036-load-pandas-import-probe` immediately: two thirds of every load was DuckDB re-attempting
+an import of pandas, once per non-NULL bound value, with Python never caching the failure. That is
+a defect rather than a property of the language, and removing it made the load ~2.9x faster at every
+bundle size. What remained was what a cache removes, and what remains after *that* is process
+startup — which benchmark v2 already priced at nothing. ADR 0005 records the decision with the
+whole trade, and names the two things that would reopen it: a native install story `uvx` cannot
+serve, or a caller that pays the ~70 ms floor often enough for it to add up.
+
+`034-persistent-index-cache` is the sprint's build. It began as an all-or-nothing cache and became
+an incremental one during design review, because a full rebuild on every single-file edit would
+have made the common workflow the slow one. Two more decisions came out of measuring: git is not
+used for change detection (`git status` is no faster than the walk and has blind spots that fail
+toward a stale answer), and a file whose timestamp moved is confirmed by content hash before it is
+believed changed, which is 12x cheaper than re-parsing and keeps a mass mtime change from rewriting
+anything.
+
+`040-hash-virtual-column` joined scope during design: the cache needed a per-file digest, and
+exposing it as `__hash` turned duplicate detection and change tracking into queries.
+
+Two defects were found by driving the built artifact and re-reading the diff rather than by tests:
+the cache's own bookkeeping table appeared in the unknown-table error's list of tables, and an
+incremental update replayed the previous cache's warnings so every skipped file was reported twice.
+Both are fixed and pinned.
 
 ## Session log
 
+* **2026-08-23** — Implemented all six tasks, ran the gates, and closed the sprint out on the
+  branch. `040-hash-virtual-column` was added to scope during design; `038-derive-text-columns` and
+  `039-git-aware-change-detection` were drafted out of it.
 * **2026-08-23** — Design approved. ADRs 0005, 0006 and 0007 `Accepted`; six tasks `Designed`;
   sprint `Implementing`; design merge to `main`. `040-hash-virtual-column` joined scope during the
   phase; `038-derive-text-columns` and `039-git-aware-change-detection` were drafted out of it and

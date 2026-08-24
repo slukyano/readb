@@ -2,14 +2,14 @@
 type: Task
 title: An unknown table should name the bundle's tables, not DuckDB's internals
 description: readb passes DuckDB's catalog error through verbatim, so a mistyped table is answered with a suggestion like `duckdb_indexes` and no mention of `readb schema`.
-status: Designed
+status: Done
 priority: medium
 tags:
 - cli
 - errors
 - agents
 created: 2026-08-22
-timestamp: '2026-08-23T12:00:00Z'
+timestamp: '2026-08-23T18:00:00Z'
 ---
 
 Found by the v2 agent-efficiency benchmark (`031-benchmark-v2`, sprint-005). An agent guessed a

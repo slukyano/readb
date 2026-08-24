@@ -1,6 +1,16 @@
 # Task Bundle Log
 
 ## 2026-08-23
+* **Sprint 006 closed**: six tasks `Designed -> Done` — the Rust decision, the load-pass defect,
+  the persistent index cache, the `__hash` column, the skill's description, and the unknown-table
+  error; sprint `Implementing -> Done`. readb stays a Python package
+  ([ADR 0005](../docs/dev/adr/0005-stay-on-python.md)): the load pass was ~2.9x slower than it
+  should be because DuckDB re-probed for pandas on every bound value, and what remained is what
+  the cache removes. On a 6000-concept bundle a query now costs 0.14 s against 4.1 s, editing one
+  file costs 0.18 s, and touching every file costs 0.27 s and re-reads nothing. Four tasks were
+  drafted along the way and stay open: `037-field-editor-list-values`,
+  `038-derive-text-columns`, `039-git-aware-change-detection` and `035-benchmark-v3-cached`.
+
 * **Sprint 006 design approved**: [the Rust decision](archive/../tasks/028-evaluate-rust-rewrite.md),
   [the load-pass defect](tasks/036-load-pandas-import-probe.md),
   [the persistent index cache](tasks/034-persistent-index-cache.md),

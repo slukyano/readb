@@ -118,8 +118,8 @@ readb query "..." --bundle ./library --no-cache   # load from source, read and w
 
 Turn it off for a whole registry with `cache = false` in `.readb/config.toml`, or per call with
 `--no-cache` (`readb.open(path, cache=False)` from Python). Nothing in the bundle is ever
-written either way, and `.readb/cache/` is a good candidate for your `.gitignore` — readb does
-not edit that file for you.
+written either way, and `.readb/cache/` is a good candidate for a `.gitignore` entry — readb
+never edits that file itself.
 
 ## Tables and views
 
