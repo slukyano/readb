@@ -26,6 +26,7 @@ okf_version: "0.1"
 * [Submit the readb plugin to the community marketplace](tasks/027-plugin-marketplace-submission.md) - discovery only: `gh skill install` already works; the hint protocol needs an official listing.
 * [An unknown table should name the bundle's tables](tasks/032-unknown-table-error.md) - DuckDB's catalog error is passed through verbatim, suggesting a DuckDB internal table.
 * [The shipped skill is invoked on fewer than half the runs where it is available](tasks/033-skill-discovery-rate.md) - discovery, not content; measured by benchmark v2.
+* [Detect bundle changes without stat-ing every file](tasks/039-git-aware-change-detection.md) - the cache's detector assumes stat is cheap; S3-backed and network filesystems need an fsmonitor-backed one.
 * [Stop storing every file's text twice — derive the text columns instead](tasks/038-derive-text-columns.md) - `__raw` and `__body` duplicate the corpus in `__DOCUMENTS` and again per type table.
 * [The field editor cannot change a list-valued key](tasks/037-field-editor-list-values.md) - `set` refuses a list and `unset` destroys it; adding a task to a sprint needs a hand edit.
 * [The load pass spends two thirds of its time on a failed pandas import](tasks/036-load-pandas-import-probe.md) - DuckDB probes for pandas per bound value; the load is ~2.9x slower than it should be.

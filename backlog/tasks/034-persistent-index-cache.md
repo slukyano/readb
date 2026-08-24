@@ -85,6 +85,8 @@ Design-branch measurements, duckdb 1.5.4 / CPython 3.14.6 / macOS arm64, medians
 | **Open the cache and query it** | **4.2 ms** | **4.0 ms** | **4.0 ms** |
 | **Apply a one-file edit** (open, delete rows, re-parse, insert) | — | — | **6.9 ms** |
 | Detect change (`os.scandir` walk) | 1.0 ms | 3.3 ms | 10.7 ms |
+| Confirm a suspect file by content hash | — | — | 0.014 ms each |
+| Re-parse a file instead of confirming it | — | — | 0.161 ms each |
 | Copy the cache file, which is what makes an update atomic | — | — | 4.7 ms |
 | Materialize a fresh cache | 42 ms | 68 ms | 161 ms |
 | Cache file size, at `BLOCK_SIZE 16384` | 2.9 MB | — | 22.4 MB |
@@ -96,15 +98,24 @@ Both hit paths are flat in bundle size. A cold miss costs a full load plus the m
 **Hit.** Walk the bundle with `os.scandir`, collecting each file's bundle-relative path, its own
 `st_size` and its `st_mtime_ns` — no directory is ever sized. Every file is stat-ed, at a measured
 1.7–2.1 µs each (1.0 ms at 600 files, 10.7 ms at 6000, 41.6 ms at 20000): the same work `git status`
-does, and a strict subset of the open-and-read every uncached load performs on the same files. Hash that manifest with the readb and
+does, and a strict subset of the open-and-read every uncached load performs on the same files. This
+is the design's known limitation — it assumes stat is cheap, which an S3-backed or network
+filesystem does not guarantee — and the answer for those is `039-git-aware-change-detection`, a
+later optimization behind the same seam, not part of this task. Hash that manifest with the readb and
 duckdb versions; the result is carried in the cache's filename, so recognizing a hit opens nothing.
 Open the file read-only and return. No markdown file is read at all.
 
 **Incremental.** When the manifest differs, open the cached database and read the per-file metadata
-it carries — path, size and `st_mtime_ns`, and nothing else. **A file whose stat moved is re-parsed
-outright**, with no attempt to check first whether its bytes really changed: re-parsing one file
-costs about 1 ms, and confirming that it did not need re-parsing would cost most of that anyway.
-Nothing is stored to support such a check — no digests, no retained text for comparison. What remains is a change set: for each deleted or
+it carries: path, size, `st_mtime_ns`, and a 16-byte content hash. A file whose stat moved is a
+**suspect**, not yet a change: it is read and hashed first, which is **12× cheaper than re-parsing
+it** (0.014 ms against 0.161 ms). A matching hash means the file was touched, not changed — its
+manifest entry is refreshed and nothing else happens. Only a differing hash joins the change set.
+
+This is what keeps a **mass mtime change from becoming a mass rewrite**: 6000 touched-but-identical
+files confirm in 95 ms and the cached database stands, where re-parsing them would cost 3873 ms. The
+hashes cost 16 bytes per file — 256 KB at 6000 files, about 1% of the cache — and are stored
+independently of which columns the cache holds, so `038-derive-text-columns` can proceed without
+touching detection. What remains is a change set: for each deleted or
 modified concept, `DELETE ... WHERE __path = ?` from its type table and from `__DOCUMENTS`; for each
 added or modified one, parse the file and insert. Per-(table, column) **type evidence** — a count of
 concepts contributing each lattice type — is decremented and incremented alongside, so the unified
@@ -117,11 +128,9 @@ intact; there is no write lock to contend on.
 **Full rebuild.** The incremental path is attempted only when the change is provably local *and*
 small. Any of these falls back to loading from source:
 
-- the change set exceeds a quarter of the bundle (floor 500 files) — thousands of individual deletes
-  and inserts are slower than a bulk load, and this is also what bounds the cost of a **mass mtime
-  change**: a formatter that rewrites every file with identical bytes, a `cp -R` or `rsync` without
-  `-t`, an unzip, a sync client, or a `git checkout` away and back. readb rebuilds, which costs
-  exactly what every load costs today;
+- the **confirmed** change set exceeds a quarter of the bundle (floor 500 files) — thousands of
+  individual deletes and inserts are slower than a bulk load. The threshold counts files whose
+  content changed, never files whose mtime merely moved;
 
 - a column's unified type would change under the lattice;
 - a producer key appears for a type, or disappears from it entirely;
@@ -187,9 +196,10 @@ reported, not a quiet outcome.
 - Hit and miss are asserted **by observation, not timing**: a spy on the parser shows zero files
   parsed on a hit, and exactly the changed files parsed on an incremental update.
 - A `readb set` between two queries is observed by the second (mtime invalidation, no cache hook).
-- Touching a file without changing its bytes re-parses it and produces an identical database — the
-  deliberate trade, pinned so it is a decision rather than a surprise.
-- A change set over the threshold takes the full-rebuild path, and the result equals a fresh load.
+- Touching every file without changing any bytes (`find -exec touch`) re-parses **nothing**: the
+  parser spy shows zero files parsed, and the manifest is refreshed. This is the mass-mtime test.
+- A confirmed change set over the threshold takes the full-rebuild path, and the result equals a
+  fresh load.
 - No registry root → no file is created anywhere, and the query still answers. This pins the consent
   rule.
 - `cache = false`, `--no-cache` and `cache=False` each suppress both read and write.
@@ -201,9 +211,11 @@ reported, not a quiet outcome.
 
 ### Deliberately not in this task
 
-- **No git integration.** ADR 0006 records the measurements: `git status` is no faster than the
-  `scandir` walk, and it introduces blind spots (ignored files, untracked files, multiple
-  repositories, no repository at all) whose failure mode is a stale answer.
+- **No git integration.** ADR 0006 records the measurements: on a local disk `git status` is no
+  faster than the `scandir` walk, and it introduces blind spots (ignored files, untracked files,
+  multiple repositories, no repository at all) whose failure mode is a stale answer. Where git
+  genuinely wins is a filesystem on which stat is expensive, and that is
+  `039-git-aware-change-detection`.
 - **No daemon, no watcher.** At 4 ms per open the only residual win is amortizing process startup,
   which [ADR 0005](../../docs/dev/adr/0005-stay-on-python.md) prices at nothing.
 - **No cross-bundle sharing.** One cache per bundle; `021-cross-bundle-querying` would attach

@@ -36,6 +36,8 @@ against a 6000-concept bundle unless stated:
 | `git rev-parse HEAD` | — | — | 4.0 ms | — |
 | `git ls-files` | — | — | 6.1 ms | — |
 | Read (not parse) every file | 8.2 ms | — | ~100 ms | — |
+| Confirm a suspect file by content hash | — | — | 0.014 ms each | — |
+| Re-parse a file instead of confirming it | — | — | 0.161 ms each | — |
 
 | Rebuilding | 6000 concepts |
 | --- | --- |
@@ -58,44 +60,47 @@ in the bundle, and never any file at all outside a `.readb/` directory the user 
 **readb never edits `.gitignore`,** or any other file belonging to the user's tooling. What to ignore
 is the user's business; the documentation says `.readb/cache/` is disposable and the rest is theirs.
 
-**2. Detection: a per-file stat manifest. Nothing is hashed and nothing is compared. No git.**
+**2. Detection: a per-file stat manifest, with every suspect confirmed by content hash.**
 
 The manifest is built by an `os.scandir` walk that mirrors the loader's own walk, recording for each
 file its bundle-relative POSIX path, **that file's own `st_size`**, and its `st_mtime_ns`. No
 directory is ever sized — a directory's size is not defined cheaply on any filesystem, and nothing
 here needs it.
 
-**Every file is stat-ed on every load, and that is the cheapest part of what a load already does.**
-There is no way to learn that a file changed without asking the filesystem, short of a daemon
-watching events — git does not have one either, which is why `git status` also stats every file and
-lands within a millisecond of the walk. The measured rate is 1.7–2.1 µs per file, linear from 600 to
-20000 files. Against the load it replaces the walk is 0.3% (10.7 ms against 3873 ms at 6000
-concepts), and against just *reading* those files without parsing them it is about a tenth. The
-walk is a strict subset of the work every uncached invocation does today.
+A file whose size and mtime match its manifest entry is unchanged. A file whose stat moved is a
+**suspect**, and every suspect is read and hashed before anything is rebuilt. The order matters
+because confirming is **twelve times cheaper than re-parsing** — 0.014 ms against 0.161 ms per file —
+so the check never costs more than the work it might save:
 
-A file whose size and mtime match its manifest entry is unchanged. **A file whose stat differs is
-re-parsed, without first checking whether its bytes actually changed.** Re-parsing one file costs
-about 1 ms; establishing that it did not need re-parsing would cost most of that anyway, so the
-check does not pay for itself on the change sets that dominate — one file, or a handful.
+- hash matches → the file was touched, not changed. Its manifest entry is refreshed and nothing else
+  happens.
+- hash differs → the file is genuinely changed and joins the change set.
 
-Nothing is stored to support such a check: no per-file digest, no comparison against retained text.
-Files present in one set and not the other are additions and deletions.
+**A mass mtime change therefore cannot cause a mass rewrite.** Six thousand touched-but-identical
+files confirm in 95 ms and the cached database stands, against 3873 ms to rebuild it. That case is
+routine — a formatter rewriting every file with identical bytes, a `cp -R` or `rsync` without `-t`,
+an unzip, a restore from backup, a sync client, a `git checkout` away and back — and it is the case
+this check exists for.
 
-The manifest is hashed together with the readb version and the duckdb version to form the cache
-identity, which is carried in the cache's filename so a hit can be recognized without opening
-anything.
+Hashes cost 16 bytes per file: 256 KB for a 6000-file bundle, about 1% of its cache. They are stored
+independently of which columns the cache holds, so
+`038-derive-text-columns` can change what is stored without touching change detection.
 
-**3. A large change set falls back to a full rebuild.** Applying thousands of individual deletes and
-inserts is slower than loading the bundle from scratch, so above a threshold (a quarter of the
-bundle, floor 500 files) the incremental path is abandoned before it starts. This also bounds what a
-**mass mtime change** can cost.
+**The known limitation: this assumes stat is cheap.** It is, on a local disk — 1.7–2.1 µs per file,
+linear from 600 to 20000 files, 0.3% of the load it replaces, and a strict subset of the
+open-and-read that every uncached load already performs on the same files. On an S3-backed
+filesystem, or NTFS or SMB over a network, per-file stat is not cheap, and neither is `git status`,
+which stats every file for the same reason. The escape for those filesystems is a change detector
+that does not walk at all — git backed by an fsmonitor daemon, where detection becomes O(changed
+files) rather than O(files) — and that is deliberately **not** built here. It is
+`039-git-aware-change-detection`, an optimization to be added behind the same seam once the cache
+exists.
 
-Mass mtime changes are real and routine: a formatter rewriting every file with identical bytes, a
-`cp -R` or an `rsync` without `-t`, an unzip or a restore from backup, a file-sync client, a
-`git checkout` to another branch and back, a `git stash pop`. In every one of those cases readb sees
-the whole bundle as changed and rebuilds it — which costs exactly what a load costs today, and
-produces a correct answer. That is the deliberate trade: the design does not spend anything to make
-the rare case fast, and its worst case is the status quo.
+**3. A large *confirmed* change set falls back to a full rebuild.** Applying thousands of individual
+deletes and inserts is slower than loading the bundle from scratch, so above a threshold (a quarter
+of the bundle, floor 500 files) the incremental path is abandoned before it starts. The threshold
+counts files whose **content** changed, never files whose mtime merely moved — those have already
+been filtered out by the confirmation step above.
 
 **4. Granularity: incremental.** A change set of added, deleted and modified files is applied to the
 cached database — delete the affected concepts' rows by `__path`, re-parse only the files that
@@ -144,8 +149,8 @@ permissiveness the load path already promises for malformed markdown.
 - mtime is trusted for the *unchanged* verdict. A filesystem with coarse timestamps, or a tool that
   restores mtimes while changing content, could serve a stale answer. Git has the same blind spot
   for the same reason. `--no-cache` and `readb cache clear` are the escape hatches.
-- mtime is also trusted for the *changed* verdict, which costs work rather than correctness: a
-  touched-but-identical file is re-parsed, and a whole bundle of them is rebuilt.
+- mtime is *not* trusted for the changed verdict: a stat mismatch only nominates a file for a
+  content check, so touching files never rewrites anything.
 - **Cache files are created with `BLOCK_SIZE 16384` rather than DuckDB's default.** DuckDB's file
   format has a large fixed overhead — a 9-concept bundle materializes to 3.6 MB and the project's
   own 34-concept backlog to 4.9 MB at the default block size, because every column claims at least
@@ -195,12 +200,17 @@ Rejected as the default at 106 ms per invocation on a large bundle — an eightf
 path's cost to close a gap git does not close either. It remains the natural implementation of a
 future `--verify` flag.
 
-**Confirm each suspect file before re-parsing it** — by stored digest, or by comparing against the
-`__raw` text the cache already holds (0.79 ms for one file, 3.4 ms for twenty). Rejected: it buys
-nothing on a one-file change, where re-parsing costs about 1 ms outright, and on a mass mtime change
-the size threshold above sends the load to a full rebuild anyway. It would also have tied change
-detection to `__raw` being *stored*, which
-`038-derive-text-columns` may stop doing.
+**Re-parse every suspect without confirming it first.** Simpler, and briefly adopted during design on
+the reasoning that re-parsing one file is cheap anyway. Rejected once measured: confirmation is 12×
+cheaper than re-parsing rather than comparable, so it pays for itself even on a single file, and
+without it a mass mtime change turns into a full rebuild — the outcome this design most wants to
+avoid.
+
+**Confirm by comparing against the `__raw` text the cache already holds**, instead of storing a
+digest. Exact, and needs no extra bytes, but it costs 0.79 ms per point lookup and ties change
+detection to `__raw` being *stored* — which
+`038-derive-text-columns` may stop doing. A 16-byte digest per file is 1% of the cache and depends
+on nothing.
 
 **Mutate the cache file in place instead of copy-apply-rename.** Saves a 4.7 ms copy and costs
 single-writer locking, contention between concurrent readb processes, and a corrupt cache if a write
