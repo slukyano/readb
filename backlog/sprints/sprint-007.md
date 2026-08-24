@@ -44,8 +44,9 @@ the backlog; the release has no task yet and needs one when it is next proposed.
 
 ## Task checklist
 
-- [ ] 041-empty-struct-crashes-the-load — an empty mapping value, duplicate stringified struct
-      keys, an empty-string key and an out-of-range integer each kill an entire load
+- [x] 041-empty-struct-crashes-the-load — the lattice is total: scalars promote to text, maps
+      unify by field union, keys normalize at the parse boundary, and a table degrades rather
+      than failing the load
 - [ ] 035-benchmark-v3-cached — the full matrix re-run: five arms, two models, four corpora, the
       26-question battery, pre-registered before the first measured run
 
@@ -74,6 +75,10 @@ _(none)_
 
 ## Session log
 
+* **2026-08-23** — `041` implemented: 264 tests pass (249 before), the nine fatal shapes load,
+  and the binding spec, README and changelog carry the revised rule. Two defects surfaced while
+  building it: the degradation ladder mutated the type map it was reading from, and degrading
+  `__DOCUMENTS` left `__TAGS` with no column to explode.
 * **2026-08-23** — Design approved: ADR 0008 accepted, scalar promotion and parse-boundary key
   normalization decided, v3's design and budget approved.
 * **2026-08-23** — Scope approved: two tasks, branch `sprint/007`. Narrowed from a four-item
