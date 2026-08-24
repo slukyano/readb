@@ -51,38 +51,33 @@ BOOTSTRAP = 10_000
 ENDPOINTS = [
     {
         "id": "E1",
-        "what": "billed cost, join stratum",
-        "arm": "readb-bare",
-        "against": "shell-coached",
-        "model": "claude-sonnet-5",
-        "strata": ("join",),
-        "measure": "cost",
-        "why": "the eight questions where v1's per-question effect was largest",
-    },
-    {
-        "id": "E2",
         "what": "billed cost, backlog stratum",
-        "arm": "readb-bare",
-        "against": "shell-coached",
+        "arm": "readb-cached",
+        "against": "readb-bare",
         "model": "claude-sonnet-5",
         "strata": ("backlog",),
         "measure": "cost",
         "why": (
-            "recorded in advance: that bundle is small, so runs sit near the harness floor "
-            "and a compressed ratio is the expected honest outcome. Parity is a finding"
+            "the cache's own contrast: two arms with identical preambles, differing only in "
+            "whether the bundle is a registry with a warm cache. Parity is the predicted "
+            "outcome, recorded as such in the pre-registration"
         ),
     },
     {
         "id": "E3",
-        "what": "exactness, every question",
-        "arm": "readb-bare",
+        "what": "billed cost, join stratum",
+        "arm": "readb-cached",
         "against": "shell-coached",
-        "model": "claude-haiku-4-5",
-        "strata": None,
-        "measure": "exact",
-        "why": "the accuracy dimension has variance on a weaker model, where v1 had none",
+        "model": "claude-sonnet-5",
+        "strata": ("join",),
+        "measure": "cost",
+        "why": "readb at its best against the honest competitor, carried forward from v2's E1",
     },
 ]
+
+# E2 is a proportion rather than a paired contrast over questions, so it is computed apart from
+# these two and reported beside them.
+SKILL_INVOCATION_V2 = (37, 78)  # v2: the skill arm loaded the skill on 37 of 78 runs
 
 
 def load(path: Path) -> list[dict]:
@@ -453,43 +448,29 @@ def main() -> None:
                 + f"| {sum(r.get('failed_readb_calls') or 0 for r in rows)} |"
             )
 
-        # --- the nudge contrast -----------------------------------------------
-        if {(model, "readb-bare"), (model, "readb-nudged")} <= set(by_arm_model):
-            print("\n### The nudge — `readb-nudged` against `readb-bare`\n")
-            bare = by_arm_model[(model, "readb-bare")]
-            nudged = by_arm_model[(model, "readb-nudged")]
-            bare_med = question_medians(rows_for_model, "readb-bare", model, "cost_billed_usd")
-            nudged_med = question_medians(rows_for_model, "readb-nudged", model, "cost_billed_usd")
-            shared = sorted(set(bare_med) & set(nudged_med))
-            ratios = [nudged_med[q] / bare_med[q] for q in shared if bare_med[q]]
-            test = wilcoxon([math.log(r) for r in ratios if r > 0])
-            print("| measure | readb-bare | readb-nudged |")
-            print("|---|---|---|")
-            for label, fn in (
-                ("exact", lambda rows: f"{sum(1 for r in rows if r['correct']) / len(rows):.0%}"),
-                (
-                    "tool match",
-                    lambda rows: f"{sum(1 for r in rows if r.get('tool_match')) / len(rows):.0%}",
-                ),
-                (
-                    "readb reached for",
-                    lambda rows: (
-                        f"{sum(1 for r in rows if r.get('tool_choice') == 'readb') / len(rows):.0%}"
-                    ),
-                ),
-                (
-                    "billed cost (median)",
-                    lambda rows: fmt(med([r["cost_billed_usd"] for r in rows]), 4),
-                ),
-                ("turns (median)", lambda rows: fmt(med([r["num_turns"] for r in rows]), 1)),
-            ):
-                print(f"| {label} | {fn(bare)} | {fn(nudged)} |")
-            print(
-                f"\nPaired cost ratio, nudged/bare: **{med(ratios):.2f}x** over {len(ratios)} "
-                f"questions"
-                + (f", p = {test['p']:.4f} ({test['method']})." if test else ", too few pairs.")
-            )
         print()
+
+    # --- the cache contrast ---------------------------------------------------
+    for model in models:
+        if {(model, "readb-bare"), (model, "readb-cached")} <= set(by_arm_model):
+            bare_med = question_medians(rows, "readb-bare", model, "cost_billed_usd")
+            cached_med = question_medians(rows, "readb-cached", model, "cost_billed_usd")
+            shared = sorted(set(bare_med) & set(cached_med))
+            ratios = [cached_med[q] / bare_med[q] for q in shared if bare_med[q]]
+            wall_bare = question_medians(rows, "readb-bare", model, "wall_s")
+            wall_cached = question_medians(rows, "readb-cached", model, "wall_s")
+            wall_shared = sorted(set(wall_bare) & set(wall_cached))
+            wall_ratios = [wall_cached[q] / wall_bare[q] for q in wall_shared if wall_bare[q]]
+            print(f"\n### The cache — `readb-cached` against `readb-bare` ({model})\n")
+            print("Identical preambles; the corpus is a registry with a primed cache.\n")
+            print("| measure | ratio, cached/bare | questions |")
+            print("| --- | --- | --- |")
+            if ratios:
+                print(f"| billed cost | {med(ratios):.2f}x | {len(ratios)} |")
+            if wall_ratios:
+                wall = f"{med(wall_ratios):.2f}x"
+                print(f"| wall clock (declared secondary) | {wall} | {len(wall_ratios)} |")
+            print()
 
     # --- hazard diagnostics ---------------------------------------------------
     hazard = (

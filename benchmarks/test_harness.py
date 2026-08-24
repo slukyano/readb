@@ -771,21 +771,31 @@ def test_holm_adjustment_is_monotone_and_correct():
     assert analyze.holm([0.5, 0.5, 0.5]) == pytest.approx([1.0, 1.0, 1.0])
 
 
-def test_the_three_endpoints_are_the_pre_registered_ones():
-    assert [e["id"] for e in analyze.ENDPOINTS] == ["E1", "E2", "E3"]
+def test_the_endpoints_are_v3s_pre_registered_ones():
+    """E2 is a proportion, computed apart from these two paired contrasts."""
+    assert [e["id"] for e in analyze.ENDPOINTS] == ["E1", "E3"]
+    assert analyze.SKILL_INVOCATION_V2 == (37, 78), "v2's recorded rate, the E2 comparison point"
+    e1, e3 = analyze.ENDPOINTS
+    # E1 prices the cache: the two arms differ only in whether the corpus is a primed registry.
+    assert (e1["arm"], e1["against"]) == ("readb-cached", "readb-bare")
+    assert e1["strata"] == ("backlog",)
+    # E3 is v2's E1 carried forward, against the honest competitor rather than the baseline.
+    assert (e3["arm"], e3["against"]) == ("readb-cached", "shell-coached")
+    assert e3["strata"] == ("join",)
     for endpoint in analyze.ENDPOINTS:
-        assert endpoint["against"] == "shell-coached", "the honest competitor, never the baseline"
-        assert endpoint["arm"] == "readb-bare", "never the nudged arm — that contrast is its own"
-    assert [e["measure"] for e in analyze.ENDPOINTS] == ["cost", "cost", "exact"]
-    assert analyze.ENDPOINTS[2]["model"] == "claude-haiku-4-5"
+        assert endpoint["against"] != "baseline", "never against the uncoached baseline"
+        assert endpoint["measure"] == "cost"
+        assert endpoint["model"] == "claude-sonnet-5"
 
 
 def test_an_endpoint_reports_the_ratio_and_a_p_value():
     rows = []
     for i in range(8):
-        rows.append(_rec("shell-coached", f"q{i}", 1.0))
-        rows.append(_rec("readb-bare", f"q{i}", 0.6))
-    result = analyze.run_endpoint(analyze.ENDPOINTS[0], rows, {f"q{i}": "join" for i in range(8)})
+        rows.append(_rec("readb-bare", f"q{i}", 1.0))
+        rows.append(_rec("readb-cached", f"q{i}", 0.6))
+    result = analyze.run_endpoint(
+        analyze.ENDPOINTS[0], rows, {f"q{i}": "backlog" for i in range(8)}
+    )
     assert result["questions"] == 8
     assert result["effect"] == "0.60x"
     assert result["test"]["p"] == pytest.approx(2 / 2**8)
