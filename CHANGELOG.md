@@ -5,6 +5,20 @@ All notable changes to readb are documented here, following
 
 ## [Unreleased]
 
+### Added
+
+- `__hash`, a fifth virtual column on every table: the lowercase hex SHA-256 of the file's bytes,
+  the same value `sha256sum` prints. Byte-identical documents are now
+  `GROUP BY __hash HAVING count(*) > 1`, and a bundle can be compared against an external record
+  without readb growing a feature for it.
+
+### Changed
+
+- Loading a bundle is about 2.9x faster at every size measured. DuckDB's Python client probes each
+  non-NULL bound value for pandas types and Python never caches a failed import, so with pandas
+  absent every probe walked `sys.path` again — 25,326 times for a 600-concept bundle. The insert
+  pass now suppresses the probe: 2000 concepts load in 1.37 s against 3.63 s.
+
 ### Fixed
 
 - The shipped usage skill's leading example now invokes `readb` directly. It opened with

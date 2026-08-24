@@ -283,6 +283,7 @@ def _bind_row(
     row.append(concept.name)  # __name
     row.append(concept.body)  # __body
     row.append(concept.raw)  # __raw
+    row.append(concept.content_hash)  # __hash
     return row
 
 

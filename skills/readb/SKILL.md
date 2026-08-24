@@ -41,7 +41,7 @@ prints every table, its original type, and every column with its inferred type.
 | `__UNKNOWNTYPE` | concepts with a missing or unusable `type` |
 | `__TAGS` | a `(concept_path, tag)` view, for tag filtering by join |
 
-**Four virtual columns** are on every table:
+**Five virtual columns** are on every table:
 
 | Column | Value |
 | --- | --- |
@@ -49,6 +49,7 @@ prints every table, its original type, and every column with its inferred type.
 | `__name` | the bare file name, no directory and no `.md` (wiki-style) |
 | `__body` | the markdown body with frontmatter stripped |
 | `__raw` | the byte-exact file text, frontmatter included |
+| `__hash` | lowercase hex SHA-256 of the file's bytes, as `sha256sum` prints it |
 
 `__name` is derived from the filename and is immutable. A `name:` key in frontmatter is an
 ordinary data column and changes nothing about addressing.

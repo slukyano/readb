@@ -282,3 +282,51 @@ def test_no_files_created_or_modified(mini_path: Path) -> None:
     db.close()
     after = _hash_tree(mini_path)
     assert before == after  # identical file set and identical contents
+
+
+# --------------------------------------------------------------------------------------------
+# __hash — the fifth virtual column (ADR 0007, task 040-hash-virtual-column).
+# --------------------------------------------------------------------------------------------
+
+
+def test_hash_column_equals_sha256_of_the_file(tmp_path: Path) -> None:
+    """``__hash`` must be reproducible with standard tools, byte for byte."""
+    import hashlib
+
+    payload = "---\ntype: T\ntitle: ünïcode\r\nx: 1\n---\nbody, no trailing newline"
+    target = tmp_path / "doc.md"
+    target.write_bytes(payload.encode("utf-8"))
+    with readb.open(str(tmp_path)) as db:
+        row = db.sql("SELECT __hash FROM t")[0]
+    assert row["__hash"] == hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def test_identical_files_share_a_hash_and_one_edit_breaks_it(tmp_path: Path) -> None:
+    (tmp_path / "a").mkdir()
+    (tmp_path / "b").mkdir()
+    text = "---\ntype: T\ntitle: same\n---\nbody\n"
+    (tmp_path / "a" / "one.md").write_text(text, encoding="utf-8")
+    (tmp_path / "b" / "two.md").write_text(text, encoding="utf-8")
+    (tmp_path / "b" / "three.md").write_text(text.replace("same", "samE"), encoding="utf-8")
+    with readb.open(str(tmp_path)) as db:
+        rows = {r["__name"]: r["__hash"] for r in db.sql("SELECT __name, __hash FROM t")}
+        dupes = db.sql("SELECT __hash FROM t GROUP BY __hash HAVING count(*) > 1")
+    assert rows["one"] == rows["two"]
+    assert rows["three"] != rows["one"]
+    assert len(dupes) == 1
+
+
+def test_hash_is_present_wherever_raw_is(mini_path: Path) -> None:
+    with readb.open(str(mini_path)) as db:
+        schema = db.schema()
+        for table in schema.tables.values():
+            if "__raw" in table.columns:
+                assert table.columns.get("__hash") == "VARCHAR", table.table_name
+
+
+def test_a_producer_key_named_hash_does_not_shadow_the_virtual_column(tmp_path: Path) -> None:
+    (tmp_path / "x.md").write_text("---\ntype: T\n__hash: sneaky\n---\nbody\n", encoding="utf-8")
+    with readb.open(str(tmp_path)) as db:
+        row = db.sql("SELECT __hash FROM t")[0]
+    assert row["__hash"] != "sneaky"
+    assert len(row["__hash"]) == 64

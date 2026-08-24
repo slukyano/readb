@@ -103,10 +103,12 @@ path alike). `--format raw` prints values verbatim, so
 | `__UNKNOWNTYPE` | one per non-conformant concept (no / non-string / empty-normalized `type`) |
 | `__TAGS` | normalized `(concept_path, tag)` view for join-style tag filtering |
 
-Every table also carries four virtual columns: `__path` (bundle-relative path, with `.md` —
+Every table also carries five virtual columns: `__path` (bundle-relative path, with `.md` —
 the guaranteed-unique key), `__name` (the simple file name, no directories or `.md`; wiki-style,
-assumed unique but not guaranteed), `__body` (the markdown body, frontmatter stripped), and
-`__raw` (the byte-exact file text as on disk, frontmatter included).
+assumed unique but not guaranteed), `__body` (the markdown body, frontmatter stripped),
+`__raw` (the byte-exact file text as on disk, frontmatter included), and `__hash` (the lowercase
+hex SHA-256 of the file's bytes — the value `sha256sum` prints, so duplicate detection is
+`GROUP BY __hash HAVING count(*) > 1`).
 
 ## Type inference
 

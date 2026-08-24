@@ -57,7 +57,14 @@ VIRTUAL_PATH = "__path"  # concept path relative to bundle root, WITH the .md su
 VIRTUAL_NAME = "__name"  # the simple file name, no dirs/.md; assumed unique, NOT guaranteed
 VIRTUAL_BODY = "__body"  # the markdown body, frontmatter stripped
 VIRTUAL_RAW = "__raw"  # the byte-exact file text as on disk, frontmatter included
-VIRTUAL_FIELDS: tuple[str, ...] = (VIRTUAL_PATH, VIRTUAL_NAME, VIRTUAL_BODY, VIRTUAL_RAW)
+VIRTUAL_HASH = "__hash"  # lowercase hex SHA-256 of the file's bytes, as `sha256sum` prints it
+VIRTUAL_FIELDS: tuple[str, ...] = (
+    VIRTUAL_PATH,
+    VIRTUAL_NAME,
+    VIRTUAL_BODY,
+    VIRTUAL_RAW,
+    VIRTUAL_HASH,
+)
 
 # Reserved filenames that are NOT concept docs.
 RESERVED_FILENAMES: frozenset[str] = frozenset({"index.md", "log.md"})
