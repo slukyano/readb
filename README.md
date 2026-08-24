@@ -155,12 +155,31 @@ Run 'readb schema --bundle ./library' for their columns.
 
 ## Type inference
 
-Each column's type is inferred once at load time as the narrowest DuckDB type that losslessly
-holds every observed value (`int`+`float` → `DOUBLE`; a scalar alongside a list → a `LIST`;
-maps with a consistent key set → a `STRUCT`). Anything that doesn't reduce to a single engine
-type is stored as a `JSON` column — nothing is dropped, and producer intent is never guessed
-(strings are never split or parsed). The reserved `tags` field is always a `LIST`. Run
-`readb schema` to see the inferred type of every column.
+Each column's type is inferred once at load time as the **narrowest type that losslessly holds
+every value in it**:
+
+| Values in a column | Column type |
+| --- | --- |
+| one scalar kind | that type |
+| `int` + `float` | `DOUBLE` |
+| `date` + `timestamp` | `TIMESTAMP` |
+| any other mix of scalars | `VARCHAR` — each value rendered canonically (`true`, `42`, `2026-01-01`) |
+| an integer outside 64 bits | `VARCHAR`, carrying its decimal text |
+| a scalar beside a list | `LIST` of the unified element type |
+| maps | `STRUCT` of the **union** of their fields, recursively; absent fields are NULL |
+| a map beside a scalar or a list | `JSON` |
+
+JSON is the top of the lattice and the universal fallback, reached only when values disagree
+structurally. Nothing is ever dropped, and producer intent is never guessed: a comma-string is not
+split into a list, and a string of digits stays a string.
+
+Map keys are stringified when the file is read, and if two collide (`1` and `"1"`) the last one
+wins. A map column whose values carry no keys at all renders `STRUCT("__DUMMY" VARCHAR)`, because
+`STRUCT()` is not valid DDL.
+
+If a table still cannot be built — a shape nobody anticipated — that table degrades to JSON
+columns, and failing that to its virtual columns alone, with a warning in `readb schema`. One
+unrepresentable column never takes the bundle down with it.
 
 ## Using readb with an agent
 

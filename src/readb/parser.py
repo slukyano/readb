@@ -97,7 +97,46 @@ def parse_file(file_path: Path, *, bundle_root: Path) -> Concept | None:
         )
         return None
 
-    return Concept(path=rel_path, frontmatter=parsed, body=body, raw=text)
+    return Concept(
+        path=rel_path, frontmatter=_normalize_keys(parsed, rel_path), body=body, raw=text
+    )
+
+
+def _normalize_keys(value: Any, rel_path: str) -> Any:
+    """Stringify every mapping key, recursively; on a collision the last occurrence wins.
+
+    YAML keys may be any scalar, but a column name and a STRUCT field name are strings, and two
+    distinct YAML keys can collide once stringified (``1`` and ``"1"``). Resolving that here, at
+    the parse boundary, means the type lattice, the column set, the JSON encoding and the field
+    editor all see one mapping and cannot disagree about it (ADR 0008).
+
+    A non-string key used to be dropped outright further downstream, taking its value with it —
+    union-of-keys is meant to be lossless, so it now arrives as an ordinary stringified key.
+    """
+    if isinstance(value, list):
+        return [_normalize_keys(item, rel_path) for item in value]
+    if not isinstance(value, dict):
+        return value
+    normalized: dict[str, Any] = {}
+    for key, item in value.items():
+        name = key if isinstance(key, str) else _key_text(key)
+        if name in normalized:
+            logger.warning(
+                "%s: frontmatter keys %r and %r both name %r; keeping the last",
+                rel_path,
+                name,
+                key,
+                name,
+            )
+        normalized[name] = _normalize_keys(item, rel_path)
+    return normalized
+
+
+def _key_text(key: Any) -> str:
+    """A non-string key's column/field name — the same canonical form a promoted value takes."""
+    from readb.schema import _canonical_text
+
+    return _canonical_text(key)
 
 
 def _split_frontmatter(text: str) -> tuple[str | None, str]:

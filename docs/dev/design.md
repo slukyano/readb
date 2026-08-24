@@ -75,13 +75,21 @@ Per table, per column, infer ONE type at load time that losslessly holds every o
 value, then coerce on insert. **JSON is the top of the lattice and the universal fallback.**
 Rules, narrowest-fit-wins:
 - Absent / null never constrains the column type.
-- All values one scalar kind → that type. `int` mixed with `float` → `double`.
+- A column takes the **narrowest type that holds every value it has**; JSON only when no such
+  type exists (revised by [ADR 0008](adr/0008-struct-field-union.md); this section originally
+  reached for JSON as soon as two values disagreed).
+- All values one scalar kind → that type. `int` mixed with `float` → `double`; `date` mixed with
+  `timestamp` → `timestamp`; any other pair of scalars → `varchar`, rendered canonically from the
+  parsed value.
+- An integer outside BIGINT's range is `varchar`, carrying its decimal text.
 - Scalar mixed with list for the same key → promote each scalar to a singleton list; the
-  column is a LIST. Unify element types by these same rules (incompatible elements → element
-  type JSON).
-- Maps with a consistent key set → STRUCT; inconsistent keys → JSON.
-- Any combination that doesn't reduce to a single engine type → store the RAW parsed value as
-  a JSON column (queryable via DuckDB JSON path operators). Nothing is dropped.
+  column is a LIST. Unify element types by these same rules.
+- Maps → STRUCT whose fields are the **union** of the maps' fields, recursively; a field only some
+  documents carry is NULL for the rest. A map whose keys are all absent renders
+  `STRUCT("__DUMMY" VARCHAR)`, since `STRUCT()` is not valid DDL.
+- Map keys are stringified at the parse boundary; when two collide the last occurrence wins.
+- Values that disagree structurally — a map against a scalar, a map against a list → store the RAW
+  parsed value as a JSON column (queryable via DuckDB JSON path operators). Nothing is dropped.
 - Do NOT guess at producer intent: never split a comma-string into a list, never parse
   strings into numbers. A YAML string stays a string.
 - `tags` is OKF-reserved and semantically a list: always coerce to LIST (bare scalar →

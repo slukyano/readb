@@ -5,6 +5,29 @@ All notable changes to readb are documented here, following
 
 ## [Unreleased]
 
+### Changed
+
+- **Breaking: a column now takes the narrowest type that holds every value in it, instead of
+  falling to JSON as soon as two values disagree.** Mixed scalars become `VARCHAR` (a date beside
+  a timestamp becomes `TIMESTAMP`, an int beside a float still becomes `DOUBLE`), and maps unify
+  into a `STRUCT` of the union of their fields, recursively, with absent fields NULL. JSON remains
+  the top of the lattice for values that disagree structurally — a map beside a scalar or a list.
+  Queries using JSON extraction on a column that is now `VARCHAR` or `STRUCT` need updating;
+  ordinary predicates and struct access start working on those columns.
+
+### Fixed
+
+- Nine frontmatter shapes made an entire bundle unqueryable rather than skipping one file: an
+  empty mapping value (which rendered as invalid `STRUCT()` DDL), a mapping whose keys collide once
+  stringified, a mapping with an empty-string key, and an integer outside 64 bits. Map keys are now
+  stringified when the file is read, with the last of two colliding keys winning, and an integer
+  that does not fit is carried as text. If a table still cannot be built it degrades to JSON
+  columns — and failing that to its virtual columns — with a warning, instead of failing the load.
+
+- A frontmatter key that is not a string (`1:`, `2026-01-01:`) was silently dropped along with its
+  value, breaking the union-of-keys promise. Such keys now become columns under their stringified
+  names.
+
 ### Added
 
 - A persistent index cache. Once a bundle sits under a `.readb/` registry (`readb init`), readb

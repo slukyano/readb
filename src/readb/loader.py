@@ -40,6 +40,7 @@ import duckdb
 
 from readb.parser import Concept, parse_file
 from readb.schema import (
+    JSON,
     RESERVED_FIELDS,
     SYSTEM_TABLE_NAMES,
     VIRTUAL_FIELDS,
@@ -264,17 +265,9 @@ def _build_table(
             inferred = as_list_type(inferred)  # tags is semantically a list (singleton-promote)
         column_types[column] = inferred
 
-    column_ddl = [f"{quote_ident(c)} {render_ddl(column_types[c])}" for c in frontmatter_columns]
-    column_ddl += [f"{quote_ident(v)} VARCHAR" for v in VIRTUAL_FIELDS]
-    connection.execute(f"CREATE TABLE {quote_ident(table_name)} ({', '.join(column_ddl)})")
-
-    if rows:
-        bound_rows = [_bind_row(concept, frontmatter_columns, column_types) for concept in rows]
-        placeholders = ", ".join("?" * (len(frontmatter_columns) + len(VIRTUAL_FIELDS)))
-        with _suppress_pandas_probe():
-            connection.executemany(
-                f"INSERT INTO {quote_ident(table_name)} VALUES ({placeholders})", bound_rows
-            )
+    frontmatter_columns, column_types = _create_and_fill(
+        connection, table_name, rows, frontmatter_columns, column_types, schema
+    )
 
     if evidence is not None:
         # One entry per concept that *has* the key: a column exists while its count is positive,
@@ -292,6 +285,75 @@ def _build_table(
     for virtual in VIRTUAL_FIELDS:
         table_schema.columns[virtual] = "VARCHAR"
     schema.tables[table_name] = table_schema
+
+
+def _create_and_fill(
+    connection: duckdb.DuckDBPyConnection,
+    table_name: str,
+    rows: list[Concept],
+    frontmatter_columns: list[str],
+    column_types: dict[str, LType],
+    schema: BundleSchema,
+) -> tuple[list[str], dict[str, LType]]:
+    """Create ``table_name`` and insert ``rows``, degrading rather than failing the whole load.
+
+    Returns the columns and types the table actually ended up with, which differ from the ones
+    asked for only when a rung below the first was needed.
+
+    The lattice is total (ADR 0008), so the inferred types should always render and bind. This
+    ladder exists for the shape nobody has thought of yet: the load's promise is that a bad file
+    is logged and skipped, never fatal, and a single unrenderable column used to take every query
+    against the bundle down with it. Each rung is narrower in what it keeps and is recorded in
+    ``schema.warnings`` so ``readb schema`` shows that a table is degraded.
+    """
+    attempts = (
+        (column_types, None),
+        ({column: JSON for column in frontmatter_columns}, "every column widened to JSON"),
+        ({}, "frontmatter columns dropped"),
+    )
+    for types, degradation in attempts:
+        columns = [c for c in frontmatter_columns if c in types]
+        try:
+            _create_table(connection, table_name, columns, types)
+            _insert_rows(connection, table_name, rows, columns, types)
+        except duckdb.Error as exc:
+            connection.execute(f"DROP TABLE IF EXISTS {quote_ident(table_name)}")
+            logger.debug("table %s failed to build (%s)", table_name, exc)
+            continue
+        if degradation is not None:
+            message = f"table {table_name!r} could not be built as inferred: {degradation}"
+            logger.warning(message)
+            schema.warnings.append(message)
+        return columns, {column: types[column] for column in columns}
+    raise RuntimeError(f"table {table_name!r} could not be created even without its columns")
+
+
+def _create_table(
+    connection: duckdb.DuckDBPyConnection,
+    table_name: str,
+    frontmatter_columns: list[str],
+    column_types: dict[str, LType],
+) -> None:
+    column_ddl = [f"{quote_ident(c)} {render_ddl(column_types[c])}" for c in frontmatter_columns]
+    column_ddl += [f"{quote_ident(v)} VARCHAR" for v in VIRTUAL_FIELDS]
+    connection.execute(f"CREATE TABLE {quote_ident(table_name)} ({', '.join(column_ddl)})")
+
+
+def _insert_rows(
+    connection: duckdb.DuckDBPyConnection,
+    table_name: str,
+    rows: list[Concept],
+    frontmatter_columns: list[str],
+    column_types: dict[str, LType],
+) -> None:
+    if not rows:
+        return
+    bound_rows = [_bind_row(concept, frontmatter_columns, column_types) for concept in rows]
+    placeholders = ", ".join("?" * (len(frontmatter_columns) + len(VIRTUAL_FIELDS)))
+    with _suppress_pandas_probe():
+        connection.executemany(
+            f"INSERT INTO {quote_ident(table_name)} VALUES ({placeholders})", bound_rows
+        )
 
 
 def _bind_row(
@@ -356,11 +418,28 @@ def _frontmatter_union(rows: list[Concept]) -> list[str]:
 def _create_tags_view(connection: duckdb.DuckDBPyConnection) -> None:
     """Create ``__TAGS(concept_path, tag)`` by exploding ``__DOCUMENTS.tags``.
 
-    ``tags`` is always a LIST column on ``__DOCUMENTS`` (see the lattice's tags rule), so the
+    ``tags`` is normally a LIST column on ``__DOCUMENTS`` (see the lattice's tags rule), so the
     explode is well-defined. NULL and empty-list tag values simply contribute no rows.
+
+    When ``__DOCUMENTS`` itself had to be degraded — the last rung of :func:`_create_and_fill`,
+    which drops frontmatter columns to keep the load alive — there is no ``tags`` column to
+    explode. The view is then created empty rather than skipped, so a query naming ``__TAGS``
+    still answers instead of failing on a missing relation.
     """
     path_col = quote_ident(VIRTUAL_PATH)
     tags_col = quote_ident(_TAGS_FIELD)
+    columns = {
+        row[0]
+        for row in connection.execute(
+            f"SELECT column_name FROM duckdb_columns() WHERE table_name = '{_DOCUMENTS}'"
+        ).fetchall()
+    }
+    if _TAGS_FIELD not in columns:
+        connection.execute(
+            f"CREATE VIEW {quote_ident(_TAGS)} AS "
+            "SELECT NULL::VARCHAR AS concept_path, NULL::VARCHAR AS tag WHERE FALSE"
+        )
+        return
     connection.execute(
         f"""
         CREATE VIEW {quote_ident(_TAGS)} AS
