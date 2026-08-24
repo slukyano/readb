@@ -59,9 +59,14 @@ holds every value it has**, and JSON only when none does.
 | `DATE` + `TIMESTAMP` | `JSON` | `TIMESTAMP` |
 | the other thirteen scalar pairs | `JSON` | `VARCHAR` |
 
-A value written into a promoted `VARCHAR` column keeps its YAML rendering — `true`, `42`, `1.5`,
-`2026-01-01` — so a reader sees what the file said. Text also stays usable: `LIKE`, ordering and
-equality all work, where JSON needs extraction first.
+A value written into a promoted `VARCHAR` column is rendered **canonically from the parsed value**,
+not copied from the file: `true`/`false` for booleans, decimal for integers, the shortest
+round-tripping form for floats, ISO-8601 for dates and timestamps. For ordinary spellings that is
+what the file said; alternate YAML spellings are normalized, and the design says so rather than
+pretending otherwise — `yes` becomes `true`, `0x10` becomes `16`, `00123` becomes `83`, `1.50`
+becomes `1.5`. The original bytes are always in `__raw`.
+
+Text also stays usable: `LIKE`, ordering and equality all work, where JSON needs extraction first.
 
 ### 2. Structs unify by recursive field union
 
@@ -166,7 +171,9 @@ version (ADR 0006), so no bundle is served types from the old rule.
 - A fixture bundle carrying **all nine measured shapes** alongside healthy documents: every healthy
   document stays queryable, and every previously fatal value round trips.
 - Every scalar pair, asserted as a table: the two that keep a narrower type and the thirteen that
-  become `VARCHAR`, plus the rendering of each promoted value (`true`, not `True`).
+  become `VARCHAR`.
+- The canonical rendering of each promoted scalar, including the normalizing cases: `yes` -> `true`,
+  `0x10` -> `16`, `00123` -> `83`, `1.50` -> `1.5`, `True` -> `true`.
 - The union rule at each shape: disjoint key sets, overlapping key sets, nested mappings unified
   recursively, a mapping beside a non-mapping still meeting at `JSON`.
 - The placeholder: a column of only `{}` is `STRUCT("__DUMMY" VARCHAR)`; adding one real key removes

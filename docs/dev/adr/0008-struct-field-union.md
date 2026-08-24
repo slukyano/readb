@@ -48,8 +48,10 @@ fifteen scalar pairs, thirteen change:
 | every other scalar pair | `JSON` | `VARCHAR` |
 
 The scalar order is `NULL` < {`BOOLEAN`, `BIGINT` < `DOUBLE`, `DATE` < `TIMESTAMP`} < `VARCHAR` <
-`JSON`. A value written into a `VARCHAR` column keeps its YAML rendering — `true`, `42`, `1.5`,
-`2026-01-01` — so the text is what the file said, not a Python repr.
+`JSON`. A value promoted into a `VARCHAR` column is rendered canonically from the *parsed* value —
+`true`/`false`, decimal integers, shortest round-tripping floats, ISO-8601 dates — which matches the
+file for ordinary spellings and normalizes the alternates YAML allows (`yes` becomes `true`, `0x10`
+becomes `16`, `00123` becomes `83`). The file's own bytes remain in `__raw`.
 
 JSON remains the top of the lattice and the universal fallback, but it is now reached only when the
 values disagree *structurally* — a scalar against a mapping, a list against a mapping — where no
@@ -96,6 +98,9 @@ Three rules make the mapping case total:
   (`DOUBLE`, `VARCHAR`, `LIST<BIGINT>` folded in two orders now agree). Whether the lattice is
   associative *everywhere* is a separate claim needing its own proof or fuzzing, so the cache's
   guard stays until someone establishes it.
+- A promoted column normalizes alternate YAML spellings, so a bundle written with `yes` and `0x10`
+  reads back `true` and `16`. That is a consequence of typing the parsed value rather than the text,
+  which readb has always done; promotion just makes it visible in a column a reader will look at.
 - A pathological bundle can now produce a very wide struct — one field per distinct key across
   every document of that type. That is the same exposure the union-of-keys rule already accepts for
   table columns, and it is bounded by the same thing: what the producer actually wrote.
