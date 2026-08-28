@@ -95,8 +95,10 @@ on Sonnet with no treatment at all.
 
 # Results
 
-**732 runs on 2026-08-24** — 390 Sonnet, 312 Haiku, 30 floors. **$48.18 billed** by the committed
-price tables, which is the basis of every figure below. **One run was excluded**, a `baseline` run
+**732 runs on 2026-08-24** — 390 Sonnet, 312 Haiku, 30 floors. **$47.26 billed** by the committed
+price tables, which is the basis of every figure below; the runtime reported $48.18 for the same
+runs, a 1.9% difference from its own side-calls — the same gap v2 recorded, which is the check that
+the price table is right. **One run was excluded**, a `baseline` run
 that hit an API 529. No PATH leak, no context compaction, no permission denial, and all 701 battery
 runs produced an `ANSWER` line that parsed.
 
