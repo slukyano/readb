@@ -43,9 +43,20 @@ fifteen scalar pairs, thirteen change:
 
 | | Today | After |
 | --- | --- | --- |
-| `BIGINT` + `DOUBLE` | `DOUBLE` | `DOUBLE` — unchanged |
+| `BIGINT` + `DOUBLE` | `DOUBLE` | `DOUBLE` — unchanged, and the one deliberate exception to the rule above |
 | `DATE` + `TIMESTAMP` | `JSON` | `TIMESTAMP` — a date is midnight, the widening SQL itself performs |
 | every other scalar pair | `JSON` | `VARCHAR` |
+
+**`BIGINT` + `DOUBLE` → `DOUBLE` is not lossless, and is kept anyway.** A double cannot hold an
+integer above 2^53: a column with `9007199254740993` beside `1.5` returns `9007199254740992`. That
+contradicts the rule this ADR states, so it is recorded as an exception rather than left to be
+discovered. It is kept because it is what SQL itself does — verified against DuckDB, which resolves
+`BIGINT` with `DOUBLE` to `DOUBLE` in a `UNION`, in arithmetic, in `COALESCE` and in a list, and
+loses exactly the same precision silently; the SQL standard's numeric rule (exact + approximate →
+approximate) says the same. Making readb's most ordinary numeric shape — an integer beside a
+decimal — into text to avoid a precision loss above 2^53 would cost every numeric comparison in the
+column and surprise every user who knows SQL. Values above 2^53 remain exact in `__raw`, and an
+integer too large for `BIGINT` at all is still `VARCHAR`.
 
 The scalar order is `NULL` < {`BOOLEAN`, `BIGINT` < `DOUBLE`, `DATE` < `TIMESTAMP`} < `VARCHAR` <
 `JSON`. A value promoted into a `VARCHAR` column is rendered canonically from the *parsed* value —
@@ -89,6 +100,11 @@ Three rules make the mapping case total:
   JSON access (`flag ->> 'a'`) on such a column breaks, and struct access (`flag.a`) starts
   working. Columns whose key sets already matched are unaffected, as is every non-mapping column.
   Persistent caches are invalidated automatically, since the cache key carries the readb version.
+- **Measured blast radius: nothing observed changes.** Every real bundle to hand was loaded under
+  both lattices and its `readb schema` output compared — the three upstream OKF bundles
+  (`crypto_bitcoin`, `ga4`, `stackoverflow`) and this project's own `backlog/` and `docs/dev/`.
+  All five are byte-identical: none carries a mapping-valued column or a mixed-scalar column, so
+  none is affected. The break is real for a bundle that has one, and no such bundle is at hand.
 - Four value shapes that made an entire bundle unqueryable now load.
 - A frontmatter key that is not a string becomes a column under its stringified name. Today the
   loader skips it and the value is reachable only through `__raw` — a silent breach of the

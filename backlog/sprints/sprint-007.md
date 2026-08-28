@@ -5,10 +5,10 @@ description: Fix the frontmatter shapes that kill a whole load instead of skippi
 tags:
 - correctness
 - benchmarks
-timestamp: '2026-08-23T22:00:00Z'
+timestamp: '2026-08-24T04:00:00Z'
 branch: sprint/007
 created: '2026-08-23'
-status: Implementing
+status: Done
 tasks:
 - 041-empty-struct-crashes-the-load
 - 035-benchmark-v3-cached
@@ -44,10 +44,11 @@ the backlog; the release has no task yet and needs one when it is next proposed.
 
 ## Task checklist
 
-- [ ] 041-empty-struct-crashes-the-load — an empty mapping value, duplicate stringified struct
-      keys, an empty-string key and an out-of-range integer each kill an entire load
-- [ ] 035-benchmark-v3-cached — the full matrix re-run: five arms, two models, four corpora, the
-      26-question battery, pre-registered before the first measured run
+- [x] 041-empty-struct-crashes-the-load — the lattice is total: scalars promote to text, maps
+      unify by field union, keys normalize at the parse boundary, and a table degrades rather
+      than failing the load
+- [x] 035-benchmark-v3-cached — harness changed, pre-registration committed, matrix running:
+      Sonnet's five arms, then Haiku's four, then the floors
 
 ## Design phase
 
@@ -74,6 +75,20 @@ _(none)_
 
 ## Session log
 
+* **2026-08-24** — Sprint closed out on the branch: both tasks `Done`, v3 published, 732 runs for
+  $47.26 by the committed price tables, with one exclusion.
+* **2026-08-23** — Two independent reviews of `041` returned twelve findings: eleven fixed and
+  pinned (five made a whole bundle unqueryable, four lost values silently, one re-typed healthy
+  columns, one stored a set non-deterministically), and the twelfth — `int` + `float` meeting at
+  `DOUBLE` — kept as a deliberate carve-out after verifying DuckDB resolves and rounds the pair
+  the same way. The lattice itself was fuzzed for order dependence and found clean.
+* **2026-08-23** — v3 pre-registered and the matrix started: four corpora generated, the harness
+  smoke-tested, Sonnet's 390 runs under way against a $40 cap.
+* **2026-08-23** — `041` implemented: 264 tests pass (249 before), the nine fatal shapes load,
+  and the binding spec, README and changelog carry the revised rule. Two defects surfaced while
+  building it and were fixed before any commit: the degradation ladder mutated the type map it was
+  reading from, and it failed to isolate the column that had actually failed. The `__TAGS` defect
+  that a degraded `__DOCUMENTS` causes was found later, by review, not here.
 * **2026-08-23** — Design approved: ADR 0008 accepted, scalar promotion and parse-boundary key
   normalization decided, v3's design and budget approved.
 * **2026-08-23** — Scope approved: two tasks, branch `sprint/007`. Narrowed from a four-item

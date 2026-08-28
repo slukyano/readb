@@ -2,14 +2,14 @@
 type: Task
 title: 'Make the type lattice total: promote to the narrowest type that holds every value'
 description: An empty mapping value anywhere in a bundle makes every query against it fail with a DuckDB parser error, which breaks the permissive-load promise outright.
-status: Designed
+status: Done
 priority: high
 tags:
 - loader
 - parser
 - bug
 created: 2026-08-23
-timestamp: '2026-08-23T22:00:00Z'
+timestamp: '2026-08-24T04:00:00Z'
 ---
 
 Found by the adversarial review of `034-persistent-index-cache` in sprint-006, while fuzzing the
@@ -163,6 +163,11 @@ be broken, and it can be dropped without affecting the four rules above.
 | Columns | A frontmatter key that is not a string now becomes a column under its stringified name. Today it is silently dropped, so nothing that works loses a column — bundles gain the ones they were missing. |
 | `readb schema` | Prints `STRUCT(...)` where it printed `JSON` for those columns, plus a warning line for a degraded table. |
 | Exit codes, CLI commands, flags, Python API names, on-disk paths | Unchanged. |
+
+**How much this actually breaks, measured rather than estimated:** every real bundle available was
+loaded under both lattices and its schema compared — the three upstream OKF bundles and this
+project's own two. All five produce identical column types, because none has a mapping-valued or
+mixed-scalar column. The break matters for a bundle that has one; none was found.
 
 Caches built by an earlier readb are invalidated automatically: the cache key carries the readb
 version (ADR 0006), so no bundle is served types from the old rule.

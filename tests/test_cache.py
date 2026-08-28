@@ -202,7 +202,7 @@ def test_a_new_key_falls_back_to_a_full_rebuild(tmp_path: Path, spy: _ParseSpy) 
 
 
 def test_a_widening_type_falls_back_to_a_full_rebuild(tmp_path: Path, spy: _ParseSpy) -> None:
-    """`rank` is BIGINT until a document makes it text; JSON is the lattice's meeting point."""
+    """`rank` is BIGINT until a document makes it text, and the column follows (ADR 0008)."""
     bundle = _bundle(tmp_path)
     with readb.open(str(bundle)) as db:
         assert db.schema().tables["note"].columns["rank"] == "BIGINT"
@@ -211,7 +211,7 @@ def test_a_widening_type_falls_back_to_a_full_rebuild(tmp_path: Path, spy: _Pars
     )
     spy.reset()
     with readb.open(str(bundle)) as db:
-        assert db.schema().tables["note"].columns["rank"] == "JSON"
+        assert db.schema().tables["note"].columns["rank"] == "VARCHAR"
     assert {f"note{index}.md" for index in range(6)} <= set(spy.parsed)
 
 

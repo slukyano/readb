@@ -250,6 +250,10 @@ class Arm:
     extra_args: tuple[str, ...]
     expects_skill: bool
     uv_on_path: bool = False
+    # Whether this arm's corpus is a readb registry with a primed cache. This is the ONE way
+    # `readb-cached` differs from `readb-bare` — not a word of prompt text — so the contrast
+    # prices the cache and nothing else.
+    cached: bool = False
 
 
 # A PATH entry is built by symlinking named binaries into a directory, rather than adding
@@ -281,31 +285,24 @@ SHARED_TOOLS = ("rg", "jq", "yq", "python3", "perl", "sqlite3")
 UV_TOOLS = ("uv", "uvx")
 
 
-# --- the nudge -----------------------------------------------------------------
-# FROZEN. Written once, before the first measured run, and not edited afterwards.
+# --- the dropped nudge ---------------------------------------------------------
+# v2 ran a fifth arm carrying one frozen sentence of routing guidance. It moved readb usage
+# without moving any cost ratio, and roughly doubled failed readb calls. That result is
+# published (docs/dev/research/agent-efficiency-v2.md) and stands; re-running the arm would
+# spend a fifth of this battery re-confirming a negative. Its absence from v3 is a deviation
+# from v2's arm set and is reported as one.
 #
-# Routing guidance is a fifth ARM rather than an edit to `readb-bare`, for two reasons.
-# Folding it into the base arm would silently redefine what v1 measured, so the two
-# batteries would stop being comparable. And editing prompt text until the agent picks the
-# tool the experimenter prefers is tuning the benchmark until it flatters the tool — the
-# un-nudged arm is always run and always reported, and the nudge's worth is the contrast
-# between them, declared in advance.
-#
-# RETRACTION RULE: if this sentence changes after any measured run, every `readb-nudged`
-# record produced before the change is flagged `retracted` and re-measured. If the nudge
-# proves valuable, that is an argument for changing the shipped skill — a separate task,
-# measured separately, never a change to this experiment.
-NUDGE = (
-    "When a question is about many documents at once — counting them, filtering them, "
-    "grouping them, or relating one kind of document to another — a single `readb query` "
-    "is usually cheaper than reading or searching the files.\n\n"
-)
+# The rule it existed to enforce still governs this file: prompt text is never adjusted because
+# an agent chose the "wrong" tool. A routing hypothesis is an arm, declared in advance, or it is
+# not tested at all.
+
 
 ARMS = {
     "baseline": Arm("baseline", PREAMBLE_BASELINE, False, ISOLATION, False),
     "shell-coached": Arm("shell-coached", "", False, ISOLATION, False),
     "readb-bare": Arm("readb-bare", PREAMBLE_READB, True, ISOLATION, False),
-    "readb-nudged": Arm("readb-nudged", PREAMBLE_READB + NUDGE, True, ISOLATION, False),
+    # Identical to `readb-bare` word for word; the corpus is a registry with a primed cache.
+    "readb-cached": Arm("readb-cached", PREAMBLE_READB, True, ISOLATION, False, cached=True),
     "readb-skill": Arm(
         "readb-skill",
         PREAMBLE_BASELINE,
@@ -313,6 +310,7 @@ ARMS = {
         (*ISOLATION, "--plugin-dir", str(REPO_ROOT)),
         True,
         uv_on_path=True,
+        cached=True,
     ),
 }
 
@@ -553,6 +551,33 @@ def costs(usage: dict, prices: dict) -> dict:
     }
 
 
+def prime_cache(workdir: Path, readb_bin: Path) -> str:
+    """Make this run's corpus a readb registry and build its cache before the agent starts.
+
+    The claim under test is about repeat invocation — an agent working in a repository someone
+    already uses readb in — so the corpus arrives warm. Neither command is charged to the arm:
+    they run here, outside the runtime call whose tokens and wall clock are recorded.
+    """
+    subprocess.run([str(readb_bin), "init", "corpus"], cwd=workdir, check=True, capture_output=True)
+    subprocess.run(
+        [str(readb_bin), "query", "SELECT count(*) FROM __DOCUMENTS", "--bundle", "corpus"],
+        cwd=workdir,
+        check=True,
+        capture_output=True,
+    )
+    # An arm whose treatment silently failed to apply would produce exactly the null result E1
+    # predicts, so the treatment is verified rather than assumed. `readb cache status` reports
+    # "current" only when a cache exists and matches the bundle as it stands.
+    status = subprocess.run(
+        [str(readb_bin), "cache", "status", "--bundle", "corpus"],
+        cwd=workdir,
+        check=False,
+        capture_output=True,
+        text=True,
+    ).stdout
+    return "current" if "current" in status else f"NOT-PRIMED: {status.strip()[:120]}"
+
+
 # --- one run ------------------------------------------------------------------
 
 
@@ -564,6 +589,7 @@ def run_one(
     workdir = cfg.workroot / f"kb-{uuid.uuid4().hex[:12]}"
     workdir.mkdir(parents=True)
     shutil.copytree(corpus, workdir / "corpus")
+    cache_state = prime_cache(workdir, cfg.readb_bin) if arm.cached else "not-requested"
 
     env = {
         "HOME": os.environ["HOME"],
@@ -660,6 +686,9 @@ def run_one(
 
     record = {
         "arm": arm.name,
+        # Whether the arm's treatment actually applied. An arm whose cache silently failed to
+        # build would produce exactly the null result E1 predicts, so it is recorded, not assumed.
+        "cache_state": cache_state,
         "question": question.id,
         "shape": question.shape,
         "favours": question.favours,
@@ -1072,8 +1101,8 @@ def main() -> None:
         "corpus_generation": {k: truths[k].get("_meta") for k in truths},
         "corpus_sha256": {k: sha256_tree(v) for k, v in corpora.items()},
         "corpus_concepts": {k: sum(1 for _ in v.rglob("*.md")) - 1 for k, v in corpora.items()},
-        # Frozen before the first measured run; a change after one retracts the arm.
-        "nudge": NUDGE,
+        # v3 drops v2's routing-nudge arm; the manifest records the arm set that ran.
+        "arms_declared": sorted(ARMS),
         "strata": {q.id: q.stratum for q in questions_wanted},
         "expert_tools": {q.id: q.expert_tool for q in questions_wanted},
         # The variable that invalidated the first arm-C batch: the shipped skill's leading
@@ -1100,8 +1129,15 @@ def main() -> None:
     questions = questions_wanted
     already = done_cells(cfg.results)
 
-    # Interleave: arms round-robin inside each repeat and the question order rotates per
-    # repeat, so no arm systematically inherits a warm cache or a quiet machine.
+    # Question order rotates per repeat, so no question systematically runs on a quiet machine.
+    #
+    # Arm order does NOT rotate: every cell runs the arms in the order given, so an arm always
+    # follows the same neighbour. Cost is robust to that (v2's uncached A/A pair sits at 0.996 on
+    # Sonnet), but wall clock is not — the later arm of an adjacent pair looks ~6% faster with no
+    # treatment at all. Any wall-clock contrast between adjacent arms has to be read against that
+    # artefact, which is why the analysis prints it beside the number. Rotating arm order would
+    # remove the artefact and is the right fix for a future battery; it changes what a resumed
+    # run's recorded cells mean, so it is not a change to make mid-battery.
     plan = []
     models = cfg.models.split(",")
     for repeat in range(1, cfg.repeats + 1):

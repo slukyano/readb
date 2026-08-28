@@ -9,6 +9,7 @@ collect this directory, and the sdist does not ship it.
 from __future__ import annotations
 
 import json
+import math
 import pathlib
 import sys
 from pathlib import Path
@@ -431,17 +432,38 @@ def test_only_the_skill_arm_carries_uv():
     assert not any(a.uv_on_path for name, a in ARMS.items() if name != "readb-skill")
 
 
-def test_the_nudge_is_an_arm_and_never_an_edit_to_the_base_arm():
-    """Folding routing guidance into `readb-bare` would silently redefine what v1 measured."""
-    from run_benchmark import ARMS, NUDGE, PREAMBLE_READB
+def test_the_cache_arm_differs_from_the_bare_arm_only_in_the_corpus():
+    """`readb-cached` prices the cache, so its treatment must not be a word of prompt text."""
+    from run_benchmark import ARMS, PREAMBLE_READB
 
-    assert NUDGE not in ARMS["readb-bare"].preamble
-    assert ARMS["readb-bare"].preamble == PREAMBLE_READB
-    assert ARMS["readb-nudged"].preamble == PREAMBLE_READB + NUDGE
-    # The nudge routes; it must not answer. Naming a table or a column would leak the schema
-    # to one arm and turn the contrast into a hint.
-    for leak in ("SELECT", "FROM", "service", "task", "GROUP BY"):
-        assert leak not in NUDGE, f"the nudge names {leak!r}, which is coaching, not routing"
+    bare, cached = ARMS["readb-bare"], ARMS["readb-cached"]
+    assert bare.preamble == PREAMBLE_READB
+    assert cached.preamble == bare.preamble
+    assert (bare.readb_on_path, bare.extra_args, bare.expects_skill, bare.uv_on_path) == (
+        cached.readb_on_path,
+        cached.extra_args,
+        cached.expects_skill,
+        cached.uv_on_path,
+    )
+    assert cached.cached is True and bare.cached is False
+
+
+def test_the_dropped_nudge_arm_is_gone_entirely():
+    """v2 published the nudge as a negative; carrying a half-removed arm would confuse v3."""
+    import run_benchmark
+
+    assert "readb-nudged" not in run_benchmark.ARMS
+    assert not hasattr(run_benchmark, "NUDGE")
+
+
+def test_priming_is_not_charged_to_the_arm():
+    """The cache is built before the runtime call whose tokens and wall clock are recorded."""
+    import inspect
+
+    from run_benchmark import run_one
+
+    source = inspect.getsource(run_one)
+    assert source.index("prime_cache") < source.index("CLAUDE_BIN")
 
 
 def test_every_corpus_has_a_coached_recipe():
@@ -750,21 +772,31 @@ def test_holm_adjustment_is_monotone_and_correct():
     assert analyze.holm([0.5, 0.5, 0.5]) == pytest.approx([1.0, 1.0, 1.0])
 
 
-def test_the_three_endpoints_are_the_pre_registered_ones():
-    assert [e["id"] for e in analyze.ENDPOINTS] == ["E1", "E2", "E3"]
+def test_the_endpoints_are_v3s_pre_registered_ones():
+    """E2 is a proportion, computed apart from these two paired contrasts."""
+    assert [e["id"] for e in analyze.ENDPOINTS] == ["E1", "E3"]
+    assert analyze.SKILL_INVOCATION_V2 == (37, 78), "v2's recorded rate, the E2 comparison point"
+    e1, e3 = analyze.ENDPOINTS
+    # E1 prices the cache: the two arms differ only in whether the corpus is a primed registry.
+    assert (e1["arm"], e1["against"]) == ("readb-cached", "readb-bare")
+    assert e1["strata"] == ("backlog",)
+    # E3 is v2's E1 carried forward, against the honest competitor rather than the baseline.
+    assert (e3["arm"], e3["against"]) == ("readb-cached", "shell-coached")
+    assert e3["strata"] == ("join",)
     for endpoint in analyze.ENDPOINTS:
-        assert endpoint["against"] == "shell-coached", "the honest competitor, never the baseline"
-        assert endpoint["arm"] == "readb-bare", "never the nudged arm — that contrast is its own"
-    assert [e["measure"] for e in analyze.ENDPOINTS] == ["cost", "cost", "exact"]
-    assert analyze.ENDPOINTS[2]["model"] == "claude-haiku-4-5"
+        assert endpoint["against"] != "baseline", "never against the uncoached baseline"
+        assert endpoint["measure"] == "cost"
+        assert endpoint["model"] == "claude-sonnet-5"
 
 
 def test_an_endpoint_reports_the_ratio_and_a_p_value():
     rows = []
     for i in range(8):
-        rows.append(_rec("shell-coached", f"q{i}", 1.0))
-        rows.append(_rec("readb-bare", f"q{i}", 0.6))
-    result = analyze.run_endpoint(analyze.ENDPOINTS[0], rows, {f"q{i}": "join" for i in range(8)})
+        rows.append(_rec("readb-bare", f"q{i}", 1.0))
+        rows.append(_rec("readb-cached", f"q{i}", 0.6))
+    result = analyze.run_endpoint(
+        analyze.ENDPOINTS[0], rows, {f"q{i}": "backlog" for i in range(8)}
+    )
     assert result["questions"] == 8
     assert result["effect"] == "0.60x"
     assert result["test"]["p"] == pytest.approx(2 / 2**8)
@@ -980,3 +1012,62 @@ def test_a_name_kind_question_can_be_matched_by_a_read():
         )
         == "shell"
     )
+
+
+def test_e2_compares_a_proportion_against_v2s_recorded_rate():
+    """E2 is a rate, not a paired contrast, so it needs its own test and its own comparison."""
+    # Identical rates cannot be distinguished.
+    assert analyze.two_proportion_p(37, 78, 37, 78) == pytest.approx(1.0)
+    # A large move on a few hundred runs should be significant.
+    assert analyze.two_proportion_p(70, 78, 37, 78) < 0.001
+    # Degenerate inputs return NaN rather than dividing by zero.
+    assert math.isnan(analyze.two_proportion_p(0, 0, 37, 78))
+
+
+# --- findings from the independent review of the v3 instrument ---------------------------------
+
+
+def test_e2_uses_an_exact_test_not_a_normal_approximation():
+    """Each arm is 78 runs; the approximation is anti-conservative exactly where it matters."""
+    assert analyze.two_proportion_p(50, 78, 37, 78) == pytest.approx(0.0527, abs=0.001)
+    assert analyze.two_proportion_p(37, 78, 37, 78) == pytest.approx(1.0)
+
+
+def test_the_holm_family_is_the_three_endpoints_the_design_declares():
+    """Correcting two while declaring three publishes a p smaller than the design allows."""
+    family = analyze.holm([0.90, 0.03, 0.02])
+    assert family == pytest.approx([0.90, 0.06, 0.06], abs=1e-9)
+    pair = analyze.holm([0.03, 0.02])
+    assert pair[0] < family[1], "a family of two is more permissive — that is the defect"
+
+
+def test_the_declared_exclusion_rules_are_the_applied_ones():
+    base = {"arm": "readb-bare", "answer_parsed": True, "supported": True}
+    assert analyze.invalid({**base, "rate_limited": True})
+    assert analyze.invalid({**base, "compacted": True})
+    assert analyze.invalid({**base, "answer_parsed": False, "supported": False})
+    # A wrong answer is never excluded: it is the measurement.
+    assert analyze.invalid({**base, "exact": False}) is None
+    # A missing field is not evidence of anything.
+    assert analyze.invalid({"arm": "readb-bare"}) is None
+
+
+def test_a_cached_arm_whose_treatment_did_not_apply_is_excluded():
+    """An unapplied treatment produces exactly the null result E1 predicts."""
+    applied = {"arm": "readb-cached", "cache_state": "current"}
+    assert analyze.invalid(applied) is None
+    assert analyze.invalid({"arm": "readb-cached", "cache_state": "NOT-PRIMED: caching off"})
+
+
+def test_the_wall_clock_secondary_is_scoped_to_the_declared_stratum():
+    """Reporting it over every question and both models publishes an undeclared number."""
+    assert analyze.CACHE_SECONDARY_STRATUM == "backlog"
+
+
+def test_the_ordering_artefact_is_measured_on_the_stratum_it_discounts():
+    """Pooled over 26 questions the A/A is 0.944; on the backlog stratum it is 1.004.
+
+    Discounting a stratum-scoped effect with an artefact measured somewhere else would explain
+    away a real result — the defect an independent accuracy check of the write-up found.
+    """
+    assert pytest.approx(1.004, abs=0.001) == analyze.AA_WALL_ARTEFACT_SONNET

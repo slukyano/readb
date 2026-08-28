@@ -130,6 +130,13 @@ class Kind(StrEnum):
     STRUCT = "struct"
 
 
+# A mapping column whose values contribute no fields would render as STRUCT(), which is not valid
+# DDL. It keeps one placeholder field instead, always NULL, and loses it the moment a real key
+# appears anywhere in the column (ADR 0008).
+STRUCT_PLACEHOLDER = "__DUMMY"
+
+# The widest scalar: text holds any scalar losslessly and stays usable with LIKE and ordering,
+# where JSON needs extraction first. Reached whenever two scalars have no narrower common type.
 _SCALAR_KINDS: frozenset[Kind] = frozenset(
     {Kind.BOOLEAN, Kind.BIGINT, Kind.DOUBLE, Kind.VARCHAR, Kind.DATE, Kind.TIMESTAMP}
 )
@@ -171,6 +178,21 @@ _LEAF_DDL: dict[Kind, str] = {
 }
 
 
+_BIGINT_MIN = -(2**63)
+_BIGINT_MAX = 2**63 - 1
+
+
+def normalize_mapping(value: dict[Any, Any]) -> dict[str, Any]:
+    """Stringify a mapping's keys; when two collide, the last occurrence wins (ADR 0008).
+
+    A STRUCT field name is a string, and two distinct YAML keys can collide once stringified
+    (``{1: a, "1": b}``). JSON is no escape — ``json.dumps`` would emit the key twice — so the
+    collision is resolved here, before any type is chosen, and every path downstream sees one
+    mapping.
+    """
+    return {str(key): item for key, item in value.items()}
+
+
 def type_of_value(value: Any) -> LType:
     """Classify a single Python value (as parsed from YAML) into its narrowest LType."""
     if value is None:
@@ -178,7 +200,8 @@ def type_of_value(value: Any) -> LType:
     if isinstance(value, bool):  # bool is a subclass of int; must precede the int check
         return BOOLEAN
     if isinstance(value, int):
-        return BIGINT
+        # BIGINT is 64-bit; an integer outside it is carried as its decimal text (ADR 0008).
+        return BIGINT if _BIGINT_MIN <= value <= _BIGINT_MAX else VARCHAR
     if isinstance(value, float):
         return DOUBLE
     if isinstance(value, str):
@@ -191,8 +214,9 @@ def type_of_value(value: Any) -> LType:
     if isinstance(value, list):
         return LType(Kind.LIST, element=infer_type(value))
     if isinstance(value, dict):
+        normalized = normalize_mapping(value)
         sorted_fields = tuple(
-            sorted(((str(k), type_of_value(v)) for k, v in value.items()), key=lambda kv: kv[0])
+            sorted(((k, type_of_value(v)) for k, v in normalized.items()), key=lambda kv: kv[0])
         )
         return LType(Kind.STRUCT, fields=sorted_fields)
     return JSON
@@ -206,9 +230,15 @@ def unify(a: LType, b: LType) -> LType:
         return a
     if a == b:
         return a
-    # int mixed with float -> double.
-    if {a.kind, b.kind} <= {Kind.BIGINT, Kind.DOUBLE}:
-        return DOUBLE
+    # Two scalars meet at the narrowest type that holds both: int+float widen to double, a date
+    # is a timestamp at midnight, and everything else meets at text (ADR 0008). JSON is reached
+    # only when the values disagree *structurally*, below.
+    if a.kind in _SCALAR_KINDS and b.kind in _SCALAR_KINDS:
+        if {a.kind, b.kind} <= {Kind.BIGINT, Kind.DOUBLE}:
+            return DOUBLE
+        if {a.kind, b.kind} <= {Kind.DATE, Kind.TIMESTAMP}:
+            return TIMESTAMP
+        return VARCHAR
     # list + list -> list of unified elements.
     if a.kind is Kind.LIST and b.kind is Kind.LIST:
         return LType(Kind.LIST, element=unify(a.element or NULL, b.element or NULL))
@@ -217,16 +247,14 @@ def unify(a: LType, b: LType) -> LType:
         return LType(Kind.LIST, element=unify(a.element or NULL, b))
     if b.kind is Kind.LIST and a.kind in _SCALAR_KINDS:
         return LType(Kind.LIST, element=unify(b.element or NULL, a))
-    # struct + struct -> struct iff the key sets match exactly; otherwise JSON.
+    # struct + struct -> the union of their fields, recursively (ADR 0008). A field only one
+    # side carries is simply NULL for the documents that lack it, which is the union-of-keys
+    # rule a type's table already follows one level up.
     if a.kind is Kind.STRUCT and b.kind is Kind.STRUCT:
-        a_fields = a.fields or ()
-        b_fields = b.fields or ()
-        if tuple(n for n, _ in a_fields) == tuple(n for n, _ in b_fields):
-            merged = tuple(
-                (n, unify(ta, tb)) for (n, ta), (_, tb) in zip(a_fields, b_fields, strict=True)
-            )
-            return LType(Kind.STRUCT, fields=merged)
-        return JSON
+        merged: dict[str, LType] = dict(a.fields or ())
+        for name, field_type in b.fields or ():
+            merged[name] = unify(merged[name], field_type) if name in merged else field_type
+        return LType(Kind.STRUCT, fields=tuple(sorted(merged.items())))
     # Anything else (incompatible scalars, scalar+struct, list+struct, anything+JSON) -> JSON.
     return JSON
 
@@ -255,7 +283,10 @@ def render_ddl(t: LType) -> str:
     if t.kind is Kind.LIST:
         return render_ddl(t.element or NULL) + "[]"
     if t.kind is Kind.STRUCT:
-        inner = ", ".join(f"{quote_ident(name)} {render_ddl(ft)}" for name, ft in (t.fields or ()))
+        fields = t.fields or ()
+        if not fields:  # STRUCT() is not valid DDL; a mapping column with no keys keeps a stub
+            fields = ((STRUCT_PLACEHOLDER, VARCHAR),)
+        inner = ", ".join(f"{quote_ident(name)} {render_ddl(ft)}" for name, ft in fields)
         return f"STRUCT({inner})"
     return _LEAF_DDL[t.kind]
 
@@ -295,9 +326,13 @@ def evidence_key(value: Any) -> str:
 def coerce(value: Any, t: LType) -> Any:
     """Coerce a raw Python value to a representation DuckDB will bind for column type ``t``.
 
-    Lossless by construction: incompatible shapes were unified to JSON upstream, so this never
-    discards data. JSON columns receive a JSON *string*; LIST columns a Python ``list``; STRUCT
-    columns a Python ``dict``.
+    Values that no single type holds were unified to JSON upstream, so this discards nothing —
+    with one documented exception (ADR 0008): a column mixing integers and floats is ``DOUBLE``,
+    which rounds an integer above 2^53. SQL resolves that pair the same way and loses the same
+    precision; ``__raw`` keeps the original text either way.
+
+    JSON columns receive a JSON *string*; LIST columns a Python ``list``; STRUCT columns a
+    Python ``dict``.
     """
     if value is None:
         return None
@@ -309,21 +344,45 @@ def coerce(value: Any, t: LType) -> Any:
         items = value if isinstance(value, list) else [value]  # promote scalar -> singleton
         return [coerce(item, element) for item in items]
     if kind is Kind.STRUCT:
+        fields = t.fields or ((STRUCT_PLACEHOLDER, VARCHAR),)
         if not isinstance(value, dict):
-            return {name: None for name, _ in (t.fields or ())}
-        by_str_key = {str(k): v for k, v in value.items()}
-        return {name: coerce(by_str_key.get(name), ft) for name, ft in (t.fields or ())}
+            return {name: None for name, _ in fields}
+        by_str_key = normalize_mapping(value)
+        return {name: coerce(by_str_key.get(name), ft) for name, ft in fields}
     if kind is Kind.DOUBLE:
         try:
             return float(value)
         except (TypeError, ValueError):
             return value
-    # BOOLEAN, BIGINT, VARCHAR, DATE, TIMESTAMP, and NULL(->VARCHAR): bind as-is.
+    if kind is Kind.VARCHAR and not isinstance(value, str):
+        return canonical_text(value)
+    # BOOLEAN, BIGINT, DATE, TIMESTAMP, and NULL(->VARCHAR): bind as-is.
     return value
+
+
+def canonical_text(value: Any) -> str:
+    """Render a non-string scalar for a promoted VARCHAR column.
+
+    Canonical form of the *parsed* value, not the file's bytes: ``true``/``false``, decimal
+    integers, the shortest round-tripping float, ISO-8601 dates and timestamps. Ordinary YAML
+    spellings survive unchanged; the alternates YAML allows are normalized (``yes`` reads back
+    as ``true``, ``0x10`` as ``16``), and the original text is always in ``__raw``.
+    """
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, (datetime, date)):
+        return value.isoformat()
+    if isinstance(value, (int, float)):
+        return repr(value)
+    return json.dumps(value, default=_json_default, ensure_ascii=False)
 
 
 def _json_default(obj: Any) -> Any:
     """Fallback serializer for the JSON column: ISO-8601 for temporals, str() otherwise."""
+    if isinstance(obj, (set, frozenset)):
+        # `str(a_set)` is hash-randomized, so the same bundle stored different bytes in different
+        # processes — and a cache keyed on content would disagree with a fresh load.
+        return sorted(obj, key=canonical_text)
     if isinstance(obj, (date, datetime)):
         return obj.isoformat()
     return str(obj)

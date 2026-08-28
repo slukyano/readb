@@ -167,21 +167,34 @@ def test_type_unification(mini_db: Database) -> None:
     cols = mini_db.schema().tables["widget"].columns
     assert cols["score"] == "DOUBLE"  # int mixed with float
     assert cols["flexible"] == "BIGINT[]"  # scalar in one doc, list in another -> LIST
-    assert cols["tag"] == "JSON[]"  # "1, 2, 3" (str) vs [1,2,3] (ints) -> LIST<JSON>
-    assert cols["mix"] == "JSON"  # str vs int -> unmixable -> JSON
+    # ADR 0008: two scalars meet at the narrowest type that holds both, which for a string
+    # beside an int is text. JSON is reached only when values disagree structurally.
+    assert cols["tag"] == "VARCHAR[]"  # "1, 2, 3" (str) vs [1,2,3] (ints) -> LIST<VARCHAR>
+    assert cols["mix"] == "VARCHAR"  # str vs int -> both hold as text
     assert cols["spec"].startswith("STRUCT(")  # consistent nested map -> STRUCT
 
 
-def test_json_fallback_preserves_values(mini_db: Database) -> None:
+def test_promotion_preserves_values(mini_db: Database) -> None:
+    """A promoted column keeps every value, rendered canonically (ADR 0008)."""
+    rows = {r["__path"]: r for r in mini_db.sql("SELECT __path, mix, tag FROM widget")}
+    # `mix` holds the string and the int side by side, as text.
+    assert rows["concepts/widget_one.md"]["mix"] == "hello"
+    assert rows["concepts/widget_two.md"]["mix"] == "42"
+    # `tag` LIST<VARCHAR>: the comma-string stays whole; each int becomes its own element.
+    assert rows["concepts/widget_one.md"]["tag"] == ["1, 2, 3"]
+    assert rows["concepts/widget_two.md"]["tag"] == ["1", "2", "3"]
+
+
+def test_json_still_holds_a_structural_mismatch(tmp_path: Path) -> None:
+    """JSON remains the top of the lattice, for values no narrower type can hold together."""
     import json
 
-    rows = {r["__path"]: r for r in mini_db.sql("SELECT __path, mix, tag FROM widget")}
-    # `mix` JSON column round-trips both the string and the int losslessly.
-    assert json.loads(rows["concepts/widget_one.md"]["mix"]) == "hello"
-    assert json.loads(rows["concepts/widget_two.md"]["mix"]) == 42
-    # `tag` LIST<JSON>: the comma-string stays a string; the ints stay ints.
-    assert [json.loads(x) for x in rows["concepts/widget_one.md"]["tag"]] == ["1, 2, 3"]
-    assert [json.loads(x) for x in rows["concepts/widget_two.md"]["tag"]] == [1, 2, 3]
+    (tmp_path / "a.md").write_text("---\ntype: T\nv: {a: 1}\n---\nbody\n", encoding="utf-8")
+    (tmp_path / "b.md").write_text("---\ntype: T\nv: plain\n---\nbody\n", encoding="utf-8")
+    with readb.open(str(tmp_path), cache=False) as db:
+        assert db.schema().tables["t"].columns["v"] == "JSON"
+        values = [json.loads(r["v"]) for r in db.sql("SELECT v FROM t ORDER BY __path") if r["v"]]
+    assert values == [{"a": 1}, "plain"]
 
 
 # --- Criterion 10: a cross-type JOIN on __path returns correct rows ----------------------------

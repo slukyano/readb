@@ -2,14 +2,14 @@
 type: Task
 title: Benchmark v3 — re-measure every arm with the cache enabled
 description: Re-run the full agent-efficiency matrix once the persistent index cache ships, and use it to measure the revised skill description after the fact.
-status: Designed
+status: Done
 priority: medium
 tags:
 - research
 - benchmarks
 - skill
 created: 2026-08-22
-timestamp: '2026-08-23T22:00:00Z'
+timestamp: '2026-08-24T04:00:00Z'
 ---
 
 Planned in the sprint-006 scope session. Two things this sprint changes invalidate the v2
@@ -114,6 +114,17 @@ The rule v1 and v2 were held to holds here: **a change to a shipped surface is m
 fact, never tuned until the benchmark improves.** The skill `description` shipped in sprint-006 is
 frozen and is measured as it stands. If E2 says discovery did not move, the hypothesis behind that
 wording was wrong and the write-up says so.
+
+### Implementation notes
+
+The harness changes landed before the pre-registration was committed, and the pre-registration
+before the first measured run — the order the rule requires. `readb-cached` is asserted equal to
+`readb-bare` field by field except for the corpus state, and the priming call's position before the
+measured invocation is asserted from the source, so neither can drift into something else quietly.
+
+The analysis gained E2 as a two-proportion test against v2's recorded 37/78, and lost v2's nudge
+contrast along with the arm. Wall clock returns for the `readb-cached` vs `readb-bare` contrast
+only.
 
 ### Deliverables
 

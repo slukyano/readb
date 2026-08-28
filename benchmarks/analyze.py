@@ -51,38 +51,114 @@ BOOTSTRAP = 10_000
 ENDPOINTS = [
     {
         "id": "E1",
-        "what": "billed cost, join stratum",
-        "arm": "readb-bare",
-        "against": "shell-coached",
-        "model": "claude-sonnet-5",
-        "strata": ("join",),
-        "measure": "cost",
-        "why": "the eight questions where v1's per-question effect was largest",
-    },
-    {
-        "id": "E2",
         "what": "billed cost, backlog stratum",
-        "arm": "readb-bare",
-        "against": "shell-coached",
+        "arm": "readb-cached",
+        "against": "readb-bare",
         "model": "claude-sonnet-5",
         "strata": ("backlog",),
         "measure": "cost",
         "why": (
-            "recorded in advance: that bundle is small, so runs sit near the harness floor "
-            "and a compressed ratio is the expected honest outcome. Parity is a finding"
+            "the cache's own contrast: two arms with identical preambles, differing only in "
+            "whether the bundle is a registry with a warm cache. Parity is the predicted "
+            "outcome, recorded as such in the pre-registration"
         ),
     },
     {
         "id": "E3",
-        "what": "exactness, every question",
-        "arm": "readb-bare",
+        "what": "billed cost, join stratum",
+        "arm": "readb-cached",
         "against": "shell-coached",
-        "model": "claude-haiku-4-5",
-        "strata": None,
-        "measure": "exact",
-        "why": "the accuracy dimension has variance on a weaker model, where v1 had none",
+        "model": "claude-sonnet-5",
+        "strata": ("join",),
+        "measure": "cost",
+        "why": "readb at its best against the honest competitor, carried forward from v2's E1",
     },
 ]
+
+# E2 is a proportion rather than a paired contrast over questions, so it is computed by
+# `skill_discovery()` rather than `run_endpoint()` — but it is a member of the same declared
+# family of three, and its p is Holm-corrected with E1's and E3's. Correcting a family of two
+# while declaring three publishes a p that is smaller than the design allows.
+SKILL_INVOCATION_V2 = (37, 78)
+
+# The stratum the pre-registration scopes the wall-clock secondary to (E1's).
+CACHE_SECONDARY_STRATUM = "backlog"
+
+# Measured from v2's records, where `readb-bare` and `readb-nudged` were both uncached and adjacent
+# in every cell, so their wall ratio is an A/A: whatever it shows is an artefact of running second.
+# It must be read on the SAME question set as the effect it is used to discount — pooled over all 26
+# questions it is 0.944, but on the backlog stratum, which is where the cache contrast is reported,
+# it is 1.004. Using the pooled figure against a stratum-scoped effect discounts a real effect with
+# an artefact measured somewhere else.
+AA_WALL_ARTEFACT_SONNET = 1.004  # backlog stratum, matching CACHE_SECONDARY_STRATUM
+
+
+def two_proportion_p(hits_a: int, n_a: int, hits_b: int, n_b: int) -> float:
+    """Two-sided p for two independent proportions — Fisher's exact test.
+
+    Each arm here is 78 runs, not the hundreds a normal approximation wants, and at that size the
+    approximation is anti-conservative exactly where it matters: 50/78 against 37/78 is p = 0.036
+    by the normal approximation and 0.053 exactly. Publishing the first would call a result
+    significant that is not.
+    """
+    if not n_a or not n_b:
+        return float("nan")
+    table = [[hits_a, n_a - hits_a], [hits_b, n_b - hits_b]]
+    return _fisher_exact_two_sided(table)
+
+
+def _fisher_exact_two_sided(table: list[list[int]]) -> float:
+    """Sum the hypergeometric probabilities no larger than the observed one."""
+    (a, b), (c, d) = table
+    row1, row2 = a + b, c + d
+    col1, total = a + c, a + b + c + d
+    if total == 0:
+        return float("nan")
+
+    def probability(x: int) -> float:
+        return math.exp(
+            math.lgamma(row1 + 1)
+            + math.lgamma(row2 + 1)
+            + math.lgamma(col1 + 1)
+            + math.lgamma(total - col1 + 1)
+            - math.lgamma(total + 1)
+            - math.lgamma(x + 1)
+            - math.lgamma(row1 - x + 1)
+            - math.lgamma(col1 - x + 1)
+            - math.lgamma(total - col1 - row1 + x + 1)
+        )
+
+    observed = probability(a)
+    low, high = max(0, col1 - row2), min(col1, row1)
+    return min(
+        1.0, sum(p for x in range(low, high + 1) if (p := probability(x)) <= observed * 1.0000001)
+    )
+
+
+def skill_discovery(clean: list[dict]) -> dict | None:
+    """E2: how often the skill arm actually invoked the skill, against v2's recorded rate.
+
+    Pinned to Sonnet, as every other endpoint is: v2's 37/78 is a Sonnet-only figure, and
+    pooling a second model in on this side alone would compare different things.
+    """
+    rows = [
+        r
+        for r in clean
+        if r["arm"] == "readb-skill" and (r.get("model") or "") == "claude-sonnet-5"
+    ]
+    if not rows:
+        return None
+    fired = sum(1 for r in rows if r.get("skill_readb_used"))
+    was, was_of = SKILL_INVOCATION_V2
+    return {
+        "n": len(rows),
+        "fired": fired,
+        "rate": fired / len(rows),
+        "never_readb": sum(1 for r in rows if not r.get("readb_used")),
+        "was": was,
+        "was_of": was_of,
+        "p": two_proportion_p(fired, len(rows), was, was_of),
+    }
 
 
 def load(path: Path) -> list[dict]:
@@ -94,15 +170,36 @@ def faulted(rec: dict) -> bool:
 
 
 def invalid(rec: dict) -> str | None:
-    """Runs whose numbers must not be used, and why."""
+    """Runs whose numbers must not be used, and why — v3's declared rules, in order.
+
+    A wrong answer is never excluded; it is the measurement. Each rule below is one the
+    pre-registration names, and each is applied here rather than merely recorded, which is the
+    defect an independent review of this file found: the published "N excluded" sentence has to
+    describe the rules that actually ran.
+    """
     if rec.get("retracted"):
         return rec["retracted"]
     if faulted(rec):
         return rec.get("harness_error") or f"api error {rec.get('api_error_status')}"
+    if rec.get("rate_limited"):
+        return "the runtime was rate-limited mid-run"
     if rec.get("leak_baseline_readb"):
         return "readb leaked into the baseline arm"
     if rec.get("permission_denials"):
         return "permission denied mid-run"
+    if rec.get("compacted"):
+        return "context compaction fired, so the run is not comparable"
+    if (
+        "answer_parsed" in rec
+        and "supported" in rec
+        and not rec["answer_parsed"]
+        and not rec["supported"]
+    ):
+        # Both fields must be present to conclude anything: a record that simply does not carry
+        # them is not evidence that the question went unattempted.
+        return "no ANSWER line and no tool call: the question was never attempted"
+    if rec.get("arm", "").endswith("cached") and rec.get("cache_state", "current") != "current":
+        return f"the cache treatment did not apply ({rec.get('cache_state')})"
     return None
 
 
@@ -330,7 +427,7 @@ def main() -> None:
     expert_of = {r["question"]: r.get("expert_tool", "?") for r in records}
     strata = sorted({strata_of[q] for q in questions})
 
-    print("# Benchmark results — v2\n")
+    print("# Benchmark results — v3\n")
     print(f"{len(records)} runs recorded, {len(dropped)} excluded as invalid, {len(clean)} used.")
     print(f"Models: {', '.join(models)}. Arms: {', '.join(arms)}. Questions: {len(questions)}.\n")
 
@@ -338,8 +435,13 @@ def main() -> None:
     if not args.skip_endpoints and not args.sweep_only:
         print("## Pre-registered endpoints\n")
         results = [run_endpoint(e, clean, strata_of) for e in ENDPOINTS]
+        # E2 is computed differently — a proportion, not a paired contrast — but it belongs to
+        # the same declared family of three, so its p enters the Holm correction with the others.
+        e2 = skill_discovery(clean)
         raw = [r["test"]["p"] if r["test"] else 1.0 for r in results]
-        adjusted = holm(raw)
+        raw_family = [*raw, e2["p"] if e2 and not math.isnan(e2["p"]) else 1.0]
+        adjusted_family = holm(raw_family)
+        adjusted, e2_holm = adjusted_family[:-1], adjusted_family[-1]
         print("| id | contrast | model | questions | effect | p | Holm p | test |")
         print("|" + "---|" * 8)
         for result, p_adj in zip(results, adjusted, strict=True):
@@ -353,8 +455,22 @@ def main() -> None:
                 f"| {result['effect']} {result['ci']} | {raw_p} | {holm_p} | {method} |"
             )
         print()
+        if e2:
+            print(
+                f"| E2 | skill invocation rate, `readb-skill` vs v2's {e2['was']}/{e2['was_of']} "
+                f"| sonnet-5 | {e2['n']} runs | {e2['fired']}/{e2['n']} = {e2['rate']:.0%} "
+                f"| {e2['p']:.4f} | {e2_holm:.4f} | Fisher exact |"
+            )
+        print()
         for result in results:
             print(f"- **{result['id']}** — {result['why']}.")
+        if e2:
+            print(
+                "- **E2** — whether the description rewritten in sprint-006 is found more often "
+                "than the one v2 measured. Read with the confounds in the write-up: v3's skill "
+                "arm also runs against a primed cache, the skill's body changed, and the runtime "
+                "moved between batteries."
+            )
         print()
 
     by_arm_model = defaultdict(list)
@@ -453,42 +569,56 @@ def main() -> None:
                 + f"| {sum(r.get('failed_readb_calls') or 0 for r in rows)} |"
             )
 
-        # --- the nudge contrast -----------------------------------------------
-        if {(model, "readb-bare"), (model, "readb-nudged")} <= set(by_arm_model):
-            print("\n### The nudge — `readb-nudged` against `readb-bare`\n")
-            bare = by_arm_model[(model, "readb-bare")]
-            nudged = by_arm_model[(model, "readb-nudged")]
-            bare_med = question_medians(rows_for_model, "readb-bare", model, "cost_billed_usd")
-            nudged_med = question_medians(rows_for_model, "readb-nudged", model, "cost_billed_usd")
-            shared = sorted(set(bare_med) & set(nudged_med))
-            ratios = [nudged_med[q] / bare_med[q] for q in shared if bare_med[q]]
-            test = wilcoxon([math.log(r) for r in ratios if r > 0])
-            print("| measure | readb-bare | readb-nudged |")
-            print("|---|---|---|")
-            for label, fn in (
-                ("exact", lambda rows: f"{sum(1 for r in rows if r['correct']) / len(rows):.0%}"),
-                (
-                    "tool match",
-                    lambda rows: f"{sum(1 for r in rows if r.get('tool_match')) / len(rows):.0%}",
-                ),
-                (
-                    "readb reached for",
-                    lambda rows: (
-                        f"{sum(1 for r in rows if r.get('tool_choice') == 'readb') / len(rows):.0%}"
-                    ),
-                ),
-                (
-                    "billed cost (median)",
-                    lambda rows: fmt(med([r["cost_billed_usd"] for r in rows]), 4),
-                ),
-                ("turns (median)", lambda rows: fmt(med([r["num_turns"] for r in rows]), 1)),
-            ):
-                print(f"| {label} | {fn(bare)} | {fn(nudged)} |")
-            print(
-                f"\nPaired cost ratio, nudged/bare: **{med(ratios):.2f}x** over {len(ratios)} "
-                f"questions"
-                + (f", p = {test['p']:.4f} ({test['method']})." if test else ", too few pairs.")
-            )
+        print()
+
+    # --- the cache contrast ---------------------------------------------------
+    # Scoped exactly as the pre-registration declares: E1's stratum, E1's model. Reporting it
+    # over every question and both models — which an earlier draft of this file did — publishes
+    # a number the design never claimed.
+    cache_model = "claude-sonnet-5"
+    if {(cache_model, "readb-bare"), (cache_model, "readb-cached")} <= set(by_arm_model):
+        here = [
+            r
+            for r in clean
+            if (r.get("model") or "?") == cache_model
+            and strata_of.get(r["question"]) == CACHE_SECONDARY_STRATUM
+        ]
+        bare_cost = question_medians(here, "readb-bare", cache_model, "cost_billed_usd")
+        cached_cost = question_medians(here, "readb-cached", cache_model, "cost_billed_usd")
+        bare_wall = question_medians(here, "readb-bare", cache_model, "wall_s")
+        cached_wall = question_medians(here, "readb-cached", cache_model, "wall_s")
+        cost_ratios = [
+            cached_cost[q] / bare_cost[q]
+            for q in sorted(set(bare_cost) & set(cached_cost))
+            if bare_cost[q]
+        ]
+        wall_ratios = [
+            cached_wall[q] / bare_wall[q]
+            for q in sorted(set(bare_wall) & set(cached_wall))
+            if bare_wall[q]
+        ]
+        print("\n### The cache — `readb-cached` against `readb-bare`\n")
+        print(
+            f"{cache_model.replace('claude-', '')}, {CACHE_SECONDARY_STRATUM} stratum. Identical "
+            "preambles; the corpus is a registry with a primed cache.\n"
+        )
+        print("| measure | ratio, cached/bare | questions |")
+        print("| --- | --- | --- |")
+        if cost_ratios:
+            print(f"| billed cost | {med(cost_ratios):.2f}x | {len(cost_ratios)} |")
+        if wall_ratios:
+            wall = f"{med(wall_ratios):.2f}x"
+            print(f"| wall clock (declared secondary) | {wall} | {len(wall_ratios)} |")
+        print(
+            "\n**Read the wall-clock figure with two cautions.** Arms run in a fixed order within "
+            "every cell, so `readb-cached` always runs immediately after `readb-bare`; v2's "
+            "uncached `readb-bare`/`readb-nudged` pair, adjacent in the same way, gives an A/A "
+            f"ratio of {AA_WALL_ARTEFACT_SONNET:.3f} on this stratum — no ordering effect here, "
+            "though it is 0.944 pooled over all 26 questions, so the artefact is real elsewhere "
+            "and the comparison has to be stratum-matched. And this is eight questions with no "
+            "test and no interval: a direction, not a measurement. The cache's speed is "
+            "established by `measure_cache.py`, not by this contrast."
+        )
         print()
 
     # --- hazard diagnostics ---------------------------------------------------
@@ -671,6 +801,27 @@ def main() -> None:
                     f"{f'{med(ratios):.2f}x' if ratios else '—'} | "
                     f"{f'{med(per_turn):.2f}x' if per_turn else '—'} |"
                 )
+
+    # --- E2: did the revised skill description move discovery? ----------------
+    skill_rows = [r for r in clean if r["arm"] == "readb-skill"]
+    if skill_rows:
+        fired = sum(1 for r in skill_rows if r.get("skill_readb_used"))
+        never = sum(1 for r in skill_rows if not r.get("readb_used"))
+        was_fired, was_of = SKILL_INVOCATION_V2
+        p_value = two_proportion_p(fired, len(skill_rows), was_fired, was_of)
+        print("\n## E2 — skill discovery, against v2's recorded rate\n")
+        print("| battery | skill loaded | rate | readb never invoked |")
+        print("| --- | --- | --- | --- |")
+        print(f"| v2 (old description) | {was_fired} / {was_of} | {was_fired / was_of:.0%} | 41 |")
+        print(
+            f"| v3 (revised description) | {fired} / {len(skill_rows)} | "
+            f"{fired / len(skill_rows):.0%} | {never} |"
+        )
+        print(f"\nTwo-proportion test against v2: p = {p_value:.4f}.")
+        print(
+            "\nThe description was frozen before this run and is not edited after it. A rate "
+            "that did not move is the result, not a prompt to try different wording."
+        )
 
     print("\n## Integrity\n")
     print(
