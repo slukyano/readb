@@ -76,7 +76,7 @@ _(none)_
 ## Session log
 
 * **2026-08-24** — Sprint closed out on the branch: both tasks `Done`, v3 published, 732 runs for
-  $48.18 with one exclusion.
+  $47.26 by the committed price tables, with one exclusion.
 * **2026-08-23** — Two independent reviews of `041` returned twelve findings: eleven fixed and
   pinned (five made a whole bundle unqueryable, four lost values silently, one re-typed healthy
   columns, one stored a set non-deterministically), and the twelfth — `int` + `float` meeting at
