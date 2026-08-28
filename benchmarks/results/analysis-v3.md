@@ -108,7 +108,7 @@ sonnet-5, backlog stratum. Identical preambles; the corpus is a registry with a 
 | billed cost | 1.00x | 8 |
 | wall clock (declared secondary) | 0.89x | 8 |
 
-**The wall-clock figure cannot be read as the cache's effect.** Arms run in a fixed order within every cell, and `readb-cached` always runs immediately after `readb-bare`. v2's `readb-bare` vs `readb-nudged` pair — both uncached, adjacent in the same way — shows a median wall ratio of 0.94 favouring the later arm on Sonnet with no treatment present at all. Any wall-clock effect smaller than that is indistinguishable from running second. The cache's speed is established by direct measurement of readb itself, reported in the write-up, not by this contrast.
+**Read the wall-clock figure with two cautions.** Arms run in a fixed order within every cell, so `readb-cached` always runs immediately after `readb-bare`; v2's uncached `readb-bare`/`readb-nudged` pair, adjacent in the same way, gives an A/A ratio of 1.004 on this stratum — no ordering effect here, though it is 0.944 pooled over all 26 questions, so the artefact is real elsewhere and the comparison has to be stratum-matched. And this is eight questions with no test and no interval: a direction, not a measurement. The cache's speed is established by `measure_cache.py`, not by this contrast.
 
 ## The malformed-file hazard
 

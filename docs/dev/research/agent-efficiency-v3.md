@@ -13,7 +13,7 @@ Produced by the backlog task `035-benchmark-v3-cached` (sprint-007), and the dir
 [v2](agent-efficiency-v2.md). Everything below was fixed before the first measured run and is
 recorded in [the pre-registration](agent-efficiency-v3-preregistration.md).
 
-**The numbers describe two models, one agent runtime, four synthetic corpora and one battery, at
+**The numbers describe two models, one agent runtime, three synthetic corpora and one battery, at
 three repeats per cell.** Nothing here supports a claim beyond that.
 
 # Why there is a v3
@@ -28,8 +28,10 @@ describe a load path that no longer exists:
 
 # Method
 
-Corpora, battery and strata are v2's — four corpora (`ops` 600 concepts messy, `ops-malformed` 612,
-`ops-tidy` 600 as the sweep control, `backlog` 192) and the same 26 questions across five strata —
+Corpora, battery and strata are v2's. Three corpora carry the battery — `ops` (600 concepts, messy;
+405 runs), `backlog` (192; 216 runs) and `ops-malformed` (612; 81 runs). A fourth, `ops-tidy`, was
+generated as v2's messiness-sweep control and **no v3 run used it**: v3 ran no sweep and the same 26
+questions across five strata —
 so the two batteries stay comparable on those axes. What differs is listed in full below, including
 the differences that were not intended as treatments, because E2 compares a rate across batteries
 and every uncontrolled difference is a rival explanation for a move in it.
@@ -51,9 +53,9 @@ the corpus is copied and before the agent starts, and is **not charged** to the 
 asserts that ordering from the source.
 
 That is deliberate about what is being measured. The claim under test is repeat invocation — an
-agent working in a repository someone already uses readb in. The cold path was measured directly
-while building the cache and is reported from those measurements rather than re-derived from agent
-runs.
+agent working in a repository someone already uses readb in. The cold path — where a load also
+*writes* a cache, and so costs more than an uncached load — is
+measured directly in `measure_cache.py` rather than re-derived from agent runs.
 
 ## One arm dropped
 
@@ -88,6 +90,15 @@ Two intended changes, and four that came along with them:
 | The skill's *body* changed in sprint-006: a `__hash` row and a paragraph about `readb init` | **no** | **E2** |
 | The agent runtime moved between batteries | **no** | everything, weakly |
 | Arms run in a fixed order, so `readb-cached` always follows `readb-bare` | pre-existing | the wall-clock secondary |
+
+And one difference **inside** v3, which matters as much: the harness was changed between the two
+models' blocks. Per-run verification that the cache treatment had actually applied was added at
+04:47 UTC; the Sonnet block ran 03:28–05:10 and the Haiku block 05:10–07:03, so **`cache_state` is
+recorded on all 312 Haiku runs and on none of the 390 Sonnet ones**. All three endpoints are
+Sonnet-only, so for them the treatment is unverified — the cached corpora were confirmed to build a
+cache before the run and after it, but no per-run evidence exists. Changing an instrument
+mid-battery
+is a mistake; recording it is the minimum the mistake requires.
 
 The last one is why the wall-clock secondary cannot be read as the cache's effect: v2's uncached
 `readb-bare`/`readb-nudged` pair, adjacent in exactly the same way, shows the later arm ~6% faster
@@ -139,11 +150,13 @@ Medians throughout; the distributions are long-tailed.
 
 **2. Against an uncoached agent, structure still wins — by the same margin it did in v2.** Paired by
 question against `baseline`: on Sonnet `readb-cached` is 0.68x [0.55–0.90] and `shell-coached`
-0.67x [0.60–0.79]; on Haiku 0.69x [0.53–0.83] and 0.71x [0.50–0.84]. Accuracy rises 11 points on
-Sonnet and 15 on Haiku. This replicates v2 on a battery whose readb arms now run different code.
+0.67x [0.60–0.79]; on Haiku 0.69x [0.53–0.83] and 0.71x [0.50–0.84]. Accuracy rises **10.4 points
+on Sonnet and 15.4 on Haiku** for `readb-cached` (98.7% against 88.3%, and 92.3% against 76.9%);
+`shell-coached` gains 7.9 and 15.4. This replicates v2 on a battery whose readb arms now run
+different code.
 
-**3. readb still does not beat a competently coached shell.** E3 is 1.04x. Two batteries have now
-asked that question and neither answers yes.
+**3. readb still does not beat a competently coached shell.** E3 is 1.04x. Three batteries have now
+asked that question and none answers yes.
 
 **4. This benchmark cannot resolve the cache's wall-clock effect.** The measured contrast is 0.89x
 on E1's stratum — but arms run in a fixed order and `readb-cached` always runs immediately after
@@ -153,14 +166,26 @@ is explained by running second, and the design cannot separate the halves.
 
 What the cache is actually worth was measured directly on the same corpora, without an agent:
 
-| corpus | files | `--no-cache` | cache hit | saved per invocation |
-| --- | --- | --- | --- | --- |
-| `backlog` | 193 | 0.528 s | 0.119 s | **0.410 s** |
-| `ops` | 601 | 0.842 s | 0.118 s | **0.724 s** |
+Three states are timed, because they answer three questions — `benchmarks/measure_cache.py`, whose
+output is committed as `benchmarks/results/cache-timing-v3.json`:
 
-An agent made a mean of 2.88 readb invocations per backlog run, so the cache's ceiling is
-2.88 x 0.41 s = **1.18 s of a 9.98 s run, about 12%** — real, and smaller than the noise this
-instrument can see. A wall-clock claim for the cache should cite the table above, not this battery.
+| corpus | files | cold (builds a cache) | `--no-cache` | warm | saved vs `--no-cache` |
+| --- | --- | --- | --- | --- | --- |
+| `backlog` | 193 | 0.415 s | 0.333 s | 0.105 s | **0.228 s** |
+| `ops` | 601 | 0.895 s | 0.741 s | 0.099 s | **0.641 s** |
+
+A cold run *builds* the cache and so costs more than an uncached one, not less; that is the price a
+bundle nobody has queried before pays, once.
+
+An agent made a mean of 2.88 readb invocations per backlog run, so the cache's ceiling there is
+2.88 x 0.228 s = **0.66 s of a 9.98 s run, about 7%**. The observed contrast is 11%, which is the
+same direction and the same order but larger than the ceiling — on eight questions, with no test and
+no interval. The honest reading is that the cache saves real wall-clock time, of a size this battery
+was not built to measure. A wall-clock claim should cite the table above, not the contrast.
+
+These timings vary with machine load: a first draft of this document published a different pair,
+measured while the battery itself was running, and they did not reproduce. The script is committed
+so the figures have a record that can be re-run.
 
 **5. Skill discovery moved, and the move is not significant.** 44 of 78 runs invoked the skill
 against v2's 37 of 78 (56% against 47%, Fisher p = 0.34), and readb went unused in 34 runs against
@@ -173,12 +198,13 @@ in sprint-006, and the agent runtime moved. E2 is reported as declared and read 
 # What this supports, and what it does not
 
 **Supported.** On these corpora and this battery, at two models: an agent given readb answers for
-**0.68x the money on Sonnet and 0.69x on Haiku** against an uncoached agent, with 11 to 15 points
-more accuracy. The cache changes an agent's cost by nothing measurable.
+**0.68x the money on Sonnet and 0.69x on Haiku** against an uncoached agent, with 10.4 and 15.4
+points more accuracy. The cache changes an agent's cost by nothing measurable.
 
-**Not supported.** That the cache makes an agent faster in any way this experiment can see. Its
-per-invocation saving is real and directly measured; its effect on a run is inside the ordering
-artefact.
+**Observed, not supported.** That the cache makes an agent's run faster. The contrast reads 0.89x
+on eight questions with no ordering artefact on that stratum, and the direct measurement gives a
+7% ceiling — the same direction, no test behind it. It was never a pre-registered endpoint and is
+not claimed as a result.
 
 **Not supported.** That readb beats a competently coached shell pipeline. Third battery, same
 answer.
@@ -205,5 +231,9 @@ way, the test does not resolve it, and three uncontrolled differences sit betwee
 3. **E2 compares across batteries** with three uncontrolled differences, listed above.
 4. Synthetic corpora, one agent runtime, one machine, three repeats. Nothing here generalizes past
    that.
-5. The cache was primed before every cached run and verified per run; a bundle nobody has queried
-   before pays the cold path, which this battery does not measure.
+5. **Per-run verification of the cache treatment covers Haiku only** — the check was added between
+   the two blocks (above). The Sonnet endpoint runs rest on the treatment having been applied, which
+   was confirmed for the corpora but not per run.
+6. A bundle nobody has queried before pays the cold path, which costs *more* than an uncached load
+   because it also writes the cache. This battery primes every cached run, so it does not measure
+   that path; `measure_cache.py` does.

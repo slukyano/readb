@@ -1062,4 +1062,12 @@ def test_a_cached_arm_whose_treatment_did_not_apply_is_excluded():
 def test_the_wall_clock_secondary_is_scoped_to_the_declared_stratum():
     """Reporting it over every question and both models publishes an undeclared number."""
     assert analyze.CACHE_SECONDARY_STRATUM == "backlog"
-    assert 0.9 < analyze.AA_WALL_ARTEFACT_SONNET < 1.0, "the A/A ordering bias, from v2's records"
+
+
+def test_the_ordering_artefact_is_measured_on_the_stratum_it_discounts():
+    """Pooled over 26 questions the A/A is 0.944; on the backlog stratum it is 1.004.
+
+    Discounting a stratum-scoped effect with an artefact measured somewhere else would explain
+    away a real result — the defect an independent accuracy check of the write-up found.
+    """
+    assert pytest.approx(1.004, abs=0.001) == analyze.AA_WALL_ARTEFACT_SONNET

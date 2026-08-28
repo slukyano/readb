@@ -86,8 +86,9 @@ _(none)_
   smoke-tested, Sonnet's 390 runs under way against a $40 cap.
 * **2026-08-23** — `041` implemented: 264 tests pass (249 before), the nine fatal shapes load,
   and the binding spec, README and changelog carry the revised rule. Two defects surfaced while
-  building it: the degradation ladder mutated the type map it was reading from, and degrading
-  `__DOCUMENTS` left `__TAGS` with no column to explode.
+  building it and were fixed before any commit: the degradation ladder mutated the type map it was
+  reading from, and it failed to isolate the column that had actually failed. The `__TAGS` defect
+  that a degraded `__DOCUMENTS` causes was found later, by review, not here.
 * **2026-08-23** — Design approved: ADR 0008 accepted, scalar promotion and parse-boundary key
   normalization decided, v3's design and budget approved.
 * **2026-08-23** — Scope approved: two tasks, branch `sprint/007`. Narrowed from a four-item

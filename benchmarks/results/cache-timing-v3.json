@@ -1,0 +1,18 @@
+[
+  {
+    "corpus": "backlog",
+    "files": 193,
+    "cold_s": 0.4155,
+    "no_cache_s": 0.3334,
+    "warm_s": 0.1054,
+    "saved_vs_no_cache_s": 0.228
+  },
+  {
+    "corpus": "ops",
+    "files": 601,
+    "cold_s": 0.8946,
+    "no_cache_s": 0.7406,
+    "warm_s": 0.0992,
+    "saved_vs_no_cache_s": 0.6414
+  }
+]

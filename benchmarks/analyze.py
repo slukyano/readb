@@ -84,10 +84,13 @@ SKILL_INVOCATION_V2 = (37, 78)
 # The stratum the pre-registration scopes the wall-clock secondary to (E1's).
 CACHE_SECONDARY_STRATUM = "backlog"
 
-# Measured from v2's records, where `readb-bare` and `readb-nudged` were both uncached and
-# adjacent in every cell: the later-running arm looks this much faster with no treatment at all.
-# Any wall-clock effect smaller than this is an ordering artefact, not a finding.
-AA_WALL_ARTEFACT_SONNET = 0.944  # v2: the skill arm loaded the skill on 37 of 78 runs
+# Measured from v2's records, where `readb-bare` and `readb-nudged` were both uncached and adjacent
+# in every cell, so their wall ratio is an A/A: whatever it shows is an artefact of running second.
+# It must be read on the SAME question set as the effect it is used to discount — pooled over all 26
+# questions it is 0.944, but on the backlog stratum, which is where the cache contrast is reported,
+# it is 1.004. Using the pooled figure against a stratum-scoped effect discounts a real effect with
+# an artefact measured somewhere else.
+AA_WALL_ARTEFACT_SONNET = 1.004  # backlog stratum, matching CACHE_SECONDARY_STRATUM
 
 
 def two_proportion_p(hits_a: int, n_a: int, hits_b: int, n_b: int) -> float:
@@ -607,14 +610,14 @@ def main() -> None:
             wall = f"{med(wall_ratios):.2f}x"
             print(f"| wall clock (declared secondary) | {wall} | {len(wall_ratios)} |")
         print(
-            f"\n**The wall-clock figure cannot be read as the cache's effect.** Arms run in a "
-            f"fixed order within every cell, and `readb-cached` always runs immediately after "
-            f"`readb-bare`. v2's `readb-bare` vs `readb-nudged` pair — both uncached, adjacent in "
-            f"the same way — shows a median wall ratio of {AA_WALL_ARTEFACT_SONNET:.2f} favouring "
-            "the later arm on Sonnet with no treatment present at all. Any wall-clock effect "
-            "smaller than that is indistinguishable from running second. The cache's speed is "
-            "established by direct measurement of readb itself, reported in the write-up, not by "
-            "this contrast."
+            "\n**Read the wall-clock figure with two cautions.** Arms run in a fixed order within "
+            "every cell, so `readb-cached` always runs immediately after `readb-bare`; v2's "
+            "uncached `readb-bare`/`readb-nudged` pair, adjacent in the same way, gives an A/A "
+            f"ratio of {AA_WALL_ARTEFACT_SONNET:.3f} on this stratum — no ordering effect here, "
+            "though it is 0.944 pooled over all 26 questions, so the artefact is real elsewhere "
+            "and the comparison has to be stratum-matched. And this is eight questions with no "
+            "test and no interval: a direction, not a measurement. The cache's speed is "
+            "established by `measure_cache.py`, not by this contrast."
         )
         print()
 
