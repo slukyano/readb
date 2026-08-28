@@ -2,14 +2,14 @@
 type: Task
 title: Benchmark v3 — re-measure every arm with the cache enabled
 description: Re-run the full agent-efficiency matrix once the persistent index cache ships, and use it to measure the revised skill description after the fact.
-status: Designed
+status: Done
 priority: medium
 tags:
 - research
 - benchmarks
 - skill
 created: 2026-08-22
-timestamp: '2026-08-23T22:00:00Z'
+timestamp: '2026-08-24T04:00:00Z'
 ---
 
 Planned in the sprint-006 scope session. Two things this sprint changes invalidate the v2

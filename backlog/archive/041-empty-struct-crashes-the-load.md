@@ -2,14 +2,14 @@
 type: Task
 title: 'Make the type lattice total: promote to the narrowest type that holds every value'
 description: An empty mapping value anywhere in a bundle makes every query against it fail with a DuckDB parser error, which breaks the permissive-load promise outright.
-status: Designed
+status: Done
 priority: high
 tags:
 - loader
 - parser
 - bug
 created: 2026-08-23
-timestamp: '2026-08-23T22:00:00Z'
+timestamp: '2026-08-24T04:00:00Z'
 ---
 
 Found by the adversarial review of `034-persistent-index-cache` in sprint-006, while fuzzing the

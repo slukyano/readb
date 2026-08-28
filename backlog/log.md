@@ -1,5 +1,19 @@
 # Task Bundle Log
 
+## 2026-08-24
+* **Sprint 007 closed**: [the total lattice](archive/041-empty-struct-crashes-the-load.md) and
+  [benchmark v3](archive/035-benchmark-v3-cached.md) `Designed -> Done`; sprint
+  `Implementing -> Done`. The lattice now takes the narrowest type holding every value —
+  [ADR 0008](../docs/dev/adr/0008-struct-field-union.md) — so mappings unify by field union,
+  mixed scalars meet at text, and nine frontmatter shapes that made a whole bundle unqueryable
+  now skip one document instead. Three independent reviews returned nineteen findings across the
+  two tasks; eighteen were fixed, and the nineteenth (`int` + `float` rounding above 2^53) was
+  kept after verifying SQL does the same. v3 measured 732 runs for $48.18 and returned three null
+  endpoints: the cache costs an agent nothing, readb still ties a coached shell, and the skill's
+  discovery rate moved 47% -> 56% without resolving. The cache's real saving — 0.41 s per
+  invocation at 193 files — is below what the benchmark can see, and is published from direct
+  measurement instead.
+
 ## 2026-08-23
 * **Sprint 007 opened**: [the permissive-load defect](tasks/041-empty-struct-crashes-the-load.md)
   and [benchmark v3](tasks/035-benchmark-v3-cached.md) on branch `sprint/007` (`Designing`). The
